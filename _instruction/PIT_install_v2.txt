@@ -1,0 +1,85 @@
+Windows installation test
+=========================
+
+1) Open "Anaconda Prompt" (try as normal user first, but potentially this has 
+to be opened as Admin)
+
+2) In order not to mess up your dependencies (*), create a virtual 
+environment with python version 3.7.5
+```
+$ conda create --name testenv python==3.7.5
+[some output]
+$ conda activate testenv
+(testenv) $
+```
+
+3) Inside your virtual environment, run the following command to download and 
+install ds-arpes-pkugin with all its dependencies. This means that arpys 
+and data_slicer will also be installed:
+```
+(testenv) $ pip install ds-arpes-plugin
+```
+This will create a lot of console output. If everything succeeded, you should 
+see something like `Successfully installed ds-arpes-plugin` towards the end.
+
+If this fails, it would be nice if you could check if `pip install 
+data_slicer` and `s` work.
+
+4) If we got this far, that's already amazing! :) To top it off, we could 
+test the installation. First, we open PIT:
+```
+(testenv) $ python -m data_slicer.pit
+```
+This should bring up a window with some example data and an ipython console 
+in the bottom right.
+Then we want to check if we can load plugins. In PIT's ipython console, type:
+```
+arpes = mw.load_plugin('ds_arpes_plugin')
+```
+
+5) If this succeeds we can try to load some ARPES data:
+```
+arpes.load_data('\your\path\to\arpes\data')
+```
+
+6) As a bonus, we could even test the angle to k space conversion!
+Roll the axes if necessary (pit.roll_axes()) until we are looking at the data 
+from a convenient viewpoint.
+Then try to use the `arpes.a2k()` function to make the conversion.
+Type `help(arpes.a2k)` to learn more about how this should be done.
+
+7) Finally, close PIT and leave the virtual environment by issuing `conda 
+deactivate` in your Anaconda prompt or just close the Anaconda prompt window.
+
+8) Thank you very much!
+
+Footnotes
+---------
+
+(*) You most likely have many different python packages installed on your 
+systems, like matplotlib, numpy, scipy, etc. These all have a specific 
+version. Certain packages, however, depend on specific versions of other 
+packages and may not work if you have the wrong version installed. Obviously, 
+with many packages, this bears the potential of becoming very messy and 
+complicated. That's the main reason virtual environments have been created. 
+The idea is, to create an isolated environment of you python install, 
+completely separate from your system installation or other virtual 
+environments. The new environment comes without any additional packages 
+(usually). So if you were to list your installed packages of your system 
+install with the command `pip freeze` like this:
+```
+$ pip freeze
+matplotlib==2.2.4
+numpy==1.13.1
+[...]
+```
+it would look like this, once you are "in" a newly created environment:
+```
+(env) $ pip freeze
+[nothing]
+```
+.
+Everything you install into this virtual environment only lives there, 
+keeping your system installation "clean".  It is also possible to have 
+varying python versions and more things, but that's the gist of it.
+
