@@ -11,7 +11,8 @@ class Raw():
         self.figure = figure
         self.original_int = self.figure.int.copy()
         self.define_mouse()
-
+        self.figure.state.enter_state('Raw')
+        
     def define_mouse(self):
         self.figure.define_mouse()
 
@@ -174,6 +175,7 @@ class Derivative_y(Derivative_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
+        self.figure.state.enter_state('K_space')
 
     def run(self):
         self.convert2k()
@@ -231,7 +233,7 @@ class Fermi_level(Raw):
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
         self.e_0 = 28 - 4.38#initial guess of fermi level
-
+        self.figure.state.enter_state('Fermi_adjusted')
     def run(self):
         self.figure.gold()#cannot be in init
         self.fit()

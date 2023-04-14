@@ -5,7 +5,7 @@ import tkinter as tk
 import numpy as np
 import json
 
-import processing, cursor
+import processing, cursor, states_figure
 
 class Functions():#figure functionality not being used
     def __init__(self):
@@ -52,6 +52,7 @@ class Figure(Functions):
         self.define_dropdowns()
         self.draw()
 
+        self.state = states_figure.Raw(self)
         self.data_processes = {'Raw':processing.Raw,'Derivative_x':processing.Derivative_x,'Derivative_y':processing.Derivative_y,'Convert_k':processing.Convert_k,'Range_plot':processing.Range_plot}
         self.set_method('Raw')
         self.define_BG()
@@ -192,11 +193,7 @@ class FS(Figure):
         self.sub_tab.right.plot(self.sub_tab.right.ax)
         self.sub_tab.right.redraw()
 
-        try:#for k-space cut
-            difference_array = np.absolute(self.data[1][:,0]-pos[1])
-        except:#for real space cut
-            difference_array = np.absolute(self.data[1]-pos[1])
-
+        difference_array = self.state.difference_array(pos[1])
         index2 = difference_array.argmin()
         self.sub_tab.down.intensity(index2)
         self.sub_tab.down.tilt = self.sub_tab.data_tab.data.yscale[index2]
@@ -350,7 +347,7 @@ class Band(Figure):
         self.draw()
 
     def plot(self,ax=None):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#FS
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#FS
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):
@@ -358,21 +355,13 @@ class Band(Figure):
 
     def click(self,pos):
         super().click(pos)
-        difference_array = np.absolute(self.data[0]-pos[0])#subtract for each channel, works.
-        try:#fermi level adjusted cut
-            index1 = np.argmin(difference_array,axis=1)
-            index1 = index1[0]
-        except:#"normal" cut
-            index1 = np.argmin(difference_array)
+        difference_array = np.absolute(self.data[0] - pos[0])#subtract for each channel, works.
+        index1 = self.state.click_right(difference_array)
         self.sub_tab.right.intensity(index1)
         self.sub_tab.right.draw()
 
-        difference_array = np.absolute(self.data[1]-pos[1])
-        index2 = np.argmin(difference_array)
-        try:#fermi level adjusted
-            self.sub_tab.down.data[0] = self.data[0][index2]
-        except:#normal
-            pass
+        difference_array = np.absolute(self.data[1] - pos[1])
+        index2 = self.state.click_down(difference_array)
         self.sub_tab.down.intensity(index2)
         self.sub_tab.down.draw()
 
