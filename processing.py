@@ -12,7 +12,7 @@ class Raw():
         self.original_int = self.figure.int.copy()
         self.define_mouse()
         self.figure.state.enter_state('Raw')
-        
+
     def define_mouse(self):
         self.figure.define_mouse()
 
@@ -234,6 +234,7 @@ class Fermi_level(Raw):
         self.eV = 1.6021766208e-19#[J]
         self.e_0 = 28 - 4.38#initial guess of fermi level
         self.figure.state.enter_state('Fermi_adjusted')
+        
     def run(self):
         self.figure.gold()#cannot be in init
         self.fit()

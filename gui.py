@@ -10,7 +10,7 @@ import figure
 
 #rotate figure?
 #kz?
-#Fermi lelve adjustement -> make cuts after adjustment?
+#Fermi lelve adjustement for maps?
 #y,x limit
 #labels
 #colour bar
@@ -22,6 +22,11 @@ import figure
 #normalisation:
     #1) by number of sweeps (can chekc the BG above FL to check for number of sweeps),
     #2) MDC/EDC cuts divided by max value (fake data, just to enhance)
+
+#Bugs:
+#probably the kspace cut is not proper for FS (need to add NaN at white areas)
+#crusor do not show up on default
+#subtract BG works for raw sate but not for fermi adjusted. Write seperate moethods for eac state
 
 class GUI():#master Gui
     def __init__(self):
@@ -111,8 +116,6 @@ class Subtab():
         self.data_tab = data_tab
         self.int_range = 0
         self.add_tab(type(self).__name__)
-        self.define_slide()
-        self.define_colour_scale()
         self.slit = 'v'#depends on instrument
         self.cmap = 'RdYlBu_r'#default colour scale
 
@@ -120,57 +123,30 @@ class Subtab():
         self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
         self.data_tab.notebook.add(self.tab,text=name)
 
-    def define_slide(self):
-        scale = tk.Scale(self.tab,from_=0,to=5,orient='horizontal',command=self.update_range,label='int range',resolution=1)#
-        scale.place(x = 990, y = 150)
-
-    def define_colour_scale(self):
-        scale = tk.Scale(self.tab,from_=0,to=300,orient='horizontal',command=self.update_colour,label='colour scale',resolution=10)#
-        scale.place(x = 990, y = 200)
-
-    def update_colour(self,value):#the slider calls it
-        self.center.vmax = int(value)
-        self.draw()
-
 class Overview(Subtab):
     def __init__(self,data_tab):
         super().__init__(data_tab)
+        self.make_figure()
+        self.operations = Operations(self)
         #self.log_parameters = ['Pass Energy','Number of Sweeps','Excitation Energy','Acquisition Mode','Center Energy', 'Energy Step' ,'Step Time' , 'A' ,'P', 'T', 'X', 'Y', 'Z']#may depend on the instrument.... Bloch
         self.log_parameters = ['pass_energy','number_of_iterations','Excitation Energy','acquisition_mode','kinetic_energy_center', 'kinetic_energy_step' ,'acquire_time' , 'saazimuth' ,'sapolar', 'satilt', 'sax', 'say', 'saz']#may depend on the instrument.... I05
         self.logbook()
-        self.define_dropdowns()
         self.append_data_botton()
         self.append_data(self.data_tab.name)
         self.data = []
+
+    def make_figure(self):
         if self.data_tab.data.zscale is None or len(self.data_tab.data.zscale)==1:#scan with many cuts, or 2D data
             #I guess it can be generalised?
             if self.data_tab.data.data[0].ndim == 3:#many 2D data, doesn't go in here for I05
                 self.center = figure.Band_scan(self,[0,0])
-                self.right = figure.DOS_right(self,[self.center.pos[0]+self.center.size[0],self.center.pos[1]])
-                self.down = figure.DOS_down(self,[self.center.pos[0],self.center.pos[1]+self.center.size[1]])
-                self.right_down = None
-
             elif self.data_tab.data.data[0].ndim == 2:#2D data
                 self.center = figure.Band(self,[0,0])
-                self.right = figure.DOS_right(self,[self.center.pos[0]+self.center.size[0],self.center.pos[1]])
-                self.down = figure.DOS_down(self,[self.center.pos[0],self.center.pos[1]+self.center.size[1]])
-                self.right_down = None
-
         else:#3D data
             self.center = figure.FS(self,[0,0])
-            self.right = figure.Band_right(self,[self.center.pos[0]+self.center.size[0],self.center.pos[1]])
-            self.down = figure.Band_down(self,[self.center.pos[0],self.center.pos[1]+self.center.size[1]])
-            self.right_down = figure.DOS_right_down(self,[self.center.pos[0]+self.center.size[0],self.center.pos[1]+self.center.size[1]])
-
-    def update_range(self,value):#the slider calls it
-        self.int_range = int(value)
-        self.draw()
 
     def draw(self):
         self.center.draw()
-        self.right.draw()
-        self.down.draw()
-        self.right_down.draw()
 
     def logbook(self):
         columns=[]
@@ -195,17 +171,6 @@ class Overview(Subtab):
         tree.insert('',tk.END,values=data)
         tree.place(x = 890, y = 0, width=610)
 
-    def define_dropdowns(self):
-        commands = ['RdYlBu_r','RdBu_r','terrain','binary', 'binary_r'] + sorted(['Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])
-        dropvar = tk.StringVar(self.tab)
-        dropvar.set('colours')
-        drop = tk.OptionMenu(self.tab,dropvar,*commands,command = self.select_drop)
-        drop.place(x = 890, y = 150)
-
-    def select_drop(self,event):
-        self.cmap = event
-        self.draw()
-
     def append_data_botton(self):#called frin init
         button = tk.Button(self.tab, text="append data", command = self.append_method)
         offset = [200,0]
@@ -229,6 +194,62 @@ class Overview(Subtab):
         idx = file.rfind('/')+1
         name = file[idx:]
         self.catalog.insert('',tk.END,values=name)
+
+class Operations():
+    def __init__(self,overview):
+        self.overview = overview
+        self.make_box()
+        self.define_dropdowns()
+        self.define_BG()
+        self.define_slide()
+
+    def make_box(self):#make a box with operations options on the figures
+        self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
+        self.notebook.place(x=890,y=80)
+        operations = ['General','Operations']
+        self.operation_tabs = {}
+        for operation in operations:
+            self.operation_tabs[operation] = tk.ttk.Frame(self.notebook, style='My.TFrame')
+            self.notebook.add(self.operation_tabs[operation],text=operation)
+
+    def define_slide(self):
+        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=5,orient='horizontal',command=self.update_range,label='int range',resolution=1)#
+        scale.place(x = 0, y = 30)
+
+    def update_range(self,value):#the slider calls it
+        self.overview.int_range = int(value)
+        self.overview.center.update_cursor()
+
+    def define_colour_scale(self):#not in use
+        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=300,orient='horizontal',command=self.update_colour,label='colour scale',resolution=10)#
+        scale.place(x = 0, y = 100)
+
+    def update_colour(self,value):#not in use
+        self.center.vmax = int(value)
+        self.draw()
+
+    def define_dropdowns(self):
+        commands = ['RdYlBu_r','RdBu_r','terrain','binary', 'binary_r'] + sorted(['Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])
+        dropvar = tk.StringVar(self.operation_tabs['General'])
+        dropvar.set('colours')
+        drop = tk.OptionMenu(self.operation_tabs['General'],dropvar,*commands,command = self.select_drop)
+        drop.place(x = 0, y = 0)
+
+    def select_drop(self,event):
+        self.overview.cmap = event
+        self.overview.draw()
+
+    def define_BG(self):#generate botton, it will run the figure method
+        button_calc = tk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.center.subtract_BG)
+        button_calc.place(x = 0, y = 0)
+        self.BG_choise()
+
+    def BG_choise(self):
+        choises = ['horizontal','vertical']
+        self.checkbox = {}
+        for index, choise in enumerate(choises):
+            self.checkbox[choise] = tk.IntVar()
+            tk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=60,y=30*index)
 
 class Analysis(Subtab):
     def __init__(self,data_tab,fig,pos,int):

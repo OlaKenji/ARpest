@@ -10,18 +10,12 @@ class Auto_cursor():
 
         self.pos = [(self.xlimits[0]+self.xlimits[-1])/2,(self.ylimits[0]+self.ylimits[-1])/2]
 
-        thickness=self.figure.sub_tab.int_range+0.8
+        thickness=0.8
         self.dyn_horizontal_line = self.figure.ax.axhline(self.pos[1],color='k', lw=thickness, ls='--',zorder=3)
         self.dyn_vertical_line = self.figure.ax.axvline(self.pos[0],color='k', lw=thickness, ls='--',zorder=3)
 
         self.sta_horizontal_line = self.figure.ax.axhline(self.pos[1],color='r', lw=thickness,zorder=2)
         self.sta_vertical_line = self.figure.ax.axvline(self.pos[0],color='r', lw=thickness,zorder=2)
-
-    def draw_sta_line(self):
-        thickness=self.figure.sub_tab.int_range+0.8
-        self.sta_horizontal_line = self.figure.ax.axhline(self.pos[1],color='r', lw=thickness,zorder=2)
-        self.sta_vertical_line = self.figure.ax.axvline(self.pos[0],color='r', lw=thickness,zorder=2)
-        self.redraw()
 
     def update_event(self,event):
         self.xlimits = self.figure.xlimits
@@ -30,15 +24,10 @@ class Auto_cursor():
         scaley = event.y/self.figure.size[1]
         return [scalex*(self.xlimits[1]-self.xlimits[0])+self.xlimits[0],scaley*(self.ylimits[0]-self.ylimits[1])+self.ylimits[1]]
 
-    def redraw(self):
-        self.figure.canvas.restore_region(self.figure.curr_background)
-        self.figure.ax.draw_artist(self.text)
-        self.figure.ax.draw_artist(self.dyn_horizontal_line)
-        self.figure.ax.draw_artist(self.dyn_vertical_line)
-        self.figure.ax.draw_artist(self.sta_horizontal_line)
-        self.figure.ax.draw_artist(self.sta_vertical_line)
-        #self.figure.range_cursor.redraw()
-        self.figure.canvas.blit(self.figure.ax.bbox)
+    def update_line_width(self):
+        self.sta_horizontal_line.set_linewidth(self.figure.sub_tab.int_range+0.8)
+        self.sta_vertical_line.set_linewidth(self.figure.sub_tab.int_range+0.8)
+        self.redraw()
 
     def on_mouse_move(self, event):
         pos = self.update_event(event)
@@ -52,6 +41,16 @@ class Auto_cursor():
         self.sta_horizontal_line.set_ydata(self.pos[1])
         self.sta_vertical_line.set_xdata(self.pos[0])
         self.figure.click(self.pos)
+
+    def redraw(self):
+        self.figure.canvas.restore_region(self.figure.curr_background)
+        self.figure.ax.draw_artist(self.text)
+        self.figure.ax.draw_artist(self.dyn_horizontal_line)
+        self.figure.ax.draw_artist(self.dyn_vertical_line)
+        self.figure.ax.draw_artist(self.sta_horizontal_line)
+        self.figure.ax.draw_artist(self.sta_vertical_line)
+        #self.figure.range_cursor.redraw()
+        self.figure.canvas.blit(self.figure.ax.bbox)
 
 class Range_cursor():
     def __init__(self, figure):
