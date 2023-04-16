@@ -212,8 +212,15 @@ class FS(Figure):
 
     def draw(self):
         super().draw()
+        self.right.sort_data()
+        self.right.intensity()
         self.right.draw()
+
+        #self.down.sort_data()
+        #self.down.intensity()
         self.down.draw()
+
+        self.right_down.sort_data()
         self.right_down.draw()
 
 class Band_right(Figure):
@@ -241,7 +248,7 @@ class Band_right(Figure):
         self.int = np.transpose(self.int)
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_tab.data.zscale,self.sub_tab.data_tab.data.yscale,self.sub_tab.data_tab.data.data]
+        self.data = [self.center.data[2],self.center.data[1],self.center.data[3]]
 
     def click(self,pos):
         super().click(pos)
@@ -274,6 +281,7 @@ class Band_down(Figure):
         self.draw()
 
     def plot(self,ax=None):#2D plot
+        print(self.data[0].shape,self.data[1].shape,np.array(self.int).shape)
         self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#FS
 
     def intensity(self,y=0):
@@ -284,7 +292,7 @@ class Band_down(Figure):
         self.int = np.array(int)
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_tab.data.xscale, self.sub_tab.data_tab.data.zscale,self.sub_tab.data_tab.data.data]
+        self.data = [self.center.data[0], self.center.data[2],self.center.data[3]]
 
     def click(self,pos):
         super().click(pos)
@@ -329,8 +337,8 @@ class DOS_right_down(Figure):
             self.int_down.append(sum(ary[start:stop:1])/step)
 
     def plot(self,ax=None):#2D plot
-        self.graph1=ax.plot(self.center.data[2], self.int_right,zorder=3)[0]
-        self.graph2=ax.plot(self.center.data[2], self.int_down,zorder=3)[0]
+        self.graph1 = ax.plot(self.center.data[2], self.int_right,zorder=3)[0]
+        self.graph2 = ax.plot(self.center.data[2], self.int_down,zorder=3)[0]
 
     def click(self,pos):
         super().click(pos)

@@ -399,13 +399,13 @@ class Fermi_level_FS(Fermi_level_band):
         for index in range(len(fermi_index)):
             slice = intensity[:,index,:]
             array = new_data[index]
-            print(array)
 
             shift = target_index - fermi_index[index]
-            for i in range(0,shift):
+            if shift != 0:#insert at the begnning
                 empty_1 = np.empty(shift)
                 empty_1[:] = array[0]
                 array = np.insert(array,0,empty_1)
+            for i in range(0,shift):
                 slice = np.insert(slice,0,NaN,0)#0 is th eaxis
 
             #insert at the end
@@ -418,13 +418,11 @@ class Fermi_level_FS(Fermi_level_band):
 
             new_intensity.append(slice)
             new_array[index] = array
-            print(new_array)
-            return
 
-        print(new_array)
-        print(new_intensity)
-        self.figure.data[3] = new_array
-        self.figure.int = new_intensity
+        new_intensity = np.array(new_intensity)
+        self.figure.data[2] = np.array(new_array)
+        self.figure.data[3] = np.transpose(new_intensity, (1, 0, 2))
+
 
 class Range_plot(Raw):
     def __init__(self,parent_figure):
