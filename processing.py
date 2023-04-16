@@ -225,16 +225,16 @@ class Convert_k(Raw):
         self.figure.sort_data()
         self.figure.draw()
 
-class Fermi_level(Raw):
+class Fermi_level_band(Raw):
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
         gold = tk.filedialog.askopenfilename(initialdir=self.figure.sub_tab.data_tab.gui.start_path ,title='gold please')
         self.gold = dataloaders.load_data(gold)
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
-        self.e_0 = 28 - 4.38#initial guess of fermi level
+        self.e_0 = 34 - 4.38#initial guess of fermi level
         self.figure.state.enter_state('Fermi_adjusted')
-        
+
     def run(self):
         self.figure.gold()#cannot be in init
         self.fit()
@@ -281,9 +281,10 @@ class Fermi_level(Raw):
 
         self.figure.data[0] = new_array
         self.figure.int = new_intensity
+        print(new_array)
 
     def fit(self):
-        hv = 28#eV
+        hv = 34#eV
         e_0 = hv - 4.38#femi level guess
         T = 10#K
 
@@ -371,6 +372,59 @@ class Fermi_level(Raw):
         elif sign*x > sign*step_x :
             result = 1
         return result
+
+class Fermi_level_FS(Fermi_level_band):
+    def __init__(self,parent_figure):
+        super().__init__(parent_figure)
+
+    def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
+        energies = self.figure.data[2]#the energies, the z axis
+        fermi_levels = self.EF
+        fermi_index = np.array([np.argmin(np.abs(energies - f)) for f in fermi_levels],dtype=int)
+        print('lets shift')
+        max_shift = max(fermi_index)-min(fermi_index)
+        new_data = np.array([energies - level for level in fermi_levels])#shifted data#s
+        target_index = max(fermi_index)
+
+        new_array = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
+        intensity = self.figure.data[3]
+
+        NaN = []
+        for i in range(len(intensity[0][0])):
+            NaN.append(np.NaN)
+        NaN = np.array(NaN)
+        new_intensity = []
+
+        #intensity = np.append(intensity,np.transpose(np.atleast_3d(NaN)),axis=0)
+        for index in range(len(fermi_index)):
+            slice = intensity[:,index,:]
+            array = new_data[index]
+            print(array)
+
+            shift = target_index - fermi_index[index]
+            for i in range(0,shift):
+                empty_1 = np.empty(shift)
+                empty_1[:] = array[0]
+                array = np.insert(array,0,empty_1)
+                slice = np.insert(slice,0,NaN,0)#0 is th eaxis
+
+            #insert at the end
+            more_shift = max_shift - shift
+            empty_1 = np.empty(more_shift)
+            empty_1[:] = array[-1]
+            array = np.append(array,empty_1)
+            for i in range(0,more_shift):
+                slice = np.vstack((slice,NaN))
+
+            new_intensity.append(slice)
+            new_array[index] = array
+            print(new_array)
+            return
+
+        print(new_array)
+        print(new_intensity)
+        self.figure.data[3] = new_array
+        self.figure.int = new_intensity
 
 class Range_plot(Raw):
     def __init__(self,parent_figure):

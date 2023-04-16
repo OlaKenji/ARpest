@@ -202,6 +202,7 @@ class Operations():
         self.define_dropdowns()
         self.define_BG()
         self.define_slide()
+        self.define_fermilevel()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -250,6 +251,11 @@ class Operations():
         for index, choise in enumerate(choises):
             self.checkbox[choise] = tk.IntVar()
             tk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=60,y=30*index)
+
+    def define_fermilevel(self):
+        button_calc = tk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.center.fermi_level)
+        offset = [200,0]
+        button_calc.place(x=0,y=70)
 
 class Analysis(Subtab):
     def __init__(self,data_tab,fig,pos,int):

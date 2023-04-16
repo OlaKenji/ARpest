@@ -43,6 +43,9 @@ class Fermi_adjusted(States):
     def __init__(self,figure):
         super().__init__(figure)
 
+    def difference_array(self,pos):
+        return np.absolute(self.figure.data[1][:,0]-pos)
+
     def click_right(self,difference_array):
         index1 = np.argmin(difference_array,axis=1)
         return index1[0]
@@ -93,4 +96,4 @@ class K_space(States):
             bg = np.nanmean(self.figure.int[:,index1:-1],axis=1)#axis = 0is vertical, axis =1 is horizontal means
             int = np.transpose(self.figure.int)
             int -=  bg
-            self.figure.int = np.transpose(int)        
+            self.figure.int = np.transpose(int)

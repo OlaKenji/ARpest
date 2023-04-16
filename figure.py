@@ -37,8 +37,8 @@ class Figure(Functions):
         self.sub_tab = sub_tab#analysis or overview
         self.pos = pos
         self.label = ['x','y']
-        self.intensity()
         self.sort_data()
+        self.intensity()
         self.original_int = self.int
 
         #self.colour_limit()
@@ -51,7 +51,6 @@ class Figure(Functions):
         self.set_method('Raw')
         #self.define_normalise()
         self.define_export()
-        self.define_fermilevel()
 
     def set_method(self,method):
         self.data_processor = self.data_processes[method](self)
@@ -156,13 +155,8 @@ class Figure(Functions):
     def gold(self):#sort the data: called from fermi_level processing init
         pass#self.data[0] is assumed to be kinetic energy need to transpose back and forth if this is not the case (not implemented)
 
-    def define_fermilevel(self):
-        button_calc = tk.Button(self.sub_tab.tab, text="Fermi level", command = self.fermi_level)
-        offset = [200,0]
-        button_calc.place(x = self.pos[0]+offset[0], y = self.pos[1]+offset[1])
-
     def fermi_level(self):
-        adjust = processing.Fermi_level(self)
+        adjust = processing.Fermi_level_FS(self)
         adjust.run()
 
 class FS(Figure):
@@ -174,32 +168,32 @@ class FS(Figure):
         self.right_down = DOS_right_down(self,[self.pos[0]+self.size[0],self.pos[1]+self.size[1]])
         self.draw()
 
-    def plot(self,ax = None):#2D plot
+    def plot(self,ax):
         self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap)#FS,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax)
         #self.fig.colorbar(self.graph)
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_tab.data.xscale,self.sub_tab.data_tab.data.yscale,self.sub_tab.data_tab.data.data]
+        self.data = [self.sub_tab.data_tab.data.xscale,self.sub_tab.data_tab.data.yscale,self.sub_tab.data_tab.data.zscale,self.sub_tab.data_tab.data.data]
 
     def click(self,pos):
         super().click(pos)
         difference_array = np.absolute(self.data[0]-pos[0])
         index1 = difference_array.argmin()
         self.right.intensity(index1)
-        self.right.tilt = self.sub_tab.data_tab.data.xscale[index1]
+        self.right.tilt = self.data[0][index1]
         self.right.plot(self.right.ax)
         self.right.redraw()
 
         difference_array = self.state.difference_array(pos[1])
         index2 = difference_array.argmin()
         self.down.intensity(index2)
-        self.down.tilt = self.sub_tab.data_tab.data.yscale[index2]
+        self.down.tilt = self.data[1][index2]
         self.down.plot(self.down.ax)
         self.down.redraw()
 
     def intensity(self,z=0):
         start,stop,step=self.int_range(z)
-        self.int = sum(self.sub_tab.data_tab.data.data[start:stop:1])/step
+        self.int = sum(self.data[3][start:stop:1])/step
 
     def define_angle2k(self):#called from procssing
         return self.data[1], self.data[0]
@@ -224,13 +218,12 @@ class FS(Figure):
 
 class Band_right(Figure):
     def __init__(self,center,pos):
-        super().__init__(center.sub_tab,pos)
         self.center = center
+        super().__init__(center.sub_tab,pos)
 
     def subtract_BG(self):#the BG botton calls it
         difference_array1 = np.absolute(self.data[0] - self.cursor.sta_vertical_line.get_data()[0])
         index1 = difference_array1.argmin()
-
         bg = np.mean(self.int[:,index1:len(self.data[0])],axis=1)#axis = 0is vertical, axis =1 is horizontal means
         int = self.int.transpose()
         int -=  bg
@@ -238,12 +231,12 @@ class Band_right(Figure):
         self.draw()
 
     def plot(self,ax=None):#2D plotnp.clip(data['z'],None,3000)
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap)#FS
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#FS
 
     def intensity(self,y=0):
         start,stop,step = self.int_range(y)
         self.int = []
-        for ary in self.sub_tab.data_tab.data.data:
+        for ary in self.center.data[3]:
             self.int.append(np.sum(ary[:,start:stop:1],axis=1)/step)
         self.int = np.transpose(self.int)
 
@@ -252,7 +245,7 @@ class Band_right(Figure):
 
     def click(self,pos):
         super().click(pos)
-        difference_array1 = np.absolute(self.sub_tab.data_tab.data.yscale-pos[1])
+        difference_array1 = np.absolute(self.center.data[1]-pos[1])
         index1 = difference_array1.argmin()
 
         self.center.right_down.intensity_right(index1)
@@ -270,8 +263,8 @@ class Band_right(Figure):
 
 class Band_down(Figure):
     def __init__(self,center,pos):
-        super().__init__(center.sub_tab,pos)
         self.center = center
+        super().__init__(center.sub_tab,pos)
 
     def subtract_BG(self):#the BG botton calls it
         difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
@@ -286,7 +279,7 @@ class Band_down(Figure):
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
         int = []
-        for ary in self.sub_tab.data_tab.data.data:
+        for ary in self.center.data[3]:
             int.append(sum(ary[start:stop:1])/step)
         self.int = np.array(int)
 
@@ -295,7 +288,7 @@ class Band_down(Figure):
 
     def click(self,pos):
         super().click(pos)
-        difference_array1 = np.absolute(self.sub_tab.data_tab.data.xscale-pos[0])
+        difference_array1 = np.absolute(self.center.data[0]-pos[0])
         index1 = difference_array1.argmin()
 
         self.center.right_down.intensity_down(index1)
@@ -317,8 +310,9 @@ class DOS_right_down(Figure):
         super().__init__(center.sub_tab,pos)
 
     def sort_data(self):
-        self.int=(self.int_right+self.int_down)/2
-        self.data = [self.sub_tab.data_tab.data.zscale,self.int]
+        self.intensity()
+        self.int = (self.int_right+self.int_down)/2
+        self.data = [self.center.data[2],self.int]
 
     def intensity(self,idx=0):
         self.intensity_right(idx)
@@ -335,12 +329,12 @@ class DOS_right_down(Figure):
             self.int_down.append(sum(ary[start:stop:1])/step)
 
     def plot(self,ax=None):#2D plot
-        self.graph1=ax.plot(self.sub_tab.data_tab.data.zscale, self.int_right,zorder=3)[0]
-        self.graph2=ax.plot(self.sub_tab.data_tab.data.zscale, self.int_down,zorder=3)[0]
+        self.graph1=ax.plot(self.center.data[2], self.int_right,zorder=3)[0]
+        self.graph2=ax.plot(self.center.data[2], self.int_down,zorder=3)[0]
 
     def click(self,pos):
         super().click(pos)
-        difference_array = np.absolute(self.sub_tab.data_tab.data.zscale-pos[0])
+        difference_array = np.absolute(self.center.data[2]-pos[0])
         index1 = difference_array.argmin()
         self.center.intensity(index1)
         self.center.plot(self.center.ax)
@@ -398,12 +392,17 @@ class Band(Figure):
         self.right.draw()
         self.down.draw()
 
+    def fermi_level(self):
+        adjust = processing.Fermi_level_band(self)
+        adjust.run()
+
 class DOS_right(Figure):
     def __init__(self,center,pos):
         self.center = center
         super().__init__(center.sub_tab,pos)
 
     def sort_data(self):
+        self.intensity()
         self.data = [self.int,self.center.data[1]]
 
     def intensity(self,x = 0):
@@ -425,6 +424,7 @@ class DOS_down(Figure):
         super().__init__(center.sub_tab,pos)
 
     def sort_data(self):
+        self.intensity()
         self.data=[self.center.data[0],self.int]
 
     def intensity(self,y=0):
