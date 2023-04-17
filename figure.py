@@ -164,6 +164,8 @@ class FS(Figure):
         self.right_down = DOS_right_down(self,[self.pos[0]+self.size[0],self.pos[1]+self.size[1]])
         self.draw()
 
+    def make_cuts(self):
+
     def plot(self,ax):
         self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap)#FS,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax)
         #self.fig.colorbar(self.graph)
