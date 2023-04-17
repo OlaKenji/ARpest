@@ -155,10 +155,6 @@ class Figure(Functions):
     def gold(self):#sort the data: called from fermi_level processing init
         pass#self.data[0] is assumed to be kinetic energy need to transpose back and forth if this is not the case (not implemented)
 
-    def fermi_level(self):
-        adjust = processing.Fermi_level_FS(self)
-        adjust.run()
-
 class FS(Figure):
     def __init__(self,data_tab,pos):
         super().__init__(data_tab,pos)
@@ -195,33 +191,40 @@ class FS(Figure):
         start,stop,step=self.int_range(z)
         self.int = sum(self.data[3][start:stop:1])/step
 
-    def define_angle2k(self):#called from procssing
-        return self.data[1], self.data[0]
-
-    def angle2k(self,kx,ky):#the stuff to convert
-        self.data[0] = kx
-        self.data[1] = ky
-        self.xlimits = [min(self.data[0][0]), max(self.data[0][0])]#used for crusor
-        self.ylimits = [min(self.data[1][0]), max(self.data[1][-1])]
-
     def update_cursor(self):
         self.cursor.update_line_width()
         self.right.cursor.update_line_width()
         self.down.cursor.update_line_width()
         self.right_down.cursor.update_line_width()
 
+    def update_data(self):#called after k convert or fermi adjust
+        self.right.sort_data()#fermi sdjust need it but not k convert
+        self.down.sort_data()#fermi sdjust need it but not k convert
+        self.right.intensity()
+        self.down.intensity()
+        self.right_down.sort_data()
+        self.right_down.sort_data()
+
     def draw(self):
         super().draw()
-        self.right.sort_data()
-        self.right.intensity()
         self.right.draw()
-
-        #self.down.sort_data()
-        #self.down.intensity()
         self.down.draw()
-
-        self.right_down.sort_data()
         self.right_down.draw()
+
+    def define_angle2k(self):#called from procssing
+        return self.data[1], self.data[0]
+
+    def angle2k(self,kx,ky):#the stuff to convert, called from k convert
+        self.data[0] = kx
+        self.data[1] = ky
+        self.xlimits = [min(self.data[0][0]), max(self.data[0][0])]#used for crusor
+        self.ylimits = [min(self.data[1][0]), max(self.data[1][-1])]
+        self.right.data[1] = ky[:,0]
+        self.down.data[0] =kx[0]
+
+    def fermi_level(self):#called when pressed the botton
+        adjust = processing.Fermi_level_FS(self)
+        adjust.run()
 
 class Band_right(Figure):
     def __init__(self,center,pos):
@@ -237,7 +240,7 @@ class Band_right(Figure):
         self.int = int.transpose()
         self.draw()
 
-    def plot(self,ax=None):#2D plotnp.clip(data['z'],None,3000)
+    def plot(self,ax):
         self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#FS
 
     def intensity(self,y=0):
@@ -281,7 +284,6 @@ class Band_down(Figure):
         self.draw()
 
     def plot(self,ax=None):#2D plot
-        print(self.data[0].shape,self.data[1].shape,np.array(self.int).shape)
         self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#FS
 
     def intensity(self,y=0):
@@ -337,8 +339,8 @@ class DOS_right_down(Figure):
             self.int_down.append(sum(ary[start:stop:1])/step)
 
     def plot(self,ax=None):#2D plot
-        self.graph1 = ax.plot(self.center.data[2], self.int_right,zorder=3)[0]
-        self.graph2 = ax.plot(self.center.data[2], self.int_down,zorder=3)[0]
+        self.graph1 = ax.plot(self.data[0], self.int_right,zorder=3)[0]
+        self.graph2 = ax.plot(self.data[0], self.int_down,zorder=3)[0]
 
     def click(self,pos):
         super().click(pos)
@@ -362,7 +364,7 @@ class Band(Figure):
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#FS
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#band
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):
@@ -383,13 +385,6 @@ class Band(Figure):
     def intensity(self,y = 0):
         self.int = self.sub_tab.data_tab.data.data[0]
 
-    def angle2k(self,kx,ky):#the stuff to convert
-        self.data[1] = ky
-        self.ylimits = [min(self.data[1][0]), max(self.data[1][-1])]
-
-    def define_angle2k(self):#called from procssing
-        return self.data[1],np.array([self.tilt])
-
     def update_cursor(self):#called when changing the int range
         self.cursor.update_line_width()
         self.right.cursor.update_line_width()
@@ -400,9 +395,19 @@ class Band(Figure):
         self.right.draw()
         self.down.draw()
 
+    def update_data(self):#called after k convert or fermi adjust
+        self.down.intensity()
+
     def fermi_level(self):
         adjust = processing.Fermi_level_band(self)
         adjust.run()
+
+    def angle2k(self,kx,ky):#the stuff to convert
+        self.data[1] = ky.ravel()
+        self.ylimits = [min(self.data[1]), max(self.data[1])]
+
+    def define_angle2k(self):#called from procssing
+        return self.data[1],np.array([self.tilt])
 
 class DOS_right(Figure):
     def __init__(self,center,pos):
@@ -433,7 +438,7 @@ class DOS_down(Figure):
 
     def sort_data(self):
         self.intensity()
-        self.data=[self.center.data[0],self.int]
+        self.data = [self.center.data[0],self.int]
 
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
@@ -442,7 +447,7 @@ class DOS_down(Figure):
         self.ylimits = [min(self.int), max(self.int)]
 
     def plot(self,ax=None):#2D plot
-        self.graph = ax.plot(self.data[0], self.int)[0]
+        self.graph = ax.plot(self.center.data[0], self.int)[0]
 
 class Band_scan(Figure):
     def __init__(self,data_tab,pos):

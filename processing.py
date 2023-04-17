@@ -182,6 +182,7 @@ class Convert_k(Raw):
         self.update_figure()
 
     def update_figure(self):
+        self.figure.update_data()
         self.figure.draw()
 
     def convert2k(self):
@@ -239,11 +240,56 @@ class Fermi_level_band(Raw):
         self.figure.gold()#cannot be in init
         self.fit()
         self.pixel_shift()
+        self.figure.update_data()
         self.figure.draw()
         self.figure.define_mouse()
-        #self.figure.gold()
+        #self.figure.gold()        
 
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
+        energies = self.figure.data[0]
+        fermi_levels = self.EF
+        fermi_index = np.array([np.argmin(np.abs(energies - f)) for f in fermi_levels],dtype=int)
+
+        max_shift = max(fermi_index)-min(fermi_index)
+        new_data = np.array([energies - level for level in fermi_levels])#shifted data#s
+        target_index = max(fermi_index)
+
+
+        dE = energies[1] - energies[0]
+
+        new_array = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
+        new_intensity = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
+        new_intensity[:] =  np.nan
+        intensity = self.figure.int
+
+        for row, array in enumerate(new_data):
+            shift = target_index - fermi_index[row]
+            if shift != 0:#insert at the begnning
+                empty_1 = np.empty(shift)
+                empty_1[:] = array[0]
+                array = np.insert(array,0,empty_1)
+                empty_1[:] = np.nan
+                temp = np.insert(intensity[row],0,empty_1)
+            else:
+                temp = intensity[row]
+
+            #insert at the end
+            more_shift = max_shift - shift
+            empty_1 = np.empty(more_shift)
+            empty_1[:] = array[-1]
+            array = np.append(array,empty_1)
+            empty_1[:] = np.nan
+            temp = np.append(temp,empty_1)
+
+            new_array[row] = array
+            new_intensity[row] = temp
+
+        new_axis = np.arange(new_array.min(), new_array.max(), dE)
+
+        self.figure.data[0] = new_axis
+        self.figure.int = new_intensity
+
+    def pixel_shift2(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
         energies = self.figure.data[0]
         fermi_levels = self.EF
         fermi_index = np.array([np.argmin(np.abs(energies - f)) for f in fermi_levels],dtype=int)
@@ -281,7 +327,6 @@ class Fermi_level_band(Raw):
 
         self.figure.data[0] = new_array
         self.figure.int = new_intensity
-        print(new_array)
 
     def fit(self):
         hv = 34#eV
@@ -377,6 +422,10 @@ class Fermi_level_FS(Fermi_level_band):
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
 
+    def run(self):
+        super().run()
+        self.figure.right_down.define_mouse()
+
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
         energies = self.figure.data[2]#the energies, the z axis
         fermi_levels = self.EF
@@ -419,10 +468,12 @@ class Fermi_level_FS(Fermi_level_band):
             new_intensity.append(slice)
             new_array[index] = array
 
-        new_intensity = np.array(new_intensity)
-        self.figure.data[2] = np.array(new_array)
-        self.figure.data[3] = np.transpose(new_intensity, (1, 0, 2))
+        dE = energies[1] - energies[0]
+        new_axis = np.arange(new_array.min(), new_array.max()+dE, dE)
 
+        new_intensity = np.array(new_intensity)
+        self.figure.data[2] = new_axis
+        self.figure.data[3] = np.transpose(new_intensity, (1, 0, 2))
 
 class Range_plot(Raw):
     def __init__(self,parent_figure):

@@ -44,16 +44,13 @@ class Fermi_adjusted(States):
         super().__init__(figure)
 
     def difference_array(self,pos):
-        return np.absolute(self.figure.data[1][:,0]-pos)
+        return np.absolute(self.figure.data[1]-pos)
 
     def click_right(self,difference_array):
-        index1 = np.argmin(difference_array,axis=1)
-        return index1[0]
+        return np.argmin(difference_array)
 
     def click_down(self,difference_array):
-        index2 = np.argmin(difference_array)
-        self.figure.down.data[0] = self.figure.data[0][index2]
-        return index2
+        return np.argmin(difference_array)
 
     def bg_subtract(self):
         if self.figure.sub_tab.operations.checkbox['vertical'].get():#vertical bg subtract
@@ -82,7 +79,7 @@ class K_space(States):
         return index2
 
     def difference_array(self,pos):
-        return np.absolute(self.figure.data[1][:,0]-pos)
+        return np.absolute(self.figure.data[1]-pos)
 
     def bg_subtract(self):
         if self.figure.sub_tab.operations.checkbox['vertical'].get():#vertical bg subtract
