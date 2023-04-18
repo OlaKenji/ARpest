@@ -78,8 +78,8 @@ class K_space(States):
         index2 = np.argmin(difference_array)
         return index2
 
-    def difference_array(self,pos):
-        return np.absolute(self.figure.data[1]-pos)
+    def difference_array(self,pos):#FS calls this
+        return np.absolute(self.figure.data[1][:,0]-pos)#should inprinciple not be [:,0] but slightly curved, good enough approx
 
     def bg_subtract(self):
         if self.figure.sub_tab.operations.checkbox['vertical'].get():#vertical bg subtract

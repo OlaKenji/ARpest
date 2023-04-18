@@ -182,8 +182,9 @@ class Convert_k(Raw):
         self.update_figure()
 
     def update_figure(self):
-        self.figure.update_data()
-        self.figure.draw()
+        #self.figure.figure_handeler.update_data()#update the cuts, but avoid for main figure
+        self.figure.figure_handeler.draw()
+        self.figure.figure_handeler.update_mouse_range()
 
     def convert2k(self):
         work_func = 4#usually 4
@@ -226,7 +227,7 @@ class Convert_k(Raw):
         self.figure.sort_data()
         self.figure.draw()
 
-class Fermi_level_band(Raw):
+class Fermi_level_band(Raw):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
         gold = tk.filedialog.askopenfilename(initialdir=self.figure.sub_tab.data_tab.gui.start_path ,title='gold please')
@@ -240,10 +241,13 @@ class Fermi_level_band(Raw):
         self.figure.gold()#cannot be in init
         self.fit()
         self.pixel_shift()
-        self.figure.update_data()
-        self.figure.draw()
-        self.figure.define_mouse()
-        #self.figure.gold()        
+        self.update_figure()
+
+    def update_figure(self):
+        self.figure.figure_handeler.update_intensity()#update the cuts, but avoid for main figure
+        self.figure.figure_handeler.update_data()#update the cuts, but avoid for main figure
+        self.figure.figure_handeler.draw()
+        self.figure.figure_handeler.update_mouse_range()
 
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
         energies = self.figure.data[0]
@@ -421,10 +425,6 @@ class Fermi_level_band(Raw):
 class Fermi_level_FS(Fermi_level_band):
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
-
-    def run(self):
-        super().run()
-        self.figure.right_down.define_mouse()
 
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
         energies = self.figure.data[2]#the energies, the z axis

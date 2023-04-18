@@ -4,6 +4,7 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 import tkinter as tk
 import numpy as np
 import json
+import sys
 
 import processing, cursor, states_figure
 
@@ -33,8 +34,9 @@ class Functions():#figure functionality not being used
         self.draw()
 
 class Figure(Functions):
-    def __init__(self,sub_tab,pos):
-        self.sub_tab = sub_tab#analysis or overview
+    def __init__(self,figure_handeler,pos):
+        self.figure_handeler = figure_handeler
+        self.sub_tab = figure_handeler.data_tab#analysis or overview
         self.pos = pos
         self.label = ['x','y']
         self.sort_data()
@@ -51,12 +53,13 @@ class Figure(Functions):
         self.set_method('Raw')
         #self.define_normalise()
         self.define_export()
+        self.draw()
 
     def set_method(self,method):
         self.data_processor = self.data_processes[method](self)
 
     def define_canvas(self):
-        self.fig = plt.Figure(figsize = (4.45,4.3))
+        self.fig = plt.Figure(figsize = [4.45,4.3])
         self.size = self.fig.get_size_inches()*self.fig.dpi
         self.ax = self.fig.add_subplot(111)
         self.fig.subplots_adjust(top=0.93,left=0.15,right=0.97)
@@ -67,9 +70,12 @@ class Figure(Functions):
         offset = [0,0]
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
 
-    def define_mouse(self):#called in init and from processing
+    def mouse_range(self):
         self.xlimits = [np.array(self.data[0]).min(), np.array(self.data[0]).max()]#used for crusor
         self.ylimits = [np.array(self.data[1]).min(), np.array(self.data[1]).max()]
+
+    def define_mouse(self):#called in init and from processing
+        self.mouse_range()
         self.cursor = cursor.Auto_cursor(self)
 
         self.canvas.get_tk_widget().bind( "<Motion>", self.cursor.on_mouse_move)
@@ -156,15 +162,10 @@ class Figure(Functions):
         pass#self.data[0] is assumed to be kinetic energy need to transpose back and forth if this is not the case (not implemented)
 
 class FS(Figure):
-    def __init__(self,data_tab,pos):
-        super().__init__(data_tab,pos)
+    def __init__(self,figure_handeler,pos):
+        super().__init__(figure_handeler,pos)
         self.label = ['x angle','y angle']
-        self.right = Band_right(self,[self.pos[0]+self.size[0],self.pos[1]])
-        self.down = Band_down(self,[self.pos[0],self.pos[1]+self.size[1]])
-        self.right_down = DOS_right_down(self,[self.pos[0]+self.size[0],self.pos[1]+self.size[1]])
-        self.draw()
-
-    def make_cuts(self):
+        self.figures = figure_handeler.figures
 
     def plot(self,ax):
         self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap)#FS,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax)
@@ -177,41 +178,22 @@ class FS(Figure):
         super().click(pos)
         difference_array = np.absolute(self.data[0]-pos[0])
         index1 = difference_array.argmin()
-        self.right.intensity(index1)
-        self.right.tilt = self.data[0][index1]
-        self.right.plot(self.right.ax)
-        self.right.redraw()
+
+        self.figures['right'].intensity(index1)
+        self.figures['right'].tilt = self.data[0][index1]
+        self.figures['right'].plot(self.figures['right'].ax)
+        self.figures['right'].redraw()
 
         difference_array = self.state.difference_array(pos[1])
         index2 = difference_array.argmin()
-        self.down.intensity(index2)
-        self.down.tilt = self.data[1][index2]
-        self.down.plot(self.down.ax)
-        self.down.redraw()
+        self.figures['down'].intensity(index2)
+        self.figures['down'].tilt = self.data[1][index2]
+        self.figures['down'].plot(self.figures['down'].ax)
+        self.figures['down'].redraw()
 
-    def intensity(self,z=0):
+    def intensity(self,z = 0):
         start,stop,step=self.int_range(z)
         self.int = sum(self.data[3][start:stop:1])/step
-
-    def update_cursor(self):
-        self.cursor.update_line_width()
-        self.right.cursor.update_line_width()
-        self.down.cursor.update_line_width()
-        self.right_down.cursor.update_line_width()
-
-    def update_data(self):#called after k convert or fermi adjust
-        self.right.sort_data()#fermi sdjust need it but not k convert
-        self.down.sort_data()#fermi sdjust need it but not k convert
-        self.right.intensity()
-        self.down.intensity()
-        self.right_down.sort_data()
-        self.right_down.sort_data()
-
-    def draw(self):
-        super().draw()
-        self.right.draw()
-        self.down.draw()
-        self.right_down.draw()
 
     def define_angle2k(self):#called from procssing
         return self.data[1], self.data[0]
@@ -221,17 +203,13 @@ class FS(Figure):
         self.data[1] = ky
         self.xlimits = [min(self.data[0][0]), max(self.data[0][0])]#used for crusor
         self.ylimits = [min(self.data[1][0]), max(self.data[1][-1])]
-        self.right.data[1] = ky[:,0]
-        self.down.data[0] =kx[0]
 
-    def fermi_level(self):#called when pressed the botton
-        adjust = processing.Fermi_level_FS(self)
-        adjust.run()
-
+        self.figures['right'].data[1] = np.linspace(np.amin(ky),np.amax(ky),num=ky.shape[0])#make a 1D array from the 2D ky
+        self.figures['down'].data[0] =np.linspace(np.amin(kx),np.amax(kx),num=kx.shape[1])#make a 1D array from the 2D kx
+        
 class Band_right(Figure):
-    def __init__(self,center,pos):
-        self.center = center
-        super().__init__(center.sub_tab,pos)
+    def __init__(self,figure_handeler,pos):
+        super().__init__(figure_handeler,pos)
 
     def subtract_BG(self):#the BG botton calls it
         difference_array1 = np.absolute(self.data[0] - self.cursor.sta_vertical_line.get_data()[0])
@@ -243,25 +221,24 @@ class Band_right(Figure):
         self.draw()
 
     def plot(self,ax):
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#FS
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#band_right
 
     def intensity(self,y=0):
         start,stop,step = self.int_range(y)
         self.int = []
-        for ary in self.center.data[3]:
+        for ary in self.figure_handeler.figures['center'].data[3]:
             self.int.append(np.sum(ary[:,start:stop:1],axis=1)/step)
         self.int = np.transpose(self.int)
 
     def sort_data(self):
-        self.data = [self.center.data[2],self.center.data[1],self.center.data[3]]
+        self.data = [self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[1],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
-        difference_array1 = np.absolute(self.center.data[1]-pos[1])
+        difference_array1 = np.absolute(self.data[1]-pos[1])
         index1 = difference_array1.argmin()
-
-        self.center.right_down.intensity_right(index1)
-        self.center.right_down.draw()
+        self.figure_handeler.figures['corner'].intensity_right(index1)
+        self.figure_handeler.figures['corner'].draw()
         #self.gui.right_down.plot()
         #self.gui.right_down.redraw()
 
@@ -274,9 +251,8 @@ class Band_right(Figure):
         self.ylimits = [min(self.data[1][0]), max(self.data[1][-1])]
 
 class Band_down(Figure):
-    def __init__(self,center,pos):
-        self.center = center
-        super().__init__(center.sub_tab,pos)
+    def __init__(self,figure_handeler,pos):
+        super().__init__(figure_handeler,pos)
 
     def subtract_BG(self):#the BG botton calls it
         difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
@@ -291,20 +267,20 @@ class Band_down(Figure):
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
         int = []
-        for ary in self.center.data[3]:
+        for ary in self.figure_handeler.figures['center'].data[3]:
             int.append(sum(ary[start:stop:1])/step)
         self.int = np.array(int)
 
     def sort_data(self):
-        self.data = [self.center.data[0], self.center.data[2],self.center.data[3]]
+        self.data = [self.figure_handeler.figures['center'].data[0], self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
-        difference_array1 = np.absolute(self.center.data[0]-pos[0])
+        difference_array1 = np.absolute(self.data[0]-pos[0])
         index1 = difference_array1.argmin()
 
-        self.center.right_down.intensity_down(index1)
-        self.center.right_down.draw()
+        self.figure_handeler.figures['corner'].intensity_down(index1)
+        self.figure_handeler.figures['corner'].draw()
         #self.gui.right_down.plot()
         #self.gui.right_down.redraw()
 
@@ -317,48 +293,44 @@ class Band_down(Figure):
         return np.array([self.tilt]),self.data[0]
 
 class DOS_right_down(Figure):
-    def __init__(self,center,pos):
-        self.center = center
-        super().__init__(center.sub_tab,pos)
+    def __init__(self,figure_handeler,pos):
+        super().__init__(figure_handeler,pos)
 
     def sort_data(self):
-        self.intensity()
-        self.int = (self.int_right+self.int_down)/2
-        self.data = [self.center.data[2],self.int]
+        self.data = [self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[2]]
 
     def intensity(self,idx=0):
         self.intensity_right(idx)
         self.intensity_down(idx)
+        self.int = (self.int_right+self.int_down)*0.5
 
     def intensity_right(self,idx=0):
         start,stop,step=self.int_range(idx)
-        self.int_right = sum(self.center.right.int[start:stop:1])/step
+        self.int_right = sum(self.figure_handeler.figures['right'].int[start:stop:1])/step
 
     def intensity_down(self,idx=0):
         start,stop,step=self.int_range(idx)
         self.int_down=[]
-        for ary in self.center.down.int:
+        for ary in self.figure_handeler.figures['down'].int:
             self.int_down.append(sum(ary[start:stop:1])/step)
 
-    def plot(self,ax=None):#2D plot
+    def plot(self,ax):#2D plot
         self.graph1 = ax.plot(self.data[0], self.int_right,zorder=3)[0]
         self.graph2 = ax.plot(self.data[0], self.int_down,zorder=3)[0]
 
     def click(self,pos):
         super().click(pos)
-        difference_array = np.absolute(self.center.data[2]-pos[0])
+        difference_array = np.absolute(self.figure_handeler.figures['center'].data[2]-pos[0])
         index1 = difference_array.argmin()
-        self.center.intensity(index1)
-        self.center.plot(self.center.ax)
-        self.center.redraw()
+        self.figure_handeler.figures['center'].intensity(index1)
+        self.figure_handeler.figures['center'].plot(self.figure_handeler.figures['center'].ax)
+        self.figure_handeler.figures['center'].redraw()
 
 class Band(Figure):
-    def __init__(self,data_tab,pos):
-        super().__init__(data_tab,pos)
+    def __init__(self,figure_handeler,pos):
+        super().__init__(figure_handeler,pos)
         self.tilt = -3.5#np.array([float(self.sub_tab.data_tab.data.metadata['T'])])
-        self.right = DOS_right(self,[self.pos[0]+self.size[0],self.pos[1]])
-        self.down = DOS_down(self,[self.pos[0],self.pos[1]+self.size[1]])
-        self.draw()
+        self.figures = figure_handeler.figures
 
     def subtract_BG(self):#the BG botton calls it
         self.state.bg_subtract()#run the appropriate method
@@ -375,34 +347,17 @@ class Band(Figure):
     def click(self,pos):
         super().click(pos)
         difference_array = np.absolute(self.data[0] - pos[0])#subtract for each channel, works.
-        index1 = self.state.click_right(difference_array)
-        self.right.intensity(index1)
-        self.right.draw()
+        index1 = np.argmin(difference_array)
+        self.figures['right'].intensity(index1)
+        self.figures['right'].draw()
 
         difference_array = np.absolute(self.data[1] - pos[1])
-        index2 = self.state.click_down(difference_array)
-        self.down.intensity(index2)
-        self.down.draw()
+        index2 = np.argmin(difference_array)
+        self.figures['down'].intensity(index2)
+        self.figures['down'].draw()
 
     def intensity(self,y = 0):
         self.int = self.sub_tab.data_tab.data.data[0]
-
-    def update_cursor(self):#called when changing the int range
-        self.cursor.update_line_width()
-        self.right.cursor.update_line_width()
-        self.down.cursor.update_line_width()
-
-    def draw(self):
-        super().draw()
-        self.right.draw()
-        self.down.draw()
-
-    def update_data(self):#called after k convert or fermi adjust
-        self.down.intensity()
-
-    def fermi_level(self):
-        adjust = processing.Fermi_level_band(self)
-        adjust.run()
 
     def angle2k(self,kx,ky):#the stuff to convert
         self.data[1] = ky.ravel()
@@ -412,44 +367,40 @@ class Band(Figure):
         return self.data[1],np.array([self.tilt])
 
 class DOS_right(Figure):
-    def __init__(self,center,pos):
-        self.center = center
-        super().__init__(center.sub_tab,pos)
+    def __init__(self,figure_handeler,pos):
+        super().__init__(figure_handeler,pos)
 
     def sort_data(self):
         self.intensity()
-        self.data = [self.int,self.center.data[1]]
+        self.data = [self.int,self.figure_handeler.figures['center'].data[1]]
 
     def intensity(self,x = 0):
         start,stop,step=self.int_range(x)
         self.int=[]
-        for ary in self.center.int:
+        for ary in self.figure_handeler.figures['center'].int:
             self.int.append(sum(ary[start:stop:1])/step)
     #    self.int=[]
         #for ary in self.sub_tab.center.int:
         #    self.int.append(ary[x])
-        self.xlimits = [min(self.int), max(self.int)]
 
     def plot(self,ax=None):#2D plot
-        self.graph = ax.plot(self.int,self.center.data[1])[0]
+        self.graph = ax.plot(self.int,self.figure_handeler.figures['center'].data[1])[0]#DOS right
 
 class DOS_down(Figure):
-    def __init__(self,center,pos):
-        self.center = center
-        super().__init__(center.sub_tab,pos)
+    def __init__(self,figure_handeler,pos):
+        super().__init__(figure_handeler,pos)
 
     def sort_data(self):
         self.intensity()
-        self.data = [self.center.data[0],self.int]
+        self.data = [self.figure_handeler.figures['center'].data[0],self.int]
 
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
-        self.int = sum(self.center.int[start:stop:1])/step
+        self.int = sum(self.figure_handeler.figures['center'].int[start:stop:1])/step
         #self.int = self.sub_tab.center.int[y]
-        self.ylimits = [min(self.int), max(self.int)]
 
     def plot(self,ax=None):#2D plot
-        self.graph = ax.plot(self.center.data[0], self.int)[0]
+        self.graph = ax.plot(self.figure_handeler.figures['center'].data[0], self.int)[0]#DOS down
 
 class Band_scan(Figure):
     def __init__(self,data_tab,pos):

@@ -6,7 +6,7 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 #from matplotlib import transforms#not using
 
 import dataloaders as dl
-import figure
+import figure_handeler
 
 #rotate figure?
 #kz?
@@ -139,14 +139,14 @@ class Overview(Subtab):
         if self.data_tab.data.zscale is None or len(self.data_tab.data.zscale)==1:#scan with many cuts, or 2D data
             #I guess it can be generalised?
             if self.data_tab.data.data[0].ndim == 3:#many 2D data, doesn't go in here for I05
-                self.center = figure.Band_scan(self,[0,0])
+                self.figure_handeler = figure.Band_scan(self,[0,0])
             elif self.data_tab.data.data[0].ndim == 2:#2D data
-                self.center = figure.Band(self,[0,0])
+                self.figure_handeler = figure_handeler.Twodimension(self)
         else:#3D data
-            self.center = figure.FS(self,[0,0])
+            self.figure_handeler = figure_handeler.Threedimension(self)
 
     def draw(self):
-        self.center.draw()
+        self.figure_handeler.draw()
 
     def logbook(self):
         columns=[]
@@ -214,19 +214,19 @@ class Operations():
             self.notebook.add(self.operation_tabs[operation],text=operation)
 
     def define_slide(self):
-        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=5,orient='horizontal',command=self.update_range,label='int range',resolution=1)#
+        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=5,orient='horizontal',command=self.update_line_width,label='int range',resolution=1)#
         scale.place(x = 0, y = 30)
 
-    def update_range(self,value):#the slider calls it
+    def update_line_width(self,value):#the slider calls it
         self.overview.int_range = int(value)
-        self.overview.center.update_cursor()
+        self.overview.figure_handeler.update_line_width()
 
     def define_colour_scale(self):#not in use
         scale = tk.Scale(self.operation_tabs['General'],from_=0,to=300,orient='horizontal',command=self.update_colour,label='colour scale',resolution=10)#
         scale.place(x = 0, y = 100)
 
     def update_colour(self,value):#not in use
-        self.center.vmax = int(value)
+        self.overview.figures.vmax = int(value)
         self.draw()
 
     def define_dropdowns(self):
@@ -241,7 +241,7 @@ class Operations():
         self.overview.draw()
 
     def define_BG(self):#generate botton, it will run the figure method
-        button_calc = tk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.center.subtract_BG)
+        button_calc = tk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.figures['center'].subtract_BG)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 0)
         self.BG_choise()
 
@@ -253,7 +253,7 @@ class Operations():
             tk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=60,y=30*index)
 
     def define_fermilevel(self):
-        button_calc = tk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.center.fermi_level)
+        button_calc = tk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
         offset = [200,0]
         button_calc.place(x=0,y=70)
 
