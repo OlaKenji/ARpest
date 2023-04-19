@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
+from matplotlib import animation
+
+
 import tkinter as tk
 import numpy as np
 import json
@@ -43,7 +46,7 @@ class Figure(Functions):
         self.intensity()
         self.original_int = self.int
 
-        #self.colour_limit()
+        self.colour_limit()
         self.define_canvas()
         self.define_mouse()
         self.define_dropdowns()
@@ -65,7 +68,6 @@ class Figure(Functions):
         self.fig.subplots_adjust(top=0.93,left=0.15,right=0.97)
         self.canvas = FigureCanvasTkAgg(self.fig, master = self.sub_tab.tab)
         self.canvas.draw()
-        self.background = self.canvas.copy_from_bbox(self.ax.bbox)
 
         offset = [0,0]
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
@@ -118,14 +120,14 @@ class Figure(Functions):
         self.plot(self.ax)
         self.set_label()
         self.canvas.draw()
-        self.curr_background = self.canvas.copy_from_bbox(self.ax.bbox)
+        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
 
     def redraw(self):
         self.canvas.restore_region(self.curr_background)
         self.ax.draw_artist(self.graph)
         self.canvas.blit(self.ax.bbox)
-        self.curr_background = self.canvas.copy_from_bbox(self.ax.bbox)
+        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
 
     def int_range(self,index):
@@ -150,13 +152,18 @@ class Figure(Functions):
         with open(path+"_exported.json", "w") as outfile:
             json.dump(export_data, outfile)
 
-    def set_label(self):
+    def set_label(self):#called from draw
         self.ax.set_xlabel(self.label[0])
         self.ax.set_ylabel(self.label[1])
 
     def colour_limit(self):#called in init
         self.vmin = self.int.min()
         self.vmax = self.int.max()
+
+    def update_colour_scale(self,value):#called from figure handlere and slide
+        self.vmax = self.int.max()*value
+        self.graph.set_clim(vmin=self.vmin, vmax=self.vmax)
+        #self.redraw()
 
     def gold(self):#sort the data: called from fermi_level processing init
         pass#self.data[0] is assumed to be kinetic energy need to transpose back and forth if this is not the case (not implemented)
@@ -166,9 +173,15 @@ class FS(Figure):
         super().__init__(figure_handeler,pos)
         self.label = ['x angle','y angle']
         self.figures = figure_handeler.figures
+        #self.anim = animation.FuncAnimation(self.fig, self.animate)#,init_func = self.init_animation,blit=True)# init_func = self.init_animation,
 
-    def plot(self,ax):
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap)#FS,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax)
+    def animate(self,frame):#this probably runs every frame
+        self.graph.set_array(self.int.ravel())
+        self.curr_background = self.canvas.copy_from_bbox(self.ax.bbox)
+        self.cursor.redraw()
+
+    def plot(self,ax):#pcolorfast
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#FS
         #self.fig.colorbar(self.graph)
 
     def sort_data(self):
@@ -206,7 +219,7 @@ class FS(Figure):
 
         self.figures['right'].data[1] = np.linspace(np.amin(ky),np.amax(ky),num=ky.shape[0])#make a 1D array from the 2D ky
         self.figures['down'].data[0] =np.linspace(np.amin(kx),np.amax(kx),num=kx.shape[1])#make a 1D array from the 2D kx
-        
+
 class Band_right(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
@@ -221,7 +234,7 @@ class Band_right(Figure):
         self.draw()
 
     def plot(self,ax):
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#band_right
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
 
     def intensity(self,y=0):
         start,stop,step = self.int_range(y)
@@ -261,8 +274,8 @@ class Band_down(Figure):
         self.int -=  bg
         self.draw()
 
-    def plot(self,ax=None):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#FS
+    def plot(self,ax):#2D plot
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#FS
 
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
@@ -326,6 +339,12 @@ class DOS_right_down(Figure):
         self.figure_handeler.figures['center'].plot(self.figure_handeler.figures['center'].ax)
         self.figure_handeler.figures['center'].redraw()
 
+    def update_colour_scale(self,value):
+        pass
+
+    def redraw(self):
+        pass
+
 class Band(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
@@ -338,7 +357,7 @@ class Band(Figure):
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#band
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):
@@ -376,15 +395,16 @@ class DOS_right(Figure):
 
     def intensity(self,x = 0):
         start,stop,step=self.int_range(x)
-        self.int=[]
+        int = []
         for ary in self.figure_handeler.figures['center'].int:
-            self.int.append(sum(ary[start:stop:1])/step)
-    #    self.int=[]
-        #for ary in self.sub_tab.center.int:
-        #    self.int.append(ary[x])
+            int.append(sum(ary[start:stop:1])/step)
+        self.int = np.array(int)
 
-    def plot(self,ax=None):#2D plot
+    def plot(self,ax):#2D plot
         self.graph = ax.plot(self.int,self.figure_handeler.figures['center'].data[1])[0]#DOS right
+
+    def update_colour_scale(self):
+        pass
 
 class DOS_down(Figure):
     def __init__(self,figure_handeler,pos):
@@ -399,8 +419,11 @@ class DOS_down(Figure):
         self.int = sum(self.figure_handeler.figures['center'].int[start:stop:1])/step
         #self.int = self.sub_tab.center.int[y]
 
-    def plot(self,ax=None):#2D plot
+    def plot(self,ax):#2D plot
         self.graph = ax.plot(self.figure_handeler.figures['center'].data[0], self.int)[0]#DOS down
+
+    def update_colour_scale(self):
+        pass
 
 class Band_scan(Figure):
     def __init__(self,data_tab,pos):

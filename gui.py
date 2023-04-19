@@ -3,18 +3,17 @@ from tkinter import ttk
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
-#from matplotlib import transforms#not using
+#from matplotlib import transforms
 
 import dataloaders as dl
 import figure_handeler
 
 #rotate figure?
-#kz?
-#Fermi lelve adjustement for maps?
+#kz
 #y,x limit
 #labels
 #colour bar
-#colour scale bar
+#speed. use nimation?
 
 #angle2k
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -24,9 +23,10 @@ import figure_handeler
     #2) MDC/EDC cuts divided by max value (fake data, just to enhance)
 
 #Bugs:
-#probably the kspace cut is not proper for FS (need to add NaN at white areas)
+#the slit issue
+#the kspace cut is not proper for FS (need to add NaN at white areas -> how? can do forloop to calculate for each layer and cut many times, possible to exctrat the data from pcolormesh (doesn't seem so))
 #crusor do not show up on default
-#subtract BG works for raw sate but not for fermi adjusted. Write seperate moethods for eac state
+#cannot go from k space to fermi level adjusted (becasue update_sort_data from processing writes the axis of band right and down into a the FS one (which is 2D))
 
 class GUI():#master Gui
     def __init__(self):
@@ -148,6 +148,9 @@ class Overview(Subtab):
     def draw(self):
         self.figure_handeler.draw()
 
+    def redraw(self):
+        self.figure_handeler.redraw()
+
     def logbook(self):
         columns=[]
         data=[]
@@ -201,8 +204,9 @@ class Operations():
         self.make_box()
         self.define_dropdowns()
         self.define_BG()
-        self.define_slide()
+        self.define_int_range()
         self.define_fermilevel()
+        self.define_colour_scale()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -213,7 +217,7 @@ class Operations():
             self.operation_tabs[operation] = tk.ttk.Frame(self.notebook, style='My.TFrame')
             self.notebook.add(self.operation_tabs[operation],text=operation)
 
-    def define_slide(self):
+    def define_int_range(self):
         scale = tk.Scale(self.operation_tabs['General'],from_=0,to=5,orient='horizontal',command=self.update_line_width,label='int range',resolution=1)#
         scale.place(x = 0, y = 30)
 
@@ -221,13 +225,13 @@ class Operations():
         self.overview.int_range = int(value)
         self.overview.figure_handeler.update_line_width()
 
-    def define_colour_scale(self):#not in use
-        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=300,orient='horizontal',command=self.update_colour,label='colour scale',resolution=10)#
+    def define_colour_scale(self):
+        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.update_colour,label='colour scale',resolution=5)#
         scale.place(x = 0, y = 100)
 
-    def update_colour(self,value):#not in use
-        self.overview.figures.vmax = int(value)
-        self.draw()
+    def update_colour(self,value):
+        self.overview.figure_handeler.update_colour_scale(int(value)/100)
+        self.overview.figure_handeler.redraw()
 
     def define_dropdowns(self):
         commands = ['RdYlBu_r','RdBu_r','terrain','binary', 'binary_r'] + sorted(['Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])
@@ -238,7 +242,7 @@ class Operations():
 
     def select_drop(self,event):
         self.overview.cmap = event
-        self.overview.draw()
+        self.overview.redraw()
 
     def define_BG(self):#generate botton, it will run the figure method
         button_calc = tk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.figures['center'].subtract_BG)#which figures shoudl have access to this?

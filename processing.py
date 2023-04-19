@@ -245,7 +245,7 @@ class Fermi_level_band(Raw):#only the main figure
 
     def update_figure(self):
         self.figure.figure_handeler.update_intensity()#update the cuts, but avoid for main figure
-        self.figure.figure_handeler.update_data()#update the cuts, but avoid for main figure
+        self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure -> this is not wokring if you do k space first since the FS will be a 2D arrat, while band wants 1D
         self.figure.figure_handeler.draw()
         self.figure.figure_handeler.update_mouse_range()
 
@@ -422,7 +422,7 @@ class Fermi_level_band(Raw):#only the main figure
             result = 1
         return result
 
-class Fermi_level_FS(Fermi_level_band):
+class Fermi_level_FS(Fermi_level_band):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
 
@@ -472,6 +472,7 @@ class Fermi_level_FS(Fermi_level_band):
         new_axis = np.arange(new_array.min(), new_array.max()+dE, dE)
 
         new_intensity = np.array(new_intensity)
+
         self.figure.data[2] = new_axis
         self.figure.data[3] = np.transpose(new_intensity, (1, 0, 2))
 

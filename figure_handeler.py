@@ -12,14 +12,14 @@ class Figure_handeler():
             if key == 'center': continue
             self.figures[key].intensity()
 
-    def update_data(self):#called after k convert or fermi adjust
+    def update_sort_data(self):#called after k convert or fermi adjust
         for key in self.figures.keys():
             if key == 'center': continue
             self.figures[key].sort_data()
 
     def update_mouse_range(self):#called after k convert or fermi adjust
         for figure in self.figures.values():
-            figure.mouse_range()
+            figure.mouse_range()#update the x,y limits
 
     def update_line_width(self):
         for figure in self.figures.values():
@@ -28,6 +28,18 @@ class Figure_handeler():
     def draw(self):
         for figure in self.figures.values():
             figure.draw()
+
+    def redraw(self):
+        for figure in self.figures.values():
+            figure.redraw()
+
+    def update_colour_scale(self,value):
+        for figure in self.figures.values():
+            figure.update_colour_scale(value)
+
+    def animate(self):
+        for figure in self.figures.values():
+            figure.animate()
 
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
