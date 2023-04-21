@@ -2,6 +2,7 @@ import numpy as np
 import sys
 
 #the state of the figure. The state is define if there have been operations on the figures (i.e. raw, fermi adjusted, k space)
+#obsolete?
 class States():
     def __init__(self,figure):
         self.figure = figure
@@ -65,4 +66,4 @@ class K_space(States):
         return index2
 
     def difference_array(self,pos):#FS calls this
-        return np.absolute(self.figure.data[1][:,0]-pos)#should inprinciple not be [:,0] but slightly curved, good enough approx
+        return np.absolute(self.figure.data[1]-pos)

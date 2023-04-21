@@ -41,6 +41,10 @@ class Figure_handeler():
         for figure in self.figures.values():
             figure.animate()
 
+    def kz_scan(self):
+        pass
+
+
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
         super().__init__(data_tab)
@@ -50,7 +54,7 @@ class Threedimension(Figure_handeler):#fermi surface
         positions = {'center':[self.pos[0],self.pos[1]],'right':[self.pos[0]+self.size[0],self.pos[1]],'down':[self.pos[0],self.pos[1]+self.size[1]],'corner':[self.pos[0]+self.size[0],self.pos[1]+self.size[1]]}
         self.figures = {}
         for key in figures.keys():
-            self.figures[key] = figures[key](self,positions[key])#make a class based on the name of the newstate: need to import sys
+            self.figures[key] = figures[key](self,positions[key])
 
     def fermi_level(self):#called when pressed the botton
         adjust = processing.Fermi_level_FS(self.figures['center'])

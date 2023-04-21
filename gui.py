@@ -5,15 +5,20 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 #from matplotlib import transforms
 
+from argparse import Namespace
+import numpy as np
+
 import dataloaders as dl
 import figure_handeler
 
-#rotate figure?
+
 #kz
+#unify meta data
 #y,x limit
 #labels
 #colour bar
-#speed. use nimation?
+#rotate figure?
+#dataloader gui?
 
 #angle2k
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -24,9 +29,7 @@ import figure_handeler
 
 #Bugs:
 #the slit issue
-#the kspace cut is not proper for FS (need to add NaN at white areas -> how? can do forloop to calculate for each layer and cut many times, possible to exctrat the data from pcolormesh (doesn't seem so))
 #crusor do not show up on default
-#cannot go from k space to fermi level adjusted (becasue update_sort_data from processing writes the axis of band right and down into a the FS one (which is 2D))
 
 class GUI():#master Gui
     def __init__(self):
@@ -51,6 +54,9 @@ class GUI():#master Gui
         self.style.configure('My.TFrame', background='white')#makes th frame where plots are white
         self.style.map('TNotebook.Tab', background= [("selected", "white")])#makes the selected tab white
         self.style.configure("TNotebook", background= 'white')#makes ther notebook bg white
+        self.style.configure('TCheckbutton',indicatorbackground="black", indicatorforeground="white",background="white", foreground="white")
+        self.style.map('TCheckbutton', foreground=[('disabled', 'blue'),('selected', 'blue'),('!selected', 'grey')],background=[("active", "white")])
+        self.style.configure("TMenubutton", background="white")
 
     def tabs(self):
         self.notebook = tk.ttk.Notebook(master = self.window,width=self.size[0],height=self.size[1])#to make tabs
@@ -61,7 +67,7 @@ class GUI():#master Gui
         botton.place(x = 700, y = 0)
 
     def open_file(self):
-        files = tk.filedialog.askopenfilenames(initialdir=self.start_path ,title='data')
+        files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
         for file in files:
             self.tab = Data_tab(self,file)
         idx = file.rfind('/')+1
@@ -86,14 +92,18 @@ class Data_tab():#holder for overview and analysis tabs. The data is stored here
         self.overview = Overview(self)#automatically open overview
         self.close_bottom()
 
-    def load_data(self,file):
-        self.data = dl.load_data(file)
-        idx = file.rfind('/')+1
-        self.add_tab(file[idx:])
-
     def define_tab(self):
         self.notebook = tk.ttk.Notebook(master=self.tab,width=self.gui.size[0], height=self.gui.size[1])#to make tabs
         self.notebook.pack()
+
+    def load_data(self,file):
+        try:#notmal
+            self.data = dl.load_data(file)
+            idx = file.rfind('/')+1
+            self.add_tab(file[idx:])
+        except:#combining data
+            self.data = file
+            self.add_tab('kz')
 
     def append_tab(self,fig,pos,int):
         self.analysis = Analysis(self,fig,pos,int)
@@ -137,11 +147,10 @@ class Overview(Subtab):
 
     def make_figure(self):
         if self.data_tab.data.zscale is None or len(self.data_tab.data.zscale)==1:#scan with many cuts, or 2D data
-            #I guess it can be generalised?
-            if self.data_tab.data.data[0].ndim == 3:#many 2D data, doesn't go in here for I05
-                self.figure_handeler = figure.Band_scan(self,[0,0])
-            elif self.data_tab.data.data[0].ndim == 2:#2D data
+            if self.data_tab.data.data.shape[0] == 1:#2D data
                 self.figure_handeler = figure_handeler.Twodimension(self)
+            else:#many 2D data, doesn't go in here for I05 or kz trans
+                self.figure_handeler = figure_handeler.Threedimension(self)
         else:#3D data
             self.figure_handeler = figure_handeler.Threedimension(self)
 
@@ -159,9 +168,9 @@ class Overview(Subtab):
                 for key in self.data_tab.data.metadata:
                     #print(self.data_tab.data.metadata['Point 24']), BLOCH scan stuff has this and contains the sacn parameter, e.g. hv
                     #print(self.data_tab.data.hv.keys())
-                    if key in self.log_parameters:
-                        columns.append(key)
-                        data.append(self.data_tab.data.metadata[key])
+                    #if key in self.log_parameters:
+                    columns.append(key)
+                    data.append(self.data_tab.data.metadata[key])
 
         tree = tk.ttk.Treeview(self.tab,columns=columns,show='headings',height=2)
         verscrlbar = tk.ttk.Scrollbar(self.tab,orient ="horizontal",command = tree.xview)
@@ -175,7 +184,7 @@ class Overview(Subtab):
         tree.place(x = 890, y = 0, width=610)
 
     def append_data_botton(self):#called frin init
-        button = tk.Button(self.tab, text="append data", command = self.append_method)
+        button = tk.ttk.Button(self.tab, text="append data", command = self.append_method)
         offset = [200,0]
         button.place(x = 890, y = 470)
         self.data_catalog()
@@ -207,6 +216,7 @@ class Operations():
         self.define_int_range()
         self.define_fermilevel()
         self.define_colour_scale()
+        self.define_kz()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -218,19 +228,23 @@ class Operations():
             self.notebook.add(self.operation_tabs[operation],text=operation)
 
     def define_int_range(self):
-        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=5,orient='horizontal',command=self.update_line_width,label='int range',resolution=1)#
-        scale.place(x = 0, y = 30)
+        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=5,orient='horizontal',command=self.update_line_width)#
+        scale.place(x = 0, y = 50)
+        label=ttk.Label(self.operation_tabs['General'],text='int. range',background='white',foreground='black')
+        label.place(x = 0, y = 30)
 
     def update_line_width(self,value):#the slider calls it
-        self.overview.int_range = int(value)
+        self.overview.int_range = int(float(value))
         self.overview.figure_handeler.update_line_width()
 
     def define_colour_scale(self):
-        scale = tk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.update_colour,label='colour scale',resolution=5)#
+        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.update_colour,value = 100)#
         scale.place(x = 0, y = 100)
+        label=ttk.Label(self.operation_tabs['General'],text='colour scale',background='white',foreground='black')
+        label.place(x = 0, y = 80)
 
     def update_colour(self,value):
-        self.overview.figure_handeler.update_colour_scale(int(value)/100)
+        self.overview.figure_handeler.update_colour_scale(int(float(value))/100)
         self.overview.figure_handeler.redraw()
 
     def define_dropdowns(self):
@@ -238,14 +252,35 @@ class Operations():
         dropvar = tk.StringVar(self.operation_tabs['General'])
         dropvar.set('colours')
         drop = tk.OptionMenu(self.operation_tabs['General'],dropvar,*commands,command = self.select_drop)
+        drop.config(bg="white")
         drop.place(x = 0, y = 0)
 
     def select_drop(self,event):
         self.overview.cmap = event
-        self.overview.redraw()
+        self.overview.draw()
+
+    def define_kz(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="kz", command = self.kz_scan)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 100)
+
+    def kz_scan(self):#would like to put photon energy as x, angle as  y, kintex energy as z, intensity as data
+        indices = self.overview.catalog.selection()
+        hv = []
+        for num, index in enumerate(indices):
+            data_name = self.overview.catalog.item(index)['values'][0]
+            scan_data = dl.load_data(self.overview.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
+            hv.append(scan_data.metadata['Excitation Energy'][0])#the photon energy
+            if num == 0:
+                int = np.transpose(scan_data.data[0])
+            else:
+                int = np.append(np.atleast_3d(int),np.atleast_3d(np.transpose(scan_data.data[0])),axis=2)
+
+        #print(int.shape)
+        new_data = Namespace(xscale=np.array(hv), yscale=scan_data.yscale,zscale=scan_data.zscale,data=int)
+        tab = Data_tab(self.overview.data_tab.gui,new_data)
 
     def define_BG(self):#generate botton, it will run the figure method
-        button_calc = tk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.figures['center'].subtract_BG)#which figures shoudl have access to this?
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.figures['center'].subtract_BG)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 0)
         self.BG_choise()
 
@@ -254,39 +289,16 @@ class Operations():
         self.checkbox = {}
         for index, choise in enumerate(choises):
             self.checkbox[choise] = tk.IntVar()
-            tk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=60,y=30*index)
+            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=120,y=30*index)
 
     def define_fermilevel(self):
-        button_calc = tk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
         offset = [200,0]
         button_calc.place(x=0,y=70)
 
 class Analysis(Subtab):
-    def __init__(self,data_tab,fig,pos,int):
+    def __init__(self,data_tab,fig):
         super().__init__(data_tab)
-        self.center = data_tab.overview.center
-        self.right = data_tab.overview.right
-        self.down = data_tab.overview.down
-        self.right_down = data_tab.overview.right_down
-
-        self.range = 0
-
-        self.fig = fig(self,pos)
-        self.fig.int = int#update int
-        self.fig.original_int = int
-        self.fig.draw()
-
-        self.define_botton()
-
-    def update_range(self,value):
-        self.int_range = int(value)
-        self.center.draw()
-        self.fig.cursor.draw_sta_line()
-
-    def define_botton(self):#generate botton, it will run the figure method
-        button_calc = tk.Button(self.tab, text="Generate", command=self.fig.generate)
-        offset = [130,20]
-        button_calc.place(x = self.fig.pos[0]+offset[0], y = self.fig.pos[1]+offset[1])
 
 class Pop_up():#the pop up window
     def __init__(self,gui):

@@ -108,7 +108,7 @@ class Dataloader_Pickle(Dataloader) :
             filedata = pickle.load(f)
         return filedata
 
-class Dataloader_i05(Dataloader) :
+class Dataloader_i05_old(Dataloader) :
     """
     Dataloader object for the i05 beamline at the Diamond Light Source.
     """
@@ -117,7 +117,6 @@ class Dataloader_i05(Dataloader) :
     def load_data(self, filename) :
         # Read file with h5py reader
         infile = h5py.File(filename, 'r')
-
         data = np.array(infile['/entry1/analyser/data']).T
         angles = np.array(infile['/entry1/analyser/angles'])
         energies = np.array(infile['/entry1/analyser/energies'])
@@ -152,6 +151,7 @@ class Dataloader_i05(Dataloader) :
 
             # Special case for 'pathgroup'
             if command.split()[1] == 'pathgroup' :
+
                 self.print_m('is pathgroup')
                 # Extract points from a ([polar, x, y], [polar, x, y], ...)
                 # tuple
@@ -170,6 +170,7 @@ class Dataloader_i05(Dataloader) :
 
             # Special case for 'scangroup'
             elif command.split()[1] == 'scan_group' :
+
                 self.print_m('is scan_group')
                 # Extract points from a ([polar, x, y], [polar, x, y], ...)
                 # tuple
@@ -211,7 +212,7 @@ class Dataloader_i05(Dataloader) :
         )
         return res
 
-class Dataloader_i052(Dataloader):#mine
+class Dataloader_i05(Dataloader):#mine
     """
     Dataloader object for the i05 beamline at the Diamond Light Source.
     """
@@ -226,25 +227,15 @@ class Dataloader_i052(Dataloader):#mine
         energies = np.array(infile['/entry1/analyser/energies'])
         hv = np.array(infile['/entry1/instrument/monochromator/energy'])
 
-        zscale = energies[0]#I have added [0]
-        yscale = angles
+        if len(energies.shape)==2:#I have added, needed for new data
+            energies = energies[0]
 
-        # Find which xscale is appropriate
-        #"""
-        #sapolar : map
-        #salong  : combined x & y scan along beam
-        #saperp  : combined x & y scan perpendicular to beam
-        #"""
-        #for z_name in ['salong', 'saperp'] :
-        #    index = '/entry1/analyser/{}'.format(z_name)
-        #    try :
-        #        zscale = np.array(infile[index])
-        #    except KeyError :
-        #        continue
+        zscale = energies
+        yscale = angles
 
         # Check if we have a scan
         if data.shape[2] == 1 :
-            xscale = energies[0]#I have added [0]
+            xscale = energies
             zscale = np.array([0])
             data = data.T
         else:
@@ -272,13 +263,13 @@ class Dataloader_i052(Dataloader):#mine
 
             # Special case for 'scangroup'
             elif command.split()[1] == 'scan_group':
+
                 self.print_m('is scan_group')
                 # Extract points from a ([polar, x, y], [polar, x, y], ...)
                 # tuple
                 #print(command.split(','))
 
                 points = command.split('((')[-1].split('))')[0]
-
                 points = ' (' + points + ')'#changed here from '((' + points + '))'
 
                 #added this stuff

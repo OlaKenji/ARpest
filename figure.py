@@ -1,15 +1,14 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib import animation
-
 
 import tkinter as tk
 import numpy as np
 import json
 import sys
 
-import processing, cursor, states_figure
+import processing, cursor
+import states_figure#do not need it, I guess
 
 class Functions():#figure functionality not being used
     def __init__(self):
@@ -42,8 +41,7 @@ class Figure(Functions):
         self.sub_tab = figure_handeler.data_tab#analysis or overview
         self.pos = pos
         self.label = ['x','y']
-        self.sort_data()
-        self.intensity()
+        self.init_data()
         self.original_int = self.int
 
         self.colour_limit()
@@ -57,6 +55,10 @@ class Figure(Functions):
         #self.define_normalise()
         self.define_export()
         self.draw()
+
+    def init_data(self):
+        self.intensity()
+        self.sort_data()
 
     def set_method(self,method):
         self.data_processor = self.data_processes[method](self)
@@ -73,8 +75,8 @@ class Figure(Functions):
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
 
     def mouse_range(self):
-        self.xlimits = [np.array(self.data[0]).min(), np.array(self.data[0]).max()]#used for crusor
-        self.ylimits = [np.array(self.data[1]).min(), np.array(self.data[1]).max()]
+        self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]#used for crusor
+        self.ylimits = [np.nanmin(self.data[1]), np.nanmax(self.data[1])]
 
     def define_mouse(self):#called in init and from processing
         self.mouse_range()
@@ -93,6 +95,7 @@ class Figure(Functions):
         dropvar = tk.StringVar()
         dropvar.set(commands[0])
         drop = tk.OptionMenu(self.sub_tab.tab,dropvar,*commands,command = self.select_drop)
+        drop.config(bg="white")
         offset=[50,0]
         drop.place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])
 
@@ -122,6 +125,7 @@ class Figure(Functions):
         self.canvas.draw()
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
+        self.mouse_range()
 
     def redraw(self):
         self.canvas.restore_region(self.curr_background)
@@ -142,8 +146,8 @@ class Figure(Functions):
             return start,stop,step
 
     def define_export(self):
-        button_calc = tk.Button(self.sub_tab.tab, text="Export", command = self.export)
-        offset = [340,0]
+        button_calc = tk.ttk.Button(self.sub_tab.tab, text="Export", command = self.export)
+        offset = [320,0]
         button_calc.place(x = self.pos[0]+offset[0], y = self.pos[1]+offset[1])
 
     def export(self):
@@ -157,11 +161,11 @@ class Figure(Functions):
         self.ax.set_ylabel(self.label[1])
 
     def colour_limit(self):#called in init
-        self.vmin = self.int.min()
-        self.vmax = self.int.max()
+        self.vmin = np.nanmin(self.int)
+        self.vmax = np.nanmax(self.int)
 
     def update_colour_scale(self,value):#called from figure handlere and slide
-        self.vmax = self.int.max()*value
+        self.vmax = np.nanmax(self.int)*value
         self.graph.set_clim(vmin=self.vmin, vmax=self.vmax)
         #self.redraw()
 
@@ -173,15 +177,14 @@ class FS(Figure):
         super().__init__(figure_handeler,pos)
         self.label = ['x angle','y angle']
         self.figures = figure_handeler.figures
-        #self.anim = animation.FuncAnimation(self.fig, self.animate)#,init_func = self.init_animation,blit=True)# init_func = self.init_animation,
+        #self.init_data()
 
-    def animate(self,frame):#this probably runs every frame
-        self.graph.set_array(self.int.ravel())
-        self.curr_background = self.canvas.copy_from_bbox(self.ax.bbox)
-        self.cursor.redraw()
+    def init_data(self):
+        self.sort_data()
+        self.intensity()
 
     def plot(self,ax):#pcolorfast
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#FS
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#FS
         #self.fig.colorbar(self.graph)
 
     def sort_data(self):
@@ -210,15 +213,6 @@ class FS(Figure):
 
     def define_angle2k(self):#called from procssing
         return self.data[1], self.data[0]
-
-    def angle2k(self,kx,ky):#the stuff to convert, called from k convert
-        self.data[0] = kx
-        self.data[1] = ky
-        self.xlimits = [min(self.data[0][0]), max(self.data[0][0])]#used for crusor
-        self.ylimits = [min(self.data[1][0]), max(self.data[1][-1])]
-
-        self.figures['right'].data[1] = np.linspace(np.amin(ky),np.amax(ky),num=ky.shape[0])#make a 1D array from the 2D ky
-        self.figures['down'].data[0] =np.linspace(np.amin(kx),np.amax(kx),num=kx.shape[1])#make a 1D array from the 2D kx
 
 class Band_right(Figure):
     def __init__(self,figure_handeler,pos):
@@ -258,11 +252,6 @@ class Band_right(Figure):
     def define_angle2k(self):#called from procssing
         return self.data[1],np.array([self.tilt])
 
-    def angle2k(self,kx,ky):#the stuff to convert
-        #self.data[0] = kx
-        self.data[1] = ky
-        self.ylimits = [min(self.data[1][0]), max(self.data[1][-1])]
-
 class Band_down(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
@@ -297,11 +286,6 @@ class Band_down(Figure):
         #self.gui.right_down.plot()
         #self.gui.right_down.redraw()
 
-    def angle2k(self,kx,ky):#the stuff to convert
-        self.data[0] = kx
-        #self.data[1] = ky
-        self.xlimits = [min(self.data[0][0]), max(self.data[0][0])]#used for crusor
-
     def define_angle2k(self):#called from procssing
         return np.array([self.tilt]),self.data[0]
 
@@ -310,7 +294,7 @@ class DOS_right_down(Figure):
         super().__init__(figure_handeler,pos)
 
     def sort_data(self):
-        self.data = [self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[2]]
+        self.data = [self.figure_handeler.figures['center'].data[2],self.int_right]
 
     def intensity(self,idx=0):
         self.intensity_right(idx)
@@ -351,13 +335,17 @@ class Band(Figure):
         self.tilt = -3.5#np.array([float(self.sub_tab.data_tab.data.metadata['T'])])
         self.figures = figure_handeler.figures
 
+    def init_data(self):
+        self.sort_data()
+        self.intensity()
+
     def subtract_BG(self):#the BG botton calls it
         self.state.bg_subtract()#run the appropriate method
         self.draw()
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):
@@ -378,10 +366,6 @@ class Band(Figure):
     def intensity(self,y = 0):
         self.int = self.sub_tab.data_tab.data.data[0]
 
-    def angle2k(self,kx,ky):#the stuff to convert
-        self.data[1] = ky.ravel()
-        self.ylimits = [min(self.data[1]), max(self.data[1])]
-
     def define_angle2k(self):#called from procssing
         return self.data[1],np.array([self.tilt])
 
@@ -390,7 +374,7 @@ class DOS_right(Figure):
         super().__init__(figure_handeler,pos)
 
     def sort_data(self):
-        self.intensity()
+        #self.intensity()
         self.data = [self.int,self.figure_handeler.figures['center'].data[1]]
 
     def intensity(self,x = 0):
@@ -399,11 +383,12 @@ class DOS_right(Figure):
         for ary in self.figure_handeler.figures['center'].int:
             int.append(sum(ary[start:stop:1])/step)
         self.int = np.array(int)
+        self.sort_data()
 
     def plot(self,ax):#2D plot
         self.graph = ax.plot(self.int,self.figure_handeler.figures['center'].data[1])[0]#DOS right
 
-    def update_colour_scale(self):
+    def update_colour_scale(self,value):
         pass
 
 class DOS_down(Figure):
@@ -411,18 +396,19 @@ class DOS_down(Figure):
         super().__init__(figure_handeler,pos)
 
     def sort_data(self):
-        self.intensity()
+        #self.intensity()
         self.data = [self.figure_handeler.figures['center'].data[0],self.int]
 
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
         self.int = sum(self.figure_handeler.figures['center'].int[start:stop:1])/step
         #self.int = self.sub_tab.center.int[y]
+        self.sort_data()
 
     def plot(self,ax):#2D plot
         self.graph = ax.plot(self.figure_handeler.figures['center'].data[0], self.int)[0]#DOS down
 
-    def update_colour_scale(self):
+    def update_colour_scale(self,value):
         pass
 
 class Band_scan(Figure):
@@ -440,8 +426,8 @@ class Band_scan(Figure):
         self.intensity(int(value))
         self.draw()
 
-    def plot(self,ax=None):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#FS
+    def plot(self,ax):#2D plot
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#FS
 
     def intensity(self,y = 0):
         #self.int = self.sub_tab.data_tab.data.data[0]
