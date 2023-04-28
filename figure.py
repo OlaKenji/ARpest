@@ -9,7 +9,6 @@ import sys
 from argparse import Namespace
 
 import processing, cursor
-#import states_figure#do not need it, I guess
 
 class Functions():#figure functionality not being used
     def __init__(self):

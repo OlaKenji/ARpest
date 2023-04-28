@@ -11,15 +11,16 @@ import numpy as np
 import dataloaders as dl
 import figure_handeler
 
+#dataloader gui?
+#unify meta data
+#namespace or dict?
+
 #to implement:
-#kz -> convert to k, correct fermi level without interpolation
+#kz -> convert to k, correct fermi level without interpolation?
 #make same y,x limits/zoom
 #labels
 #colour bar
 #rotate figure?
-#dataloader gui?
-#unify meta data
-#namespace or dict?
 #fermi level for photon ebergy scan
 #update the x axis for photon energy scan?
 
@@ -27,6 +28,7 @@ import figure_handeler
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #cannot go to analysis if in k space (array length problem)
+#probably need to the axis corrections for each energy to make a 3D data (for FS only)
 
 #stuff:
 #angle2k
