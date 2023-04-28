@@ -17,6 +17,11 @@ class Auto_cursor():
         self.sta_horizontal_line = self.figure.ax.axhline(self.pos[1],color='r', lw=thickness,zorder=2)
         self.sta_vertical_line = self.figure.ax.axvline(self.pos[0],color='r', lw=thickness,zorder=2)
 
+        self.dyn_horizontal_line.set_ydata(self.pos[1])
+        self.dyn_vertical_line.set_xdata(self.pos[0])
+        self.sta_horizontal_line.set_ydata(self.pos[1])
+        self.sta_vertical_line.set_xdata(self.pos[0])
+
     def update_event(self,event):
         self.xlimits = self.figure.xlimits
         self.ylimits = self.figure.ylimits

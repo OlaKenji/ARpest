@@ -11,25 +11,30 @@ import numpy as np
 import dataloaders as dl
 import figure_handeler
 
-
-#kz
-#unify meta data
-#y,x limit
+#to implement:
+#kz -> convert to k, correct fermi level without interpolation
+#make same y,x limits/zoom
 #labels
 #colour bar
 #rotate figure?
 #dataloader gui?
+#unify meta data
+#namespace or dict?
+#fermi level for photon ebergy scan
+#update the x axis for photon energy scan?
 
+#Bugs:
+#the slit issue
+#multiple file photon energy scan only seem to wor for evenly spaced energy scans
+#cannot go to analysis if in k space (array length problem)
+
+#stuff:
 #angle2k
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
 #2nd derivative
 #normalisation:
     #1) by number of sweeps (can chekc the BG above FL to check for number of sweeps),
     #2) MDC/EDC cuts divided by max value (fake data, just to enhance)
-
-#Bugs:
-#the slit issue
-#crusor do not show up on default
 
 class GUI():#master Gui
     def __init__(self):
@@ -85,33 +90,25 @@ class GUI():#master Gui
 
 class Data_tab():#holder for overview and analysis tabs. The data is stored here
     def __init__(self,gui,file):
-        super().__init__()
         self.gui = gui
-        self.load_data(file)
-        self.define_tab()
-        self.overview = Overview(self)#automatically open overview
+        data = dl.load_data(file)#load the data
+        self.define_tab(file)
+        self.define_notebook()
         self.close_bottom()
+        self.overview = Overview(self,data)#automatically open overview
 
-    def define_tab(self):
+    def define_notebook(self):
         self.notebook = tk.ttk.Notebook(master=self.tab,width=self.gui.size[0], height=self.gui.size[1])#to make tabs
         self.notebook.pack()
 
-    def load_data(self,file):
-        try:#notmal
-            self.data = dl.load_data(file)
-            idx = file.rfind('/')+1
-            self.add_tab(file[idx:])
-        except:#combining data
-            self.data = file
-            self.add_tab('kz')
-
-    def append_tab(self,fig,pos,int):
-        self.analysis = Analysis(self,fig,pos,int)
-
-    def add_tab(self,name):
-        self.name = name
+    def define_tab(self,file):
+        idx = file.rfind('/')+1
+        self.name = file[idx:]#used in overview
         self.tab = tk.ttk.Frame(self.gui.notebook)
-        self.gui.notebook.add(self.tab,text=name)
+        self.gui.notebook.add(self.tab,text=self.name)
+
+    def append_tab(self,data):
+        self.analysis = Analysis(self,data)
 
     def close_bottom(self):#to close the datatab
         botton = tk.ttk.Button(self.tab,text='close',command=self.close)
@@ -121,9 +118,10 @@ class Data_tab():#holder for overview and analysis tabs. The data is stored here
         self.tab.destroy()
 
 class Subtab():
-    def __init__(self,data_tab):
+    def __init__(self,data_tab,data):
         super().__init__()
         self.data_tab = data_tab
+        self.data = data
         self.int_range = 0
         self.add_tab(type(self).__name__)
         self.slit = 'v'#depends on instrument
@@ -134,8 +132,8 @@ class Subtab():
         self.data_tab.notebook.add(self.tab,text=name)
 
 class Overview(Subtab):
-    def __init__(self,data_tab):
-        super().__init__(data_tab)
+    def __init__(self,data_tab,data):
+        super().__init__(data_tab,data)
         self.make_figure()
         self.operations = Operations(self)
         #self.log_parameters = ['Pass Energy','Number of Sweeps','Excitation Energy','Acquisition Mode','Center Energy', 'Energy Step' ,'Step Time' , 'A' ,'P', 'T', 'X', 'Y', 'Z']#may depend on the instrument.... Bloch
@@ -143,11 +141,11 @@ class Overview(Subtab):
         self.logbook()
         self.append_data_botton()
         self.append_data(self.data_tab.name)
-        self.data = []
+        self.define_combine_data()
 
     def make_figure(self):
-        if self.data_tab.data.zscale is None or len(self.data_tab.data.zscale)==1:#scan with many cuts, or 2D data
-            if self.data_tab.data.data.shape[0] == 1:#2D data
+        if self.data.zscale is None or len(self.data.zscale)==1:#scan with many cuts, or 2D data
+            if self.data.data.shape[0] == 1:#2D data
                 self.figure_handeler = figure_handeler.Twodimension(self)
             else:#many 2D data, doesn't go in here for I05 or kz trans
                 self.figure_handeler = figure_handeler.Threedimension(self)
@@ -163,14 +161,12 @@ class Overview(Subtab):
     def logbook(self):
         columns=[]
         data=[]
-        for key in vars(self.data_tab.data):
-            if key == 'metadata':
-                for key in self.data_tab.data.metadata:
-                    #print(self.data_tab.data.metadata['Point 24']), BLOCH scan stuff has this and contains the sacn parameter, e.g. hv
-                    #print(self.data_tab.data.hv.keys())
-                    #if key in self.log_parameters:
-                    columns.append(key)
-                    data.append(self.data_tab.data.metadata[key])
+        for key in self.data.metadata:
+            #print(self.data_tab.data.metadata['Point 24']), BLOCH scan stuff has this and contains the sacn parameter, e.g. hv
+            #print(self.data_tab.data.hv.keys())
+            #if key in self.log_parameters:
+            columns.append(key)
+            data.append(self.data.metadata[key])
 
         tree = tk.ttk.Treeview(self.tab,columns=columns,show='headings',height=2)
         verscrlbar = tk.ttk.Scrollbar(self.tab,orient ="horizontal",command = tree.xview)
@@ -185,7 +181,6 @@ class Overview(Subtab):
 
     def append_data_botton(self):#called frin init
         button = tk.ttk.Button(self.tab, text="append data", command = self.append_method)
-        offset = [200,0]
         button.place(x = 890, y = 470)
         self.data_catalog()
 
@@ -207,6 +202,26 @@ class Overview(Subtab):
         name = file[idx:]
         self.catalog.insert('',tk.END,values=name)
 
+    def define_combine_data(self):
+        button = tk.ttk.Button(self.tab, text="combine data", command = self.combine_data)
+        button.place(x = 1080, y = 470)
+
+    def combine_data(self):#combining and putting the data in the data catalog: photon energy as x, angle as  y, kintex energy as z, intensity as data (3D)
+        indices = self.catalog.selection()
+        hv = []
+        for num, index in enumerate(indices):
+            data_name = self.catalog.item(index)['values'][0]
+            scan_data = dl.load_data(self.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
+            hv.append(scan_data.metadata['Excitation Energy'][0])#the photon energy
+            if num == 0:
+                int = np.atleast_3d(np.transpose(scan_data.data[0]))
+            else:
+                int = np.append(int,np.atleast_3d(np.transpose(scan_data.data[0])),axis=2)
+
+        scan_data.metadata['Excitation Energy'] = hv
+        new_data = Namespace(xscale=np.array(hv), yscale=scan_data.yscale,zscale=scan_data.xscale,data=int,metadata=scan_data.metadata)#add meta data
+        tab = self.data_tab.append_tab(new_data)
+
 class Operations():
     def __init__(self,overview):
         self.overview = overview
@@ -217,6 +232,7 @@ class Operations():
         self.define_fermilevel()
         self.define_colour_scale()
         self.define_kz()
+        self.define_k_convert()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -238,14 +254,10 @@ class Operations():
         self.overview.figure_handeler.update_line_width()
 
     def define_colour_scale(self):
-        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.update_colour,value = 100)#
-        scale.place(x = 0, y = 100)
+        self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.overview.figure_handeler.update_colour_scale,value = 100)#
+        self.color_scale.place(x = 0, y = 100)
         label=ttk.Label(self.operation_tabs['General'],text='colour scale',background='white',foreground='black')
         label.place(x = 0, y = 80)
-
-    def update_colour(self,value):
-        self.overview.figure_handeler.update_colour_scale(int(float(value))/100)
-        self.overview.figure_handeler.redraw()
 
     def define_dropdowns(self):
         commands = ['RdYlBu_r','RdBu_r','terrain','binary', 'binary_r'] + sorted(['Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])
@@ -258,26 +270,6 @@ class Operations():
     def select_drop(self,event):
         self.overview.cmap = event
         self.overview.draw()
-
-    def define_kz(self):
-        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="kz", command = self.kz_scan)#which figures shoudl have access to this?
-        button_calc.place(x = 0, y = 100)
-
-    def kz_scan(self):#would like to put photon energy as x, angle as  y, kintex energy as z, intensity as data
-        indices = self.overview.catalog.selection()
-        hv = []
-        for num, index in enumerate(indices):
-            data_name = self.overview.catalog.item(index)['values'][0]
-            scan_data = dl.load_data(self.overview.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
-            hv.append(scan_data.metadata['Excitation Energy'][0])#the photon energy
-            if num == 0:
-                int = np.transpose(scan_data.data[0])
-            else:
-                int = np.append(np.atleast_3d(int),np.atleast_3d(np.transpose(scan_data.data[0])),axis=2)
-
-        #print(int.shape)
-        new_data = Namespace(xscale=np.array(hv), yscale=scan_data.yscale,zscale=scan_data.zscale,data=int)
-        tab = Data_tab(self.overview.data_tab.gui,new_data)
 
     def define_BG(self):#generate botton, it will run the figure method
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.figures['center'].subtract_BG)#which figures shoudl have access to this?
@@ -296,9 +288,17 @@ class Operations():
         offset = [200,0]
         button_calc.place(x=0,y=70)
 
-class Analysis(Subtab):
-    def __init__(self,data_tab,fig):
-        super().__init__(data_tab)
+    def define_kz(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="kz", command = self.overview.figure_handeler.kz_convert)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 100)
+
+    def define_k_convert(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="k convert", command = self.overview.figure_handeler.k_convert)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 130)
+
+class Analysis(Overview):
+    def __init__(self,data_tab,data):
+        super().__init__(data_tab,data)
 
 class Pop_up():#the pop up window
     def __init__(self,gui):

@@ -35,15 +35,12 @@ class Figure_handeler():
 
     def update_colour_scale(self,value):
         for figure in self.figures.values():
-            figure.update_colour_scale(value)
+            self.redraw()
 
-    def animate(self):
-        for figure in self.figures.values():
-            figure.animate()
-
-    def kz_scan(self):
-        pass
-
+    #methods
+    def k_convert(self):#called when pressed the botton
+        adjust = processing.Convert_k(self.figures['center'])
+        adjust.run()
 
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
@@ -60,6 +57,10 @@ class Threedimension(Figure_handeler):#fermi surface
         adjust = processing.Fermi_level_FS(self.figures['center'])
         adjust.run()
 
+    def kz_convert(self):#called when pressed the botton
+        adjust = processing.Convert_kz(self.figures['center'])
+        adjust.run()
+
 class Twodimension(Figure_handeler):#band
     def __init__(self,data_tab):
         super().__init__(data_tab)
@@ -74,3 +75,6 @@ class Twodimension(Figure_handeler):#band
     def fermi_level(self):#called when pressed the botton
         adjust = processing.Fermi_level_band(self.figures['center'])
         adjust.run()
+
+    def kz_convert(self):#called when pressed the botton
+        pass

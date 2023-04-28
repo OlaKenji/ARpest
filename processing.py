@@ -5,13 +5,14 @@ import figure, cursor, dataloaders
 from scipy import ndimage
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+from scipy import interpolate
 
 class Raw():
     def __init__(self,figure):
         self.figure = figure
         self.original_int = self.figure.int.copy()
         self.define_mouse()
-        self.figure.state.enter_state('Raw')
+        #self.figure.state.enter_state('Raw')
 
     def define_mouse(self):
         self.figure.define_mouse()
@@ -175,7 +176,7 @@ class Derivative_y(Derivative_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        self.figure.state.enter_state('K_space')
+        #self.figure.state.enter_state('K_space')
 
     def run(self):
         self.convert2k()
@@ -183,6 +184,7 @@ class Convert_k(Raw):
 
     def update_figure(self):
         self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure
+        #self.figure.figure_handeler.update_intensity()
         self.figure.figure_handeler.draw()
         self.figure.figure_handeler.update_mouse_range()
 
@@ -223,7 +225,7 @@ class Convert_k(Raw):
 
 
         if KY.shape[1] == 1:#2D, band
-            self.figure.data[1] = k0*KY.ravel()
+            self.figure.data[1] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))
         else:#3D, FS
             self.new_mesh(k0*KX,k0*KY)
 
@@ -232,12 +234,12 @@ class Convert_k(Raw):
         self.figure.draw()
 
     def new_mesh(self,kx,ky):#for 3D data set, FS
-        min_index = [np.argmin((kx[:,-1]-kx[:,0])),np.argmin((ky[-1]-ky[0]))]#the index in whihc there is the minimum distance betwene the intensitie mesh
+        min_index = [np.argmin((kx[:,-1]-kx[:,0])),np.argmin((ky[-1]-ky[0]))]#the index in whihc there is the minimum distance between the intensity mesh
 
         #min_distance = [kx[index[0]][1]-kx[index[0]][0], ky[1][index[1]]-ky[0][index[1]]]#minimum bin size
         min_bin = [(np.amax(kx[min_index[0]]) - np.amin(kx[min_index[0]]))/len(kx[min_index[0]]),(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:,min_index[1]])]#min bin size
 
-        max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the minimum distance betwene the intensitie mesh
+        max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
         max_distance = [np.amax(kx[max_index[0]]) - np.amin(kx[max_index[0]]),np.amax(ky[:,max_index[1]]) - np.amin(ky[:,max_index[1]])]
         number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
 
@@ -268,6 +270,211 @@ class Convert_k(Raw):
         self.figure.data[0] = axis_x
         self.figure.data[1] = axis_y
 
+class Convert_kz(Raw):
+    def __init__(self,figure):
+        super().__init__(figure)
+        #self.figure.state.enter_state('K_space')
+
+    def run(self):
+        self.converthv()
+        self.update_figure()
+
+    def update_figure(self):
+        self.figure.figure_handeler.update_intensity()#update the cuts, but avoid for main figure
+        self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure
+        self.figure.figure_handeler.draw()
+        self.figure.figure_handeler.update_mouse_range()
+
+    def converthv(self):
+        #convert to kz
+        q = 1.60218*10**-19#charge
+        m = 9.1093837*10**-31#kg
+        hbar = (6.62607015*10**-34)/(2*np.pi)#m2 kg / s
+        V = 8*q#J
+        W = 4.5#eV
+        Eb = 0#eV binding energy
+        kz = []
+        ky = []
+        for hv in self.figure.data[0]:#do it for each photon energy
+            ky.append(self.convert2k(hv)[:,0])
+            Ek = (hv-W-Eb)*q#J -> can be extract the value from the figure?
+            kz.append(10**-10*np.sqrt(2*m*(Ek*np.cos(np.pi*self.figure.data[1]/180)**2+V))/hbar)
+
+        kz = np.transpose(np.array(kz))
+        ky = np.transpose(np.array(ky))
+        #print(ky,kz)
+
+        self.figure.data[0] = kz
+        self.figure.data[1] = ky
+
+        #new mesh
+        self.new_mesh(kz,ky)
+
+    def new_mesh(self,kx,ky):
+        min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
+
+        length = np.argmax(kx[:,min_index[0]])-np.argmin(kx[:,min_index[0]])
+        min_bin = [(np.amax(kx[:,min_index[0]]) - np.amin(kx[:,min_index[0]]))/length,(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:])]#min bin size
+
+        #max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
+        max_distance = [kx.max() - kx.min(),ky.max() - ky.min()]
+        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
+
+        axis_y = np.linspace(ky.min(),ky.max(),num = round(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
+        axis_x =np.linspace(kx.min(),kx.max(),num = round(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
+
+        data = np.zeros((len(axis_y),len(axis_x)))#place holder for mesh
+        data[:] = np.NaN
+        index=[0,0]
+
+        #bascially workds but not perfect
+        for row_index, row in enumerate(kx):
+            for col, x in enumerate(row):
+                y = ky[row_index][col]
+                #translate to appropriate positions
+                index[0] = (x - axis_x[0])/min_bin[0]
+                index[1] = (y - axis_y[0])/min_bin[1]
+                index[0] = min(index[0],3419)#fix this
+                data[int(index[1])][int(index[0])] = self.figure.int[row_index][col]
+
+        #interpolate
+        xx, yy = np.meshgrid(axis_x, axis_y)
+        masked_intensity = np.ma.masked_invalid(data)
+        intensity= interpolate.griddata((xx[~masked_intensity.mask],yy[~masked_intensity.mask]), masked_intensity[~masked_intensity.mask].ravel(),(xx, yy),method='linear')
+
+        #save the results
+        self.figure.int = intensity
+        self.figure.data[0] = axis_x
+        self.figure.data[1] = axis_y
+
+        return#below is for every energy. Very slow....
+
+        axis_z = self.figure.data[2]
+
+        data = np.zeros((len(axis_z),len(axis_y),len(axis_x)))#place holder for mesh
+        data[:] = np.NaN
+        index=[0,0]
+
+        #bascially workds but not perfect
+        for index_z, z in enumerate(axis_z):
+            for row_index, row in enumerate(kx):
+                for col, x in enumerate(row):
+                    y = ky[row_index][col]
+                    #translate to appropriate positions
+                    index[0] = (x - axis_x[0])/min_bin[0]
+                    index[1] = (y - axis_y[0])/min_bin[1]
+                    index[0] = min(index[0],3419)
+                    data[index_z][int(index[1])][int(index[0])] = self.figure.data[3][index_z][row_index][col]
+
+        #this works but insainly slow, works for up to 7 files, maybe?
+        intensity = []
+        xx, yy = np.meshgrid(axis_x, axis_y)
+        for layer in data:
+            masked_intensity = np.ma.masked_invalid(layer)
+            intensity.append(interpolate.griddata((xx[~masked_intensity.mask],yy[~masked_intensity.mask]), masked_intensity[~masked_intensity.mask].ravel(),(xx, yy),method='linear'))
+
+        self.figure.int = intensity[0]
+        self.figure.data[0] = axis_x
+        self.figure.data[1] = axis_y
+        self.figure.data[3] = intensity
+
+        return
+
+        #this also works but is even lower...
+        new_intensity=np.array(data[0])
+        xx, yy = np.meshgrid(axis_x, axis_y)
+        for index, layer in enumerate(data):
+            intensity=np.array([layer[0]])
+
+            for col,array in enumerate(layer):
+                masked_intensity = np.ma.masked_invalid(array)
+                int2 = np.interp(axis_x,axis_x[~masked_intensity.mask],masked_intensity[~masked_intensity.mask])
+
+                intensity = np.append(intensity, [int2], axis=0)
+
+                if col == 0:
+                    intensity = np.delete(intensity, len(intensity)-1, 0)
+            new_intensity=np.dstack((new_intensity,intensity))
+
+        self.figure.int = new_intensity[0]
+        self.figure.data[0] = axis_x
+        self.figure.data[1] = axis_y
+        self.figure.data[3] = new_intensity
+        return
+
+        #this doesn't work, which could be faster
+        #reshape the intensity
+        for col, x_cord in enumerate(axis_x):
+            index[1]=0
+            for row,y_cord in enumerate(axis_y):
+
+                for column in range(len(kx[0])):#check is column, every time
+
+                    if x_cord >= kx[index[1]][column]:
+                        if y_cord >= ky[index[1]][index[0]]:
+                            real_int = self.figure.int[index[1]][index[0]]
+                            index[1] += 1
+                            break
+                        else:
+                            real_int=np.NaN
+                    else:
+                        if y_cord >= ky[index[1]][index[0]]:
+                            index[1] += 1
+                        real_int=np.NaN
+
+                    #if y_cord >= ky[index[1]][index[0]]:
+                    #    index[1]+=1
+                intensity[row][col] = real_int
+
+        self.figure.int = intensity
+        self.figure.data[0] = axis_x
+        self.figure.data[1] = axis_y
+
+    def convert2k(self,hv):
+        work_func = 4#usually 4
+        hv = hv#incident energy
+        k0 = 0.5124 * np.sqrt(hv - work_func)
+
+        #alpha is the polar or theta
+        #beta is the tilt
+
+        # Angle to radian conversion
+        dalpha,dbeta = 0,0
+        alpha,beta = self.figure.define_hv()#depends on the figure
+        a = (alpha+dalpha)*np.pi/180
+        b = (beta+dbeta)*np.pi/180
+
+        # place hodlers
+        nkx = len(alpha)
+        nky = len(beta)
+        KX = np.empty((nkx, nky))
+        KY = np.empty((nkx, nky))
+
+        if self.figure.sub_tab.slit == 'h':
+            for i in range(nkx):
+                KX[i] = np.sin(b) * np.cos(a[i])
+                KY[i] = np.sin(a[i])
+
+        elif self.figure.sub_tab.slit == 'v':
+            # Precalculate outside the loop
+            theta_k = beta*np.pi/180
+            cos_theta = np.cos(theta_k)
+            sin_theta_cos_beta = np.sin(theta_k) * np.cos(dbeta*np.pi/180)
+            for i in range(nkx):
+                KX[i] = sin_theta_cos_beta + cos_theta * np.cos(a[i]) * \
+                        np.sin(dbeta*np.pi/180)
+                KY[i] = cos_theta * np.sin(a[i])
+
+        return k0*KY
+        #if KY.shape[1] == 1:#2D, band
+        #    self.figure.data[1] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))
+        #else:#3D, FS
+        #    self.new_mesh(k0*KX,k0*KY)
+
+    def exit(self):
+        self.figure.sort_data()
+        self.figure.draw()
+
 class Fermi_level_band(Raw):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
@@ -275,8 +482,8 @@ class Fermi_level_band(Raw):#only the main figure
         self.gold = dataloaders.load_data(gold)
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
-        self.e_0 = 28 - 4.38#initial guess of fermi level
-        self.figure.state.enter_state('Fermi_adjusted')
+        self.e_0 = 34 - 4.38#initial guess of fermi level
+        #self.figure.state.enter_state('Fermi_adjusted')
 
     def run(self):
         self.figure.gold()#cannot be in init
@@ -329,48 +536,9 @@ class Fermi_level_band(Raw):#only the main figure
             new_array[row] = array
             new_intensity[row] = temp
 
-        new_axis = np.arange(new_array.min(), new_array.max(), dE)
+        new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:]))
 
         self.figure.data[0] = new_axis
-        self.figure.int = new_intensity
-
-    def pixel_shift2(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
-        energies = self.figure.data[0]
-        fermi_levels = self.EF
-        fermi_index = np.array([np.argmin(np.abs(energies - f)) for f in fermi_levels],dtype=int)
-
-        max_shift = max(fermi_index)-min(fermi_index)
-        new_data = np.array([energies - level for level in fermi_levels])#shifted data#s
-        target_index = max(fermi_index)
-
-        new_array = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
-        new_intensity = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
-        new_intensity[:] =  np.nan
-        intensity = self.figure.int
-
-        for row, array in enumerate(new_data):
-            shift = target_index - fermi_index[row]
-            if shift != 0:#insert at the begnning
-                empty_1 = np.empty(shift)
-                empty_1[:] = array[0]
-                array = np.insert(array,0,empty_1)
-                empty_1[:] = np.nan
-                temp = np.insert(intensity[row],0,empty_1)
-            else:
-                temp = intensity[row]
-
-            #insert at the end
-            more_shift = max_shift - shift
-            empty_1 = np.empty(more_shift)
-            empty_1[:] = array[-1]
-            array = np.append(array,empty_1)
-            empty_1[:] = np.nan
-            temp = np.append(temp,empty_1)
-
-            new_array[row] = array
-            new_intensity[row] = temp
-
-        self.figure.data[0] = new_array
         self.figure.int = new_intensity
 
     def fit(self):
@@ -384,7 +552,7 @@ class Fermi_level_band(Raw):#only the main figure
 
         params = []
         functions = []
-        for i,edc in enumerate(gold) :
+        for i,edc in enumerate(gold):
             p, res_func = self.fit_fermi_dirac(energies, edc, self.e_0, T=T)
             params.append(p)
             self.e_0 = p[0]#update teh guess
@@ -510,9 +678,10 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
             new_array[index] = array
 
         dE = energies[1] - energies[0]
-        new_axis = np.arange(new_array.min(), new_array.max()+dE, dE)
+        #new_axis = np.arange(new_array.min(), new_array.max()+dE, dE)
 
         new_intensity = np.array(new_intensity)
+        new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:,0]))
 
         self.figure.data[2] = new_axis
         self.figure.data[3] = np.transpose(new_intensity, (1, 0, 2))

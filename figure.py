@@ -6,9 +6,10 @@ import tkinter as tk
 import numpy as np
 import json
 import sys
+from argparse import Namespace
 
 import processing, cursor
-import states_figure#do not need it, I guess
+#import states_figure#do not need it, I guess
 
 class Functions():#figure functionality not being used
     def __init__(self):
@@ -46,15 +47,15 @@ class Figure(Functions):
 
         self.colour_limit()
         self.define_canvas()
-        self.define_mouse()
-        self.define_dropdowns()
 
-        self.state = states_figure.Raw(self)
-        self.data_processes = {'Raw':processing.Raw,'Derivative_x':processing.Derivative_x,'Derivative_y':processing.Derivative_y,'Convert_k':processing.Convert_k,'Range_plot':processing.Range_plot}
+        #self.state = states_figure.Raw(self)
+        self.data_processes = {'Raw':processing.Raw,'Derivative_x':processing.Derivative_x,'Derivative_y':processing.Derivative_y,'Range_plot':processing.Range_plot}
+        self.define_dropdowns()
         self.set_method('Raw')
         #self.define_normalise()
         self.define_export()
         self.draw()
+        self.define_mouse()#defined after draw so that cruor shows up automatically
 
     def init_data(self):
         self.intensity()
@@ -73,6 +74,7 @@ class Figure(Functions):
 
         offset = [0,0]
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
+        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
 
     def mouse_range(self):
         self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]#used for crusor
@@ -86,11 +88,12 @@ class Figure(Functions):
         self.canvas.get_tk_widget().bind( "<Button-1>", self.cursor.on_mouse_click)#left click
         self.canvas.get_tk_widget().bind( "<Button-2>", self.right_click)#right click
         self.canvas.get_tk_widget().bind( "<Double-Button-1>", self.double_click)#double click
+        self.cursor.redraw()
 
     def define_dropdowns(self):
-        commands = ['Raw','Derivative_x','Derivative_y','Convert_k']
-        if str(type(self.sub_tab).__name__) == 'Analysis':#on analysis tab
-            commands.append('Range_plot')
+        commands = []
+        for command in self.data_processes.keys():
+            commands.append(command)
 
         dropvar = tk.StringVar()
         dropvar.set(commands[0])
@@ -105,10 +108,19 @@ class Figure(Functions):
         self.data_processor.run()#run the thing
         self.draw()
 
+    def define_export(self):
+        button_calc = tk.ttk.Button(self.sub_tab.tab, text="Export", command = self.export)
+        offset = [320,0]
+        button_calc.place(x = self.pos[0]+offset[0], y = self.pos[1]+offset[1])
+
+    def export(self):
+        export_data = {'x':self.data[0].tolist(), 'y':self.data[1].tolist(), 'z':self.int.tolist()}
+        path = self.sub_tab.data_tab.gui.start_path + '/' + self.sub_tab.data_tab.name
+        with open(path+"_exported.json", "w") as outfile:
+            json.dump(export_data, outfile)
+
     def double_click(self,event):
-        pos = [self.sub_tab.center.pos[0],self.sub_tab.center.pos[1]]
-        new_fig = type(self)#make a new figure
-        self.sub_tab.data_tab.append_tab(new_fig,pos,self.int)
+        pass
 
     def click(self,pos):
         self.cursor.redraw()
@@ -125,9 +137,9 @@ class Figure(Functions):
         self.canvas.draw()
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
-        self.mouse_range()
 
     def redraw(self):
+        self.update_colour_scale()
         self.canvas.restore_region(self.curr_background)
         self.ax.draw_artist(self.graph)
         self.canvas.blit(self.ax.bbox)
@@ -145,29 +157,18 @@ class Figure(Functions):
             step = stop - start
             return start,stop,step
 
-    def define_export(self):
-        button_calc = tk.ttk.Button(self.sub_tab.tab, text="Export", command = self.export)
-        offset = [320,0]
-        button_calc.place(x = self.pos[0]+offset[0], y = self.pos[1]+offset[1])
-
-    def export(self):
-        export_data = {'x':self.data[0].tolist(), 'y':self.data[1].tolist(), 'z':self.int.tolist()}
-        path = self.sub_tab.data_tab.gui.start_path + '/' + self.sub_tab.data_tab.name
-        with open(path+"_exported.json", "w") as outfile:
-            json.dump(export_data, outfile)
-
     def set_label(self):#called from draw
         self.ax.set_xlabel(self.label[0])
         self.ax.set_ylabel(self.label[1])
 
+    def update_colour_scale(self):#called in redraw
+        value = self.sub_tab.operations.color_scale.get()
+        self.vmax = np.nanmax(self.int)*int(float(value))/100
+        self.graph.set_clim(vmin=self.vmin, vmax=self.vmax)
+
     def colour_limit(self):#called in init
         self.vmin = np.nanmin(self.int)
         self.vmax = np.nanmax(self.int)
-
-    def update_colour_scale(self,value):#called from figure handlere and slide
-        self.vmax = np.nanmax(self.int)*value
-        self.graph.set_clim(vmin=self.vmin, vmax=self.vmax)
-        #self.redraw()
 
     def gold(self):#sort the data: called from fermi_level processing init
         pass#self.data[0] is assumed to be kinetic energy need to transpose back and forth if this is not the case (not implemented)
@@ -178,17 +179,18 @@ class FS(Figure):
         self.label = ['x angle','y angle']
         self.figures = figure_handeler.figures
         #self.init_data()
+        self.tilt = 1#read from metadata
 
     def init_data(self):
         self.sort_data()
         self.intensity()
 
-    def plot(self,ax):#pcolorfast
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#FS
+    def plot(self,ax):#pcolorfast -> doesn't work for the interpolated kz scan
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
         #self.fig.colorbar(self.graph)
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_tab.data.xscale,self.sub_tab.data_tab.data.yscale,self.sub_tab.data_tab.data.zscale,self.sub_tab.data_tab.data.data]
+        self.data = [self.sub_tab.data.xscale,self.sub_tab.data.yscale,self.sub_tab.data.zscale,self.sub_tab.data.data]
 
     def click(self,pos):
         super().click(pos)
@@ -199,17 +201,23 @@ class FS(Figure):
         self.figures['right'].tilt = self.data[0][index1]
         self.figures['right'].plot(self.figures['right'].ax)
         self.figures['right'].redraw()
+        self.figures['right'].click(pos)
 
-        difference_array = self.state.difference_array(pos[1])
+        difference_array = np.absolute(self.data[1]-pos[1])
         index2 = difference_array.argmin()
         self.figures['down'].intensity(index2)
         self.figures['down'].tilt = self.data[1][index2]
         self.figures['down'].plot(self.figures['down'].ax)
         self.figures['down'].redraw()
+        self.figures['down'].click(pos)
 
     def intensity(self,z = 0):
         start,stop,step=self.int_range(z)
         self.int = sum(self.data[3][start:stop:1])/step
+        self.colour_limit()
+
+    def define_hv(self):#called from procssing
+        return self.data[1], np.array([self.tilt])
 
     def define_angle2k(self):#called from procssing
         return self.data[1], self.data[0]
@@ -227,6 +235,10 @@ class Band_right(Figure):
         self.int = int.transpose()
         self.draw()
 
+    def double_click(self,event):#called when doubleclicking
+        new_data = Namespace(xscale=self.data[0], yscale=self.data[1],zscale = None,data=np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),metadata=self.sub_tab.data.metadata)
+        self.sub_tab.data_tab.append_tab(new_data)
+
     def plot(self,ax):
         self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
 
@@ -236,12 +248,15 @@ class Band_right(Figure):
         for ary in self.figure_handeler.figures['center'].data[3]:
             self.int.append(np.sum(ary[:,start:stop:1],axis=1)/step)
         self.int = np.transpose(self.int)
+        self.colour_limit()
 
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[1],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
+        pos = self.cursor.sta_horizontal_line.get_data()
+
         difference_array1 = np.absolute(self.data[1]-pos[1])
         index1 = difference_array1.argmin()
         self.figure_handeler.figures['corner'].intensity_right(index1)
@@ -263,8 +278,12 @@ class Band_down(Figure):
         self.int -=  bg
         self.draw()
 
+    def double_click(self,event):#called when doubleclicking
+        new_data = Namespace(xscale=self.data[0], yscale=self.data[1],zscale = None,data=np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),metadata=self.sub_tab.data.metadata)
+        self.sub_tab.data_tab.append_tab(new_data)
+
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#FS
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band down
 
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
@@ -272,12 +291,14 @@ class Band_down(Figure):
         for ary in self.figure_handeler.figures['center'].data[3]:
             int.append(sum(ary[start:stop:1])/step)
         self.int = np.array(int)
+        self.colour_limit()
 
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[0], self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
+        pos = self.cursor.sta_vertical_line.get_data()
         difference_array1 = np.absolute(self.data[0]-pos[0])
         index1 = difference_array1.argmin()
 
@@ -300,6 +321,7 @@ class DOS_right_down(Figure):
         self.intensity_right(idx)
         self.intensity_down(idx)
         self.int = (self.int_right+self.int_down)*0.5
+        self.colour_limit()
 
     def intensity_right(self,idx=0):
         start,stop,step=self.int_range(idx)
@@ -307,11 +329,13 @@ class DOS_right_down(Figure):
 
     def intensity_down(self,idx=0):
         start,stop,step=self.int_range(idx)
-        self.int_down=[]
+        int_down=[]
         for ary in self.figure_handeler.figures['down'].int:
-            self.int_down.append(sum(ary[start:stop:1])/step)
+            int_down.append(sum(ary[start:stop:1])/step)
+        self.int_down = np.array(int_down)
 
     def plot(self,ax):#2D plot
+        #print(self.data[0].shape, self.int_right.shape,self.int_down.shape,self.figure_handeler.figures['down'].int.shape)
         self.graph1 = ax.plot(self.data[0], self.int_right,zorder=3)[0]
         self.graph2 = ax.plot(self.data[0], self.int_down,zorder=3)[0]
 
@@ -323,7 +347,7 @@ class DOS_right_down(Figure):
         self.figure_handeler.figures['center'].plot(self.figure_handeler.figures['center'].ax)
         self.figure_handeler.figures['center'].redraw()
 
-    def update_colour_scale(self,value):
+    def update_colour_scale(self):
         pass
 
     def redraw(self):
@@ -340,7 +364,19 @@ class Band(Figure):
         self.intensity()
 
     def subtract_BG(self):#the BG botton calls it
-        self.state.bg_subtract()#run the appropriate method
+        if self.sub_tab.operations.checkbox['vertical'].get():#vertical bg subtract
+            difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
+            index1 = difference_array1.argmin()
+            bg = np.nanmean(self.int[index1:-1,:],axis=0)#axis = 0is vertical, axis =1 is horizontal means
+            self.int -=  bg
+        else:#horizontal bg subtract
+            difference_array1 = np.absolute(self.data[0] - self.cursor.sta_vertical_line.get_data()[0])
+            index1 = difference_array1.argmin()
+            bg = np.nanmean(self.int[:,index1:-1],axis=1)#axis = 0is vertical, axis =1 is horizontal means
+            int = np.transpose(self.int)
+            int -=  bg
+            self.int = np.transpose(int)
+
         self.draw()
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
@@ -349,7 +385,7 @@ class Band(Figure):
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_tab.data.xscale, self.sub_tab.data_tab.data.yscale, self.sub_tab.data_tab.data.data]
+        self.data = [self.sub_tab.data.xscale, self.sub_tab.data.yscale, self.sub_tab.data.data]
 
     def click(self,pos):
         super().click(pos)
@@ -364,7 +400,7 @@ class Band(Figure):
         self.figures['down'].draw()
 
     def intensity(self,y = 0):
-        self.int = self.sub_tab.data_tab.data.data[0]
+        self.int = self.sub_tab.data.data[0]
 
     def define_angle2k(self):#called from procssing
         return self.data[1],np.array([self.tilt])
@@ -388,7 +424,7 @@ class DOS_right(Figure):
     def plot(self,ax):#2D plot
         self.graph = ax.plot(self.int,self.figure_handeler.figures['center'].data[1])[0]#DOS right
 
-    def update_colour_scale(self,value):
+    def update_colour_scale(self):
         pass
 
 class DOS_down(Figure):
@@ -408,7 +444,7 @@ class DOS_down(Figure):
     def plot(self,ax):#2D plot
         self.graph = ax.plot(self.figure_handeler.figures['center'].data[0], self.int)[0]#DOS down
 
-    def update_colour_scale(self,value):
+    def update_colour_scale(self):
         pass
 
 class Band_scan(Figure):
@@ -419,7 +455,7 @@ class Band_scan(Figure):
         self.down = DOS_down(self,[self.pos[0],self.pos[1]+self.size[1]])
 
     def define_slide(self):
-        scale = tk.Scale(self.sub_tab.tab,from_=0,to=len(self.sub_tab.data_tab.data.data[0][0][0])-1,orient=tk.HORIZONTAL,label='scan number',command=self.update_range,resolution=1)
+        scale = tk.Scale(self.sub_tab.tab,from_=0,to=len(self.sub_tab.data.data[0][0][0])-1,orient=tk.HORIZONTAL,label='scan number',command=self.update_range,resolution=1)
         scale.pack()
 
     def update_range(self,value):
@@ -432,25 +468,25 @@ class Band_scan(Figure):
     def intensity(self,y = 0):
         #self.int = self.sub_tab.data_tab.data.data[0]
         inss = []
-        for int in self.sub_tab.data_tab.data.data[0]:
+        for int in self.sub_tab.data.data[0]:
             for ins in int:
                 inss.append(ins[y])
 
-        self.int = np.array(inss).reshape((len(self.sub_tab.data_tab.data.data[0][0]),len(self.sub_tab.data_tab.data.data[0])),order='F')
+        self.int = np.array(inss).reshape((len(self.sub_tab.data.data[0][0]),len(self.sub_tab.data.data[0])),order='F')
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_tab.data.yscale, self.sub_tab.data_tab.data.xscale, self.sub_tab.data_tab.data.data]
+        self.data = [self.sub_tab.data.yscale, self.sub_tab.data.xscale, self.sub_tab.data.data]
 
     def click(self,pos):
         super().click(pos)
-        difference_array = np.absolute(self.sub_tab.data_tab.data.xscale-pos[0])
+        difference_array = np.absolute(self.sub_tab.data.xscale-pos[0])
         index1 = difference_array.argmin()
         self.right.intensity(index1)
         self.right.draw()
         #self.right.plot()
         #self.right.redraw()
 
-        difference_array = np.absolute(self.sub_tab.data_tab.data.yscale-pos[1])
+        difference_array = np.absolute(self.sub_tab.data.yscale-pos[1])
         index2 = difference_array.argmin()
         self.down.intensity(index2)
         self.down.draw()

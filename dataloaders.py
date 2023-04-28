@@ -1026,9 +1026,9 @@ class Dataloader_ADRESS(Dataloader) :
         )
         return res
 
-class Dataloader_CASSIOPEE(Dataloader) :
+class Dataloader_SOLARIS(Dataloader) :
     """ CASSIOPEE beamline at SOLEIL synchrotron, Paris. """
-    name = 'CASSIOPEE'
+    name = 'SOLARIS'
     date = '18.07.2018'
 
     # Possible scantypes
@@ -1126,7 +1126,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
             theta = 1,
             phi = 1,
             E_b = 0,
-            metadata = {'Excitation Energy':hv})
+            metadata = {'Excitation Energy':[int(hv)]})
         return res
 
     def load_from_file(self, filename) :
@@ -1146,6 +1146,8 @@ class Dataloader_CASSIOPEE(Dataloader) :
         """
         wave = binarywave.load(filename)['wave']
         data = np.array([wave['wData']])
+
+        data = np.swapaxes(data, 1, 2)#make it standard for my program that energy is on x, angle no y
 
         #print('note',wave['note'])
         #print('data_units',wave['data_units'])
@@ -1169,6 +1171,7 @@ class Dataloader_CASSIOPEE(Dataloader) :
         # Now the extraction fun begins. Most lines are of the form
         # `Some-kind-of-name=some-value`
         metadata = dict()
+
         for line in note :
             # Split at '='. If it fails, we are not in a line that contains
             # useful information
@@ -1180,12 +1183,12 @@ class Dataloader_CASSIOPEE(Dataloader) :
             metadata.update({name: val})
 
         # NOTE Unreliable hv
-        #metadata = metadata#['Excitation Energy']
+        metadata['Excitation Energy'] = [float(metadata['Excitation Energy'])]
 
         res = Namespace(
                 data = data,
-                xscale = xscale,
-                yscale = yscale,
+                xscale = yscale,
+                yscale = xscale,
                 zscale = None,
                 angles = xscale,
                 theta = 0,
@@ -1325,7 +1328,7 @@ all_dls = [
            Dataloader_SIS,
            Dataloader_ADRESS,
            Dataloader_i05,
-           Dataloader_CASSIOPEE,
+           Dataloader_SOLARIS,
            Dataloader_ALS,
            Dataloader_ALS_fits,
            Dataloader_Pickle
