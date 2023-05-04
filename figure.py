@@ -178,14 +178,14 @@ class FS(Figure):
         self.label = ['x angle','y angle']
         self.figures = figure_handeler.figures
         #self.init_data()
-        self.tilt = 1#read from metadata
+        self.tilt =  self.sub_tab.data.metadata['tilt']
 
     def init_data(self):
         self.sort_data()
         self.intensity()
 
     def plot(self,ax):#pcolorfast -> doesn't work for the interpolated kz scan
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
         #self.fig.colorbar(self.graph)
 
     def sort_data(self):
@@ -197,7 +197,7 @@ class FS(Figure):
         index1 = difference_array.argmin()
 
         self.figures['right'].intensity(index1)
-        self.figures['right'].tilt = self.data[0][index1]
+        #self.figures['right'].tilt = self.data[0][index1]
         self.figures['right'].plot(self.figures['right'].ax)
         self.figures['right'].redraw()
         self.figures['right'].click(pos)
@@ -205,7 +205,7 @@ class FS(Figure):
         difference_array = np.absolute(self.data[1]-pos[1])
         index2 = difference_array.argmin()
         self.figures['down'].intensity(index2)
-        self.figures['down'].tilt = self.data[1][index2]
+        #self.figures['down'].tilt = self.data[1][index2]
         self.figures['down'].plot(self.figures['down'].ax)
         self.figures['down'].redraw()
         self.figures['down'].click(pos)
@@ -355,7 +355,7 @@ class DOS_right_down(Figure):
 class Band(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
-        self.tilt = -3.5#np.array([float(self.sub_tab.data_tab.data.metadata['T'])])
+        self.tilt = self.sub_tab.data.metadata['tilt']
         self.figures = figure_handeler.figures
 
     def init_data(self):

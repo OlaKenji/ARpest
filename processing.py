@@ -1,11 +1,12 @@
 import numpy as np
 import tkinter as tk
 
-import figure, cursor, dataloaders
+import figure, cursor
 from scipy import ndimage
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from scipy import interpolate
+import data_loader
 
 class Raw():
     def __init__(self,figure):
@@ -177,6 +178,7 @@ class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
         #self.figure.state.enter_state('K_space')
+        self.hv = self.figure.sub_tab.data.metadata['hv']
 
     def run(self):
         self.convert2k()
@@ -190,8 +192,7 @@ class Convert_k(Raw):
 
     def convert2k(self):
         work_func = 4#usually 4
-        hv = 80#incident energy
-        k0 = 0.5124 * np.sqrt(hv - work_func)
+        k0 = 0.5124 * np.sqrt(self.hv - work_func)
 
         #alpha is the polar or theta
         #beta is the tilt
@@ -208,12 +209,12 @@ class Convert_k(Raw):
         KX = np.empty((nkx, nky))
         KY = np.empty((nkx, nky))
 
-        if self.figure.sub_tab.slit == 'h':
+        if self.figure.sub_tab.data_tab.data_loader.orientation == 'horizontal':
             for i in range(nkx):
                 KX[i] = np.sin(b) * np.cos(a[i])
                 KY[i] = np.sin(a[i])
 
-        elif self.figure.sub_tab.slit == 'v':
+        elif self.figure.sub_tab.data_tab.data_loader.orientation == 'vertical':
             # Precalculate outside the loop
             theta_k = beta*np.pi/180
             cos_theta = np.cos(theta_k)
@@ -563,10 +564,11 @@ class Fermi_level_band(Raw):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
         gold = tk.filedialog.askopenfilename(initialdir=self.figure.sub_tab.data_tab.gui.start_path ,title='gold please')
-        self.gold = dataloaders.load_data(gold)
+        self.gold = self.figure.sub_tab.data_tab.data_loader.load_data(gold)
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
-        self.e_0 = 34 - 4.38#initial guess of fermi level
+        self.hv = self.figure.sub_tab.data.metadata['hv']
+        self.e_0 = self.hv - 4.38#initial guess of fermi level
         #self.figure.state.enter_state('Fermi_adjusted')
 
     def run(self):
@@ -626,8 +628,7 @@ class Fermi_level_band(Raw):#only the main figure
         self.figure.int = new_intensity
 
     def fit(self):
-        hv = 34#eV
-        e_0 = hv - 4.38#femi level guess
+        e_0 = self.hv - 4.38#femi level guess
         T = 10#K
 
         gold = self.gold.data[0]

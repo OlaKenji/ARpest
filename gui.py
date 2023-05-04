@@ -8,27 +8,26 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 from argparse import Namespace
 import numpy as np
 
-import dataloaders as dl
-import figure_handeler
+#import dataloaders as dl
+import figure_handeler, data_loader
 
-#dataloader gui?
-#unify meta data
 #namespace or dict?
 
 #to implement:
-#kz -> convert to k, correct fermi level without interpolation?
+#update the x axis for photon energy scan
 #make same y,x limits/zoom
 #labels
-#colour bar
+#colour bar (where?)
 #rotate figure?
-#fermi level for photon ebergy scan
-#update the x axis for photon energy scan?
+#fermi level for photon ebergy scan?
+#kz -> convert to k, correct fermi level without interpolation?
 
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #cannot go to analysis if in k space (array length problem)
 #probably need to the axis corrections for each energy to make a 3D data (for FS only)
+#some of the meta data doesn't exist depending on the type of scan (I05)
 
 #stuff:
 #angle2k
@@ -52,13 +51,14 @@ class GUI():#master Gui
 
         self.pop = None
         self.start_path = '/Users/olakenjiforslund/Library/CloudStorage/OneDrive-Chalmers/Work/Research/Experiment/Data/Photons'
+        self.start_screen = Start_screen(self)
 
     def design(self):
         self.style = tk.ttk.Style()
         self.style.theme_use('alt')
         self.style.configure('TButton', background = 'white', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
         self.style.map('TButton', background=[('active','white')])
-        self.style.configure('My.TFrame', background='white')#makes th frame where plots are white
+        self.style.configure('TFrame', background='white')#makes th frame where plots are white
         self.style.map('TNotebook.Tab', background= [("selected", "white")])#makes the selected tab white
         self.style.configure("TNotebook", background= 'white')#makes ther notebook bg white
         self.style.configure('TCheckbutton',indicatorbackground="black", indicatorforeground="white",background="white", foreground="white")
@@ -90,14 +90,43 @@ class GUI():#master Gui
         if self.pop == None:
             self.pop = Pop_up(self)
 
+class Start_screen():#should add general information and such
+    def __init__(self,gui):
+        self.gui = gui
+        self.define_tab()
+        self.instruments = ['Bloch','I05','SIS','URANOS']
+        self.define_dropdowns()
+
+    def define_tab(self):
+        self.tab = tk.ttk.Frame(self.gui.notebook)
+        self.gui.notebook.add(self.tab, text = 'Settings')
+
+    def define_dropdowns(self):
+        self.instrument = tk.StringVar()
+        self.instrument.set(self.instruments[0])
+        drop = tk.OptionMenu(self.tab,self.instrument,*self.instruments)
+        drop.config(bg = "white")
+        drop.place(x = 100, y = 300)
+
 class Data_tab():#holder for overview and analysis tabs. The data is stored here
     def __init__(self,gui,file):
         self.gui = gui
-        data = dl.load_data(file)#load the data
+        data = self.define_data_loader(file)#try the selected instrument. If it doesn't work, try the other ones
         self.define_tab(file)
         self.define_notebook()
         self.close_bottom()
         self.overview = Overview(self,data)#automatically open overview
+
+    def define_data_loader(self, file):
+        self.data_loader = getattr(data_loader, self.gui.start_screen.instrument.get())(self)#make an object based on string
+        data = self.data_loader.load_data(file)
+        if data != None: return data#it means it succeeds. else, try another one
+
+        for instrument in self.gui.start_screen.instruments:
+            if instrument == self.gui.start_screen.instrument.get(): continue#skip the one alreadt tried
+            self.data_loader = getattr(data_loader, instrument)(self)#make an object based on string
+            data = self.data_loader.load_data(file)
+            if data != None: return data
 
     def define_notebook(self):
         self.notebook = tk.ttk.Notebook(master=self.tab,width=self.gui.size[0], height=self.gui.size[1])#to make tabs
@@ -126,7 +155,6 @@ class Subtab():
         self.data = data
         self.int_range = 0
         self.add_tab(type(self).__name__)
-        self.slit = 'v'#depends on instrument
         self.cmap = 'RdYlBu_r'#default colour scale
 
     def add_tab(self,name):
@@ -213,7 +241,9 @@ class Overview(Subtab):
         hv = []
         for num, index in enumerate(indices):
             data_name = self.catalog.item(index)['values'][0]
-            scan_data = dl.load_data(self.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
+            loadded_data = getattr(data_loader, self.data_tab.gui.start_screen.instrument.get())(self.data_tab)#make an object based on string
+            scan_data = loadded_data.load_data(self.data_tab.gui.start_path + '/' + data_name)
+            #scan_data = dl.load_data(self.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
             hv.append(scan_data.metadata['Excitation Energy'][0])#the photon energy
             if num == 0:
                 int = np.atleast_3d(np.transpose(scan_data.data[0]))
