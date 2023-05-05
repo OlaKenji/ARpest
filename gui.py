@@ -244,13 +244,13 @@ class Overview(Subtab):
             loadded_data = getattr(data_loader, self.data_tab.gui.start_screen.instrument.get())(self.data_tab)#make an object based on string
             scan_data = loadded_data.load_data(self.data_tab.gui.start_path + '/' + data_name)
             #scan_data = dl.load_data(self.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
-            hv.append(scan_data.metadata['Excitation Energy'][0])#the photon energy
+            hv.append(scan_data.metadata['hv'])#the photon energy
             if num == 0:
                 int = np.atleast_3d(np.transpose(scan_data.data[0]))
             else:
                 int = np.append(int,np.atleast_3d(np.transpose(scan_data.data[0])),axis=2)
 
-        scan_data.metadata['Excitation Energy'] = hv
+        scan_data.metadata['hv'] = hv
         new_data = Namespace(xscale=np.array(hv), yscale=scan_data.yscale,zscale=scan_data.xscale,data=int,metadata=scan_data.metadata)#add meta data
         tab = self.data_tab.append_tab(new_data)
 

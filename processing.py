@@ -346,9 +346,9 @@ class Convert_kz(Raw):
         ky = np.transpose(np.array(ky))
         #print(ky,kz)
 
-        #self.figure.data[0] = kz
-        #self.figure.data[1] = ky
-
+        self.figure.data[0] = kz
+        self.figure.data[1] = ky
+        return
         #new mesh
         self.new_mesh_interpolation(kz,ky)
 
@@ -535,12 +535,12 @@ class Convert_kz(Raw):
         KX = np.empty((nkx, nky))
         KY = np.empty((nkx, nky))
 
-        if self.figure.sub_tab.slit == 'h':
+        if self.figure.sub_tab.data_tab.data_loader.orientation == 'horizontal':
             for i in range(nkx):
                 KX[i] = np.sin(b) * np.cos(a[i])
                 KY[i] = np.sin(a[i])
 
-        elif self.figure.sub_tab.slit == 'v':
+        if self.figure.sub_tab.data_tab.data_loader.orientation == 'vertical':
             # Precalculate outside the loop
             theta_k = beta*np.pi/180
             cos_theta = np.cos(theta_k)

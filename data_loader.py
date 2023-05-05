@@ -145,7 +145,10 @@ class Data_loader():
         #metadata['Excitation Energy'] = [float(metadata['Excitation Energy'])]
         metadata = {}
         for key,name,type in self.meta_keys:
-            metadata[name] = M2[key]
+            if name == 'hv' or name=='tilt':
+                metadata[name] = float(M2[key])
+            else:
+                metadata[name] = M2[key]
 
         res = Namespace(
                 data = data,
@@ -339,8 +342,8 @@ class URANOS(Data_loader):
                 ('Date', 'Date', str),
                 ('Time', 'Time', str),
                 ('Excitation Energy', 'hv', float),
-                ('R1', 'polar', float),
-                ('R3', 'tilt', float),
+                ('R1', 'tilt', float),
+                ('R3', 'polar', float),
                 ('X', 'X', float),
                 ('Y', 'Y', float),
                 ('Z', 'Z', float),
@@ -371,8 +374,8 @@ class SIS(Data_loader):
         self.meta_keys = [('Excitation Energy', 'hv', float)]#zip files
 
         #h5 files
-        self.meta_keys2 = ['Acquisition Mode','Date Created','Excitation Energy (eV)', 'Pass Energy (eV)','Specified Number of Sweeps']
-        self.meta_keys3 = [ 'Temperature A', 'Temperature B','Exit Slit', 'Phi', 'Theta', 'Tilt', 'X', 'Y', 'Z']
+        self.meta_keys2 = [('Date Created','Date Created'),('Acquisition Mode','Acquisition Mode'),('Excitation Energy (eV)','hv'),('Pass Energy (eV)','Pass Energy (eV)'),('Specified Number of Sweeps','Specified Number of Sweeps')]
+        self.meta_keys3 = [('Temperature A','Temperature A'),('Temperature B','Temperature B'),('Exit Slit','Exit Slit'),('Phi','azimuth'),('Theta','theta'),('Tilt','tilt'),('X','x'),('Y','y'),('Z','z')]
 
     def load_data(self, filename) :
         if filename.endswith('h5') :
@@ -468,10 +471,10 @@ class SIS(Data_loader):
         E_b = min(energies)
 
         metadata = {}
-        for key in self.meta_keys2:
-            metadata[key] = attributes[key]
-        for key in self.meta_keys3:
-            metadata[key] = manipulator[key][0]
+        for key,name in self.meta_keys2:
+            metadata[name] = attributes[key]
+        for key,name in self.meta_keys3:
+            metadata[name] = manipulator[key][0]
 
         res = Namespace(
                data = data,

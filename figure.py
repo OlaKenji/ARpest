@@ -5,7 +5,6 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 import tkinter as tk
 import numpy as np
 import json
-import sys
 from argparse import Namespace
 
 import processing, cursor
@@ -184,7 +183,7 @@ class FS(Figure):
         self.sort_data()
         self.intensity()
 
-    def plot(self,ax):#pcolorfast -> doesn't work for the interpolated kz scan
+    def plot(self,ax):#pcolorfast -> doesn't work for the interpolated kz scan?
         self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
         #self.fig.colorbar(self.graph)
 
@@ -225,7 +224,7 @@ class Band_right(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
 
-    def subtract_BG(self):#the BG botton calls it
+    def subtract_BG(self):#not in use
         difference_array1 = np.absolute(self.data[0] - self.cursor.sta_vertical_line.get_data()[0])
         index1 = difference_array1.argmin()
         bg = np.mean(self.int[:,index1:len(self.data[0])],axis=1)#axis = 0is vertical, axis =1 is horizontal means
@@ -270,7 +269,7 @@ class Band_down(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
 
-    def subtract_BG(self):#the BG botton calls it
+    def subtract_BG(self):#not in use
         difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
         index1 = difference_array1.argmin()
         bg = np.mean(self.int[index1:len(self.data[1]),:],axis=0)#axis = 0is vertical, axis =1 is horizontal means
@@ -446,7 +445,7 @@ class DOS_down(Figure):
     def update_colour_scale(self):
         pass
 
-class Band_scan(Figure):
+class Band_scan(Figure):#not in use
     def __init__(self,data_tab,pos):
         super().__init__(data_tab,pos)
         self.define_slide()
