@@ -42,6 +42,17 @@ class Figure_handeler():
         adjust = processing.Convert_k(self.figures['center'])
         adjust.run()
 
+    def symmetrise(self):#called when pressed the botton
+        pass
+
+    def derivative(self):
+        if self.data_tab.operations.checkbox['horizontal'].get():#vertical bg subtract
+            adjust = processing.Derivative_x(self.figures['center'])
+        else:
+            adjust = processing.Derivative_y(self.figures['center'])
+        adjust.run()
+        self.draw()
+
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
         super().__init__(data_tab)
@@ -61,6 +72,9 @@ class Threedimension(Figure_handeler):#fermi surface
         adjust = processing.Convert_kz(self.figures['center'])
         adjust.run()
 
+    def subtract_BG(self):
+        self.figures['right'].subtract_BG()
+
 class Twodimension(Figure_handeler):#band
     def __init__(self,data_tab):
         super().__init__(data_tab)
@@ -78,3 +92,10 @@ class Twodimension(Figure_handeler):#band
 
     def kz_convert(self):#called when pressed the botton
         pass
+
+    def symmetrise(self):#called when pressed the botton
+        adjust = processing.Symmetrise(self.figures['center'])
+        adjust.run()
+
+    def subtract_BG(self):
+        self.figures['center'].subtract_BG()

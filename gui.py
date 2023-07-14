@@ -8,26 +8,25 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 from argparse import Namespace
 import numpy as np
 
-#import dataloaders as dl
 import figure_handeler, data_loader
 
 #namespace or dict?
 
 #to implement:
-#update the x axis for photon energy scan
 #make same y,x limits/zoom
 #labels
 #colour bar (where?)
 #rotate figure?
 #fermi level for photon ebergy scan?
 #kz -> convert to k, correct fermi level without interpolation?
+#log scale
+#make so that mouse appears automatically at the begining
 
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
-#cannot go to analysis if in k space (array length problem)
+#(array length problem/uniform shape problem)
 #probably need to the axis corrections for each energy to make a 3D data (for FS only)
-#some of the meta data doesn't exist depending on the type of scan (I05)
 
 #stuff:
 #angle2k
@@ -166,19 +165,14 @@ class Overview(Subtab):
         super().__init__(data_tab,data)
         self.make_figure()
         self.operations = Operations(self)
-        #self.log_parameters = ['Pass Energy','Number of Sweeps','Excitation Energy','Acquisition Mode','Center Energy', 'Energy Step' ,'Step Time' , 'A' ,'P', 'T', 'X', 'Y', 'Z']#may depend on the instrument.... Bloch
-        self.log_parameters = ['pass_energy','number_of_iterations','Excitation Energy','acquisition_mode','kinetic_energy_center', 'kinetic_energy_step' ,'acquire_time' , 'saazimuth' ,'sapolar', 'satilt', 'sax', 'say', 'saz']#may depend on the instrument.... I05
         self.logbook()
         self.append_data_botton()
         self.append_data(self.data_tab.name)
         self.define_combine_data()
 
     def make_figure(self):
-        if self.data.zscale is None or len(self.data.zscale)==1:#scan with many cuts, or 2D data
-            if self.data.data.shape[0] == 1:#2D data
-                self.figure_handeler = figure_handeler.Twodimension(self)
-            else:#many 2D data, doesn't go in here for I05 or kz trans
-                self.figure_handeler = figure_handeler.Threedimension(self)
+        if self.data.zscale is None or len(self.data.zscale)==1:#2D data
+            self.figure_handeler = figure_handeler.Twodimension(self)
         else:#3D data
             self.figure_handeler = figure_handeler.Threedimension(self)
 
@@ -192,9 +186,6 @@ class Overview(Subtab):
         columns=[]
         data=[]
         for key in self.data.metadata:
-            #print(self.data_tab.data.metadata['Point 24']), BLOCH scan stuff has this and contains the sacn parameter, e.g. hv
-            #print(self.data_tab.data.hv.keys())
-            #if key in self.log_parameters:
             columns.append(key)
             data.append(self.data.metadata[key])
 
@@ -265,6 +256,8 @@ class Operations():
         self.define_colour_scale()
         self.define_kz()
         self.define_k_convert()
+        self.define_symmetrise()
+        self.define_derivative()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -304,16 +297,28 @@ class Operations():
         self.overview.draw()
 
     def define_BG(self):#generate botton, it will run the figure method
-        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.figures['center'].subtract_BG)#which figures shoudl have access to this?
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.subtract_BG)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 0)
         self.BG_choise()
 
     def BG_choise(self):
-        choises = ['horizontal','vertical']
+        choises = ['horizontal','vertical','EDC']
         self.checkbox = {}
         for index, choise in enumerate(choises):
             self.checkbox[choise] = tk.IntVar()
             tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=120,y=30*index)
+
+    def define_derivative(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="2nd derivative", command = self.overview.figure_handeler.derivative)#which figures shoudl have access to this?
+        button_calc.place(x = 230, y = 0)
+        self.derivative_choise()
+
+    def derivative_choise(self):
+        choises = ['horizontal','vertical']
+        self.checkbox = {}
+        for index, choise in enumerate(choises):
+            self.checkbox[choise] = tk.IntVar()
+            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=350,y=30*index)
 
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
@@ -327,6 +332,10 @@ class Operations():
     def define_k_convert(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="k convert", command = self.overview.figure_handeler.k_convert)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 130)
+
+    def define_symmetrise(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="symmetrise", command = self.overview.figure_handeler.symmetrise)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 160)
 
 class Analysis(Overview):
     def __init__(self,data_tab,data):

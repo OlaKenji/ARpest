@@ -85,10 +85,10 @@ class Data_loader():
         for key,name,type in self.meta_keys:
             metadata[name] = vars(M2)[name]
 
-        res = Namespace(
-            data = data,
-            xscale = xscale,
-            yscale = yscale,
+        res = Namespace(#switched y and x for maxiv, so that the measuerd cut is on the right for 3D data set
+            data = np.transpose(data,(0, 2, 1)),
+            xscale = yscale,
+            yscale = xscale,
             zscale = energies,
             metadata = metadata
         )
@@ -150,17 +150,22 @@ class Data_loader():
             else:
                 metadata[name] = M2[key]
 
+        data,xscale,yscale,zscale = self.origanise_data(data,xscale,yscale,M2)
+
         res = Namespace(
                 data = data,
                 xscale = yscale,
                 yscale = xscale,
-                zscale = None,
+                zscale = zscale,
                 angles = xscale,
                 theta = 0,
                 phi = 0,
                 E_b = 0,
                 metadata = metadata)
         return res
+
+    def origanise_data(self,data,xscale,yscale,M2):#for max iv
+        return data, xscale, yscale, None
 
 class Bloch(Data_loader):
     def __init__(self,data_tab):
@@ -186,6 +191,17 @@ class Bloch(Data_loader):
                         #('Thetay_StepSize', 'Thetay_StepSize', float),
                     #    ('Comments', 'Comments', str)
                         ]#acquisition_mode
+
+    def origanise_data(self,data,xscale,yscale,M2):#if it is a 2D scan,organise it into a 3D data sets (like a map)
+        zscale = None
+        if len(data.shape) == 4:#many 2D cuts, e.g. hv scan: organise it into a 3D data sets (like a map)
+            #data = np.transpose(data[0], (1, 0, 2))
+            data = np.swapaxes(data[0], 0,1)
+            zscale = np.flip(yscale)#the binding energy/kinetic energy: need to flip it for some reason
+            start = M2['Point 1']#the first energy
+            stop = M2['Point ' + str(data.shape[2])]#the last energy
+            yscale = np.linspace(int(start.replace(" eV","")),int(stop.replace(" eV","")),data.shape[2])#photon energies
+        return data,xscale,yscale,zscale
 
     def load_data(self, filename) :
         if filename.endswith('ibw') :
@@ -319,7 +335,10 @@ class I05(Data_loader):
 
         metadata = {}
         for key,name,type in self.meta_keys:
-            metadata[name] = M2[key]
+            try:
+                metadata[name] = M2[key]
+            except:
+                pass
 
         res = Namespace(
            data = data,

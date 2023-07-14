@@ -27,20 +27,21 @@ class Raw():
 class Derivative_x(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        self.slides = []
-        self.slide_cx()
-        self.slide_cy()
-        self.slide_dx()
-        self.slide_dy()
-
-        self.cx = 1
-        self.cy = 1
-        self.dx = 0.001
-        self.dy = 0.001
         self.direction = 'x'#smooth direction
+        self.slides = []
+        #self.slide_cx()
+        #self.slide_cy()
+        #self.slide_dx()
+        #self.slide_dy()
+
+        #self.cx = 1
+        #self.cy = 1
+        #self.dx = 0.001
+        #self.dy = 0.001
 
     def exit(self):
         self.figure.int = self.original_int.copy()
+        self.figure.update_colour_scale()
         for slide in self.slides:
             slide.destroy()#remove the slides
 
@@ -84,30 +85,7 @@ class Derivative_x(Raw):
         self.run()
         self.figure.draw()
 
-    def smooth(self,data,kernel_size = 50):
-        direction={'x':-1,'y':0}[self.direction]
-        kern = np.hanning(kernel_size)   # a Hanning window with width 50
-        kern /= kern.sum()      # normalize the kernel weights to sum to 1
-        smooth_data = ndimage.convolve1d(data, kern, axis = direction)#axis =0 is y, axis = -1 is x
-        return smooth_data
-
-    @staticmethod
-    def derivatives(data,dx,dy):
-    # The `axis` arguments change depending on the shape of the input data
-        d = len(data.shape)
-        axis0 = 0 if d==2 else 1
-
-        # Calculate the derivatives in both directions
-        grad_x = np.gradient(data, dx, axis=axis0)
-        grad_y = np.gradient(data, dy, axis=axis0+1)
-
-        # And the second derivatives...
-        grad2_x = np.gradient(grad_x, dx, axis=axis0)
-        grad2_y = np.gradient(grad_y, dy, axis=axis0+1)
-
-        return grad_x, grad_y, grad2_x, grad2_y
-
-    def run(self):#DOI: 10.1063/1.3585113
+    def run2(self):#DOI: 10.1063/1.3585113
         data = self.original_int.copy()
         smooth_data = self.smooth(data)
 
@@ -132,9 +110,8 @@ class Derivative_x(Raw):
         # Return the curvature
         self.figure.int =  nominator / denominator#np.clip(intensity,0,1000)
 
-    def run2(self):#numpy method
-        d = len(self.figure.int.shape)
-        if d == 2:
+    def run(self):#numpy method
+        if len(self.figure.int.shape) == 2:
             axis0 = 0
         else:
             axis0 = 1
@@ -142,16 +119,23 @@ class Derivative_x(Raw):
         smooth_data = self.smooth(self.figure.int)
 
         #1st derivatives in both directions
-        data1_x = np.gradient(smooth_data, axis=axis0)
-        data1_y = np.gradient(smooth_data, axis=axis0+1)
+        data1_x = np.gradient(smooth_data, axis=axis0+1)
+        data1_y = np.gradient(smooth_data, axis=axis0)
 
         # 2nd derivatives in both directions
-        data2_x  = np.gradient(data1_x, axis=axis0)
-        data2_y = np.gradient(data1_y, axis=axis0+1)
+        data2_x  = np.gradient(data1_x, axis=axis0+1)
+        data2_y = np.gradient(data1_y, axis=axis0)
 
         self.set_values(data2_x,data2_y)
 
-    def smooth2(self,data,kernel_size = 20):#not as good
+    def smooth(self,data,kernel_size = 40):
+        direction={'x':-1,'y':0}[self.direction]
+        kern = np.hanning(kernel_size)   # a Hanning window with width 50
+        kern /= kern.sum()      # normalize the kernel weights to sum to 1
+        smooth_data = ndimage.convolve1d(data, kern, axis = direction)#axis =0 is y, axis = -1 is x
+        return smooth_data
+
+    def smooth2(self,data,kernel_size = 40):#not as good
         kernel = np.ones(kernel_size) / kernel_size
         smooth_data = data#place holrder
         if self.direction == 'x':#smooth in x direction
@@ -165,6 +149,7 @@ class Derivative_x(Raw):
 
     def set_values(self,data2_x,data2_y):
         self.figure.int = data2_x
+        self.figure.update_colour_scale()
 
 class Derivative_y(Derivative_x):
     def __init__(self,figure):
@@ -172,7 +157,8 @@ class Derivative_y(Derivative_x):
         self.direction = 'y'#smooth direction
 
     def set_values(self,data2_x,data2_y):
-        self.figure.int = data2_y
+        self.figure.int = -data2_y
+        self.figure.update_colour_scale()
 
 class Convert_k(Raw):
     def __init__(self,figure):
@@ -223,7 +209,6 @@ class Convert_k(Raw):
                 KX[i] = sin_theta_cos_beta + cos_theta * np.cos(a[i]) * \
                         np.sin(dbeta*np.pi/180)
                 KY[i] = cos_theta * np.sin(a[i])
-
 
         if KY.shape[1] == 1:#2D, band
             self.figure.data[1] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))
@@ -823,3 +808,25 @@ class Range_plot(Raw):
         del self.fig#doesn'r work
         self.scale.destroy()
         self.e1.destroy()
+
+class Symmetrise(Raw):
+    def __init__(self,parent_figure):
+        super().__init__(parent_figure)
+
+    def run(self):
+        self.symmetrise()
+        self.update_figure()
+
+    def symmetrise(self):
+        intensity = self.figure.int
+
+        half_intensity = np.flip(intensity[:,0:int(0.5*len(intensity[0]))])
+        intensity[:,int(0.5*len(intensity[0])):-1] = half_intensity
+
+        self.figure.int = intensity
+
+    def update_figure(self):
+        self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure
+        #self.figure.figure_handeler.update_intensity()
+        self.figure.figure_handeler.draw()
+        self.figure.figure_handeler.update_mouse_range()
