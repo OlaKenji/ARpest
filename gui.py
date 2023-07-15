@@ -258,6 +258,8 @@ class Operations():
         self.define_k_convert()
         self.define_symmetrise()
         self.define_derivative()
+        self.define_reset()
+        self.define_smooth()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -315,14 +317,17 @@ class Operations():
 
     def derivative_choise(self):
         choises = ['horizontal','vertical']
-        self.checkbox = {}
+        self.checkbox_drivative = {}
         for index, choise in enumerate(choises):
-            self.checkbox[choise] = tk.IntVar()
-            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=350,y=30*index)
+            self.checkbox_drivative[choise] = tk.IntVar()
+            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_drivative[choise]).place(x=350,y=30*index)
+
+    def define_reset(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
+        button_calc.place(x = 480, y = 0)
 
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
-        offset = [200,0]
         button_calc.place(x=0,y=70)
 
     def define_kz(self):
@@ -336,6 +341,18 @@ class Operations():
     def define_symmetrise(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="symmetrise", command = self.overview.figure_handeler.symmetrise)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 160)
+
+    def define_smooth(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="smooth", command = self.overview.figure_handeler.smooth)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 190)
+        self.smooth_choise()
+
+    def smooth_choise(self):
+        choises = ['horizontal','vertical']
+        self.checkbox_smooth = {}
+        for index, choise in enumerate(choises):
+            self.checkbox_smooth[choise] = tk.IntVar()
+            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_smooth[choise]).place(x=150,y=190 + 30*index)
 
 class Analysis(Overview):
     def __init__(self,data_tab,data):

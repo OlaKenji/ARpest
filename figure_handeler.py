@@ -45,11 +45,25 @@ class Figure_handeler():
     def symmetrise(self):#called when pressed the botton
         pass
 
-    def derivative(self):
-        if self.data_tab.operations.checkbox['horizontal'].get():#vertical bg subtract
+    def derivative(self):#called when pushing the 2nd derivative botton
+        if self.data_tab.operations.checkbox_drivative['horizontal'].get():
             adjust = processing.Derivative_x(self.figures['center'])
-        else:
+        else:#vertical
             adjust = processing.Derivative_y(self.figures['center'])
+        adjust.run()
+        self.draw()
+
+    def reset(self):#the reset bottom
+        self.figures['center'].int = self.figures['center'].original_int
+        self.figures['center'].update_colour_scale()
+        self.draw()
+
+    def smooth(self):#the smooth botton
+        if self.data_tab.operations.checkbox_smooth['horizontal'].get():
+            adjust = processing.Smooth_x(self.figures['center'])
+        else:
+            adjust = processing.Smooth_y(self.figures['center'])            
+
         adjust.run()
         self.draw()
 

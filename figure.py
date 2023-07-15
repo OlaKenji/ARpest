@@ -66,8 +66,8 @@ class Figure(Functions):
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
 
-    def mouse_range(self):
-        self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]#used for crusor
+    def mouse_range(self):#used for crusor
+        self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]
         self.ylimits = [np.nanmin(self.data[1]), np.nanmax(self.data[1])]
 
     def define_mouse(self):#called in init and from processing
@@ -93,7 +93,7 @@ class Figure(Functions):
 
     def define_add_data(self):
         button_calc = tk.ttk.Button(self.sub_tab.tab, text="Add data", command = self.add_data)
-        offset = [120,0]
+        offset = [80,0]
         button_calc.place(x = self.pos[0]+offset[0], y = self.pos[1]+offset[1])
 
     def add_data(self):
