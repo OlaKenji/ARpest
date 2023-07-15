@@ -102,9 +102,10 @@ class Figure(Functions):
             loadded_data = getattr(data_loader, self.sub_tab.data_tab.gui.start_screen.instrument.get())(self.sub_tab)#make an object based on string
             data = loadded_data.load_data(file)
             self.data[-1] = self.data[-1] + data.data
-        self.data[-1]/(len(files)+1)
+
+        self.data[-1] = self.data[-1]/(len(files)+1)
         self.intensity()
-        self.plot(self.ax)
+        self.draw()
 
     def double_click(self,event):
         pass
@@ -199,7 +200,7 @@ class FS(Figure):
         self.figures['down'].click(pos)
 
     def intensity(self,z = 0):
-        start,stop,step=self.int_range(z)
+        start,stop,step = self.int_range(z)
         self.int = sum(self.data[3][start:stop:1])/step
         self.colour_limit()
 
@@ -387,7 +388,7 @@ class Band(Figure):
         self.figures['down'].draw()
 
     def intensity(self,y = 0):
-        self.int = self.sub_tab.data.data[0]
+        self.int = self.data[-1][0]
 
     def define_angle2k(self):#called from procssing
         return self.data[1],np.array([self.tilt])
@@ -433,54 +434,3 @@ class DOS_down(Figure):
 
     def update_colour_scale(self):
         pass
-
-class Band_scan(Figure):#not in use
-    def __init__(self,data_tab,pos):
-        super().__init__(data_tab,pos)
-        self.define_slide()
-        #self.right = DOS_right(self,[self.pos[0]+self.size[0],self.pos[1]])
-        #self.down = DOS_down(self,[self.pos[0],self.pos[1]+self.size[1]])
-
-    def define_slide(self):
-        scale = tk.Scale(self.sub_tab.tab,from_=0,to=len(self.sub_tab.data.data[0][0][0])-1,orient=tk.HORIZONTAL,label='scan number',command=self.update_range,resolution=1)
-        scale.place(x=500,y=500)
-
-    def update_range(self,value):
-        self.intensity(int(value))
-        self.draw()
-
-    def plot(self,ax):#2D plot
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#FS
-
-    def intensity(self,y = 0):
-        #self.int = self.sub_tab.data_tab.data.data[0]
-        inss = []
-        for int in self.sub_tab.data.data[0]:
-            for ins in int:
-                inss.append(ins[y])
-
-        self.int = np.array(inss).reshape((len(self.sub_tab.data.data[0][0]),len(self.sub_tab.data.data[0])),order='F')
-
-    def sort_data(self):
-        self.data = [self.sub_tab.data.yscale, self.sub_tab.data.xscale, self.sub_tab.data.data]
-
-    def click(self,pos):
-        super().click(pos)
-        difference_array = np.absolute(self.sub_tab.data.xscale-pos[0])
-        index1 = difference_array.argmin()
-        #self.right.intensity(index1)
-        #self.right.draw()
-        #self.right.plot()
-        #self.right.redraw()
-
-        difference_array = np.absolute(self.sub_tab.data.yscale-pos[1])
-        index2 = difference_array.argmin()
-        #self.down.intensity(index2)
-        #self.down.draw()
-        #self.down.plot()
-        #self.down.redraw()
-
-    #def draw(self):
-    #    super().draw()
-        #self.right.draw()
-        #self.down.draw()
