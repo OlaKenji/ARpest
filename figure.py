@@ -107,6 +107,10 @@ class Figure(Functions):
         self.intensity()
         self.draw()
 
+    def angle_crusor(self):
+        self.anglecrusor = cursor.Angle_cursor(self)
+        self.anglecrusor.redraw()
+
     def double_click(self,event):
         pass
 

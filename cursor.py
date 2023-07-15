@@ -1,3 +1,5 @@
+import math
+
 class Auto_cursor():
     def __init__(self, figure):
         self.figure = figure
@@ -55,6 +57,31 @@ class Auto_cursor():
         self.figure.ax.draw_artist(self.sta_horizontal_line)
         self.figure.ax.draw_artist(self.sta_vertical_line)
         #self.figure.range_cursor.redraw()
+        self.figure.canvas.blit(self.figure.ax.bbox)
+
+class Angle_cursor():#the lines that tilts when slided
+    def __init__(self, figure):
+        self.figure = figure
+
+        self.text = self.figure.ax.text(0.5, 1, '', zorder=4,transform = self.figure.ax.transAxes,horizontalalignment='center',verticalalignment='top')
+        self.figure.ax.add_artist(self.text)
+
+        self.xlimits = self.figure.xlimits
+        self.ylimits = self.figure.ylimits
+
+        self.pos = [(self.xlimits[0] + self.xlimits[-1])/2,(self.ylimits[0] + self.ylimits[-1])/2]#the middle
+        self.sta_line = self.figure.ax.axline((self.pos[0],self.pos[1]),slope = 0)
+
+    def update_slope(self,angle):#called from slide
+        pos2 = [self.xlimits[-1],math.tan(2*3.14159*float(angle)/360)*self.ylimits[-1]]
+        self.sta_line._slope = (self.pos[1]-pos2[1])/(self.pos[0]-pos2[0])
+        self.text.set_text('x=%1.2f' % (float(angle)))
+        self.redraw()
+
+    def redraw(self):
+        self.figure.canvas.restore_region(self.figure.curr_background)
+        self.figure.ax.draw_artist(self.sta_line)
+        self.figure.ax.draw_artist(self.text)
         self.figure.canvas.blit(self.figure.ax.bbox)
 
 class Range_cursor():

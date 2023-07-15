@@ -3,7 +3,6 @@ from tkinter import ttk
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
-#from matplotlib import transforms
 
 from argparse import Namespace
 import numpy as np
@@ -16,7 +15,6 @@ import figure_handeler, data_loader
 #make same y,x limits/zoom
 #labels
 #colour bar (where?)
-#rotate figure?
 #fermi level for photon ebergy scan?
 #kz -> convert to k, correct fermi level without interpolation?
 #log scale
@@ -29,9 +27,7 @@ import figure_handeler, data_loader
 #probably need to the axis corrections for each energy to make a 3D data (for FS only)
 
 #stuff:
-#angle2k
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
-#2nd derivative
 #normalisation:
     #1) by number of sweeps (can chekc the BG above FL to check for number of sweeps),
     #2) MDC/EDC cuts divided by max value (fake data, just to enhance)
@@ -260,6 +256,8 @@ class Operations():
         self.define_derivative()
         self.define_reset()
         self.define_smooth()
+        self.define_anglecrusor()
+        self.define_crusorslope()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -293,6 +291,16 @@ class Operations():
         drop = tk.OptionMenu(self.operation_tabs['General'],dropvar,*commands,command = self.select_drop)
         drop.config(bg="white")
         drop.place(x = 0, y = 0)
+
+    def define_anglecrusor(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['General'], text="anglecrusor", command = self.overview.figure_handeler.anglecrusor)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 180)
+
+    def define_crusorslope(self):
+        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=-45,to=45,orient='horizontal',command = self.overview.figure_handeler.update_slope)#
+        scale.place(x = 0, y = 150)
+        label=ttk.Label(self.operation_tabs['General'],text='slope',background='white',foreground='black')
+        label.place(x = 0, y = 130)
 
     def select_drop(self,event):
         self.overview.cmap = event
