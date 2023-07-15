@@ -7,6 +7,7 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from scipy import interpolate
 import data_loader
+from scipy.interpolate import griddata
 
 class Raw():
     def __init__(self,figure):
@@ -163,13 +164,52 @@ class Convert_k(Raw):
         if KY.shape[1] == 1:#2D, band
             self.figure.data[1] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))
         else:#3D, FS
-            self.new_mesh(k0*KX,k0*KY)
+            self.new_mesh_all(k0*KX,k0*KY)
 
     def exit(self):
         self.figure.sort_data()
         self.figure.draw()
 
-    def new_mesh(self,kx,ky):#for 3D data set, FS, correct only the current level
+    def new_mesh_all(self,kx,ky):#make for every layer in one go: make a new mesh, apply the same changes to all layers
+        min_index = [np.argmin((kx[:,-1]-kx[:,0])),np.argmin((ky[-1]-ky[0]))]#the index in whihc there is the minimum distance between the intensity mesh
+
+        #min_distance = [kx[index[0]][1]-kx[index[0]][0], ky[1][index[1]]-ky[0][index[1]]]#minimum bin size
+        min_bin = [(np.amax(kx[min_index[0]]) - np.amin(kx[min_index[0]]))/len(kx[min_index[0]]),(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:,min_index[1]])]#min bin size
+
+        max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
+        max_distance = [np.amax(kx[max_index[0]]) - np.amin(kx[max_index[0]]),np.amax(ky[:,max_index[1]]) - np.amin(ky[:,max_index[1]])]
+        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
+
+        axis_y = np.linspace(np.amin(ky[:,max_index[1]]),np.amax(ky[:,max_index[1]]),num = int(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
+        axis_x =np.linspace(np.amin(kx[max_index[0]]),np.amax(kx[max_index[0]]),num = int(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
+
+        #reshape the intensity
+        intensity = np.zeros((len(axis_y),len(axis_x),len(self.figure.data[2])))#place holder for mesh
+        inrange = False#a flag to check if in range
+        for col, x_cord in enumerate(axis_x):
+            index_real = [0,0]#the index of the kspace coordinates
+            for row,y_cord in enumerate(axis_y):#from below
+                if y_cord < ky[index_real[1]][col]:#below
+                    real_int = np.empty((1,len(self.figure.data[2])))[0]
+                    real_int[:] = np.NaN
+                    if inrange:
+                        real_int = self.figure.data[3][:,index_real[1],col]
+                elif y_cord > ky[-1][col]:#above
+                    inrange = False
+                    real_int = np.empty((1,len(self.figure.data[2])))[0]
+                    real_int[:] = np.NaN
+                else:#if bigger
+                    real_int = self.figure.data[3][:,index_real[1],col]
+                    index_real[1] += 1
+                    inrange = True
+                intensity[row][col][:] = real_int
+
+        self.figure.data[3] = np.transpose(intensity,(2, 0, 1))
+        self.figure.data[0] = axis_x
+        self.figure.data[1] = axis_y
+        self.figure.intensity()
+
+    def new_mesh_one(self,kx,ky):#for 3D data set, FS, correct only the current level
         min_index = [np.argmin((kx[:,-1]-kx[:,0])),np.argmin((ky[-1]-ky[0]))]#the index in whihc there is the minimum distance between the intensity mesh
 
         #min_distance = [kx[index[0]][1]-kx[index[0]][0], ky[1][index[1]]-ky[0][index[1]]]#minimum bin size
@@ -205,46 +245,6 @@ class Convert_k(Raw):
         self.figure.int = intensity
         self.figure.data[0] = axis_x
         self.figure.data[1] = axis_y
-
-    def new_mesh2(self,kx,ky):#for 3D data set, it corrects for every energy level: takes time
-        min_index = [np.argmin((kx[:,-1]-kx[:,0])),np.argmin((ky[-1]-ky[0]))]#the index in whihc there is the minimum distance between the intensity mesh
-
-        #min_distance = [kx[index[0]][1]-kx[index[0]][0], ky[1][index[1]]-ky[0][index[1]]]#minimum bin size
-        min_bin = [(np.amax(kx[min_index[0]]) - np.amin(kx[min_index[0]]))/len(kx[min_index[0]]),(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:,min_index[1]])]#min bin size
-
-        max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
-        max_distance = [np.amax(kx[max_index[0]]) - np.amin(kx[max_index[0]]),np.amax(ky[:,max_index[1]]) - np.amin(ky[:,max_index[1]])]
-        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
-
-        axis_y = np.linspace(np.amin(ky[:,max_index[1]]),np.amax(ky[:,max_index[1]]),num = int(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
-        axis_x = np.linspace(np.amin(kx[max_index[0]]),np.amax(kx[max_index[0]]),num = int(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
-        axis_z = self.figure.data[2]
-
-        #reshape the intensity, every energy
-        intensity = np.zeros((len(axis_z),len(axis_y),len(axis_x)))#place holder for mesh
-        for index_z, z in enumerate(axis_z):
-            inrange = False#a flag to check if in range
-            for col, x_cord in enumerate(axis_x):
-                index_real = [0,0]#the index of the kspace coordinates
-                for row,y_cord in enumerate(axis_y):#from below
-                    if y_cord < ky[index_real[1]][col]:#below
-                        real_int = np.NaN
-                        if inrange:
-                            real_int = self.figure.data[3][index_z][index_real[1]][col]
-                    elif y_cord > ky[-1][col]:#above
-                        inrange = False
-                        real_int = np.NaN
-                    else:#if bigger
-                        real_int = self.figure.data[3][index_z][index_real[1]][col]
-                        index_real[1] += 1
-                        inrange = True
-
-                    intensity[index_z][row][col] = real_int
-
-        self.figure.int = intensity[0]
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-        self.figure.data[3] = intensity
 
 class Convert_kz(Raw):
     def __init__(self,figure):
@@ -282,6 +282,9 @@ class Convert_kz(Raw):
 
         self.figure.data[0] = kz
         self.figure.data[1] = ky
+
+        #self.new_mesh_manual_interpolation(kz,ky)
+
         return
         #new mesh
         self.new_mesh_interpolation(kz,ky)
@@ -303,14 +306,14 @@ class Convert_kz(Raw):
         data[:] = np.NaN
         index=[0,0]
 
-        #bascially workds but not perfect
+        #bascially works but not perfect
         for row_index, row in enumerate(kx):
             for col, x in enumerate(row):
                 y = ky[row_index][col]
                 #translate to appropriate positions
                 index[0] = (x - axis_x[0])/min_bin[0]
                 index[1] = (y - axis_y[0])/min_bin[1]
-                index[0] = min(index[0],3419)#fix this
+                index[0] = min(index[0],len(axis_x)-1)#why is this needed?
                 data[int(index[1])][int(index[0])] = self.figure.int[row_index][col]
 
         #manual interpolation
@@ -382,7 +385,7 @@ class Convert_kz(Raw):
                 #translate to appropriate positions
                 index[0] = (x - axis_x[0])/min_bin[0]
                 index[1] = (y - axis_y[0])/min_bin[1]
-                index[0] = min(index[0],3419)#fix this
+                index[0] = min(index[0],len(axis_x)-1)#why is this needed?
                 data[int(index[1])][int(index[0])] = self.figure.int[row_index][col]
 
         #interpolate

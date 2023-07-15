@@ -230,7 +230,7 @@ class Band_right(Figure):
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
 
     def intensity(self,y=0):
         start,stop,step = self.int_range(y)
@@ -273,7 +273,7 @@ class Band_down(Figure):
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band down
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band down
 
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
@@ -373,7 +373,7 @@ class Band(Figure):
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):

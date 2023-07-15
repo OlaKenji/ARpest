@@ -18,13 +18,13 @@ import figure_handeler, data_loader
 #fermi level for photon ebergy scan?
 #kz -> convert to k, correct fermi level without interpolation?
 #log scale
-#make so that mouse appears automatically at the begining
 
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #(array length problem/uniform shape problem)
 #probably need to the axis corrections for each energy to make a 3D data (for FS only)
+#make so that mouse appears automatically at the begining
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
