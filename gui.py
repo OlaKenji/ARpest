@@ -22,9 +22,9 @@ import figure_handeler, data_loader
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
-#(array length problem/uniform shape problem)
-#probably need to the axis corrections for each energy to make a 3D data (for FS only)
 #make so that mouse appears automatically at the begining
+#the cuts in kz space is a bit slow
+#update the axis when blitting corner?
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)

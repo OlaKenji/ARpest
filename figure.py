@@ -65,6 +65,8 @@ class Figure(Functions):
         offset = [0,0]
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        self.blank_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+
 
     def mouse_range(self):#used for crusor
         self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]
@@ -168,7 +170,6 @@ class Figure(Functions):
 class FS(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
-        self.label = ['x angle','y angle']
         self.figures = figure_handeler.figures
         self.tilt =  self.sub_tab.data.metadata['tilt']
         self.define_add_data()
@@ -177,8 +178,8 @@ class FS(Figure):
         self.sort_data()
         self.intensity()
 
-    def plot(self,ax):#pcolorfast -> doesn't work for the interpolated kz scan?
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
+    def plot(self,ax):#pcolorfast
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
         #self.fig.colorbar(self.graph)
 
     def sort_data(self):
@@ -205,7 +206,7 @@ class FS(Figure):
 
     def intensity(self,z = 0):
         start,stop,step = self.int_range(z)
-        self.int = sum(self.data[3][start:stop:1])/step
+        self.int = np.nansum(self.data[3][start:stop:1],axis=0)/step#sum(self.data[3][start:stop:1])/step#this takes long tim for sum reason in kz space
         self.colour_limit()
 
     def define_hv(self):#called from procssing
@@ -230,7 +231,7 @@ class Band_right(Figure):
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
 
     def intensity(self,y=0):
         start,stop,step = self.int_range(y)
@@ -250,9 +251,9 @@ class Band_right(Figure):
         difference_array1 = np.absolute(self.data[1]-pos[1])
         index1 = difference_array1.argmin()
         self.figure_handeler.figures['corner'].intensity_right(index1)
-        self.figure_handeler.figures['corner'].draw()
-        #self.gui.right_down.plot()
-        #self.gui.right_down.redraw()
+        #self.figure_handeler.figures['corner'].draw()
+        self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
+        self.figure_handeler.figures['corner'].redraw()
 
     def define_angle2k(self):#called from procssing
         return self.data[1],np.array([self.tilt])
@@ -273,7 +274,7 @@ class Band_down(Figure):
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band down
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band down
 
     def intensity(self,y=0):
         start,stop,step=self.int_range(y)
@@ -293,9 +294,9 @@ class Band_down(Figure):
         index1 = difference_array1.argmin()
 
         self.figure_handeler.figures['corner'].intensity_down(index1)
-        self.figure_handeler.figures['corner'].draw()
-        #self.gui.right_down.plot()
-        #self.gui.right_down.redraw()
+        #self.figure_handeler.figures['corner'].draw()
+        self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
+        self.figure_handeler.figures['corner'].redraw()
 
     def define_angle2k(self):#called from procssing
         return np.array([self.tilt]),self.data[0]
@@ -325,15 +326,14 @@ class DOS_right_down(Figure):
         self.int_down = np.array(int_down)
 
     def plot(self,ax):#2D plot
-        #print(self.data[0].shape, self.int_right.shape,self.int_down.shape,self.figure_handeler.figures['down'].int.shape)
-        self.graph1 = ax.plot(self.data[0], self.int_right,zorder=3)[0]
-        self.graph2 = ax.plot(self.data[0], self.int_down,zorder=3)[0]
+        self.graph1 = ax.plot(self.data[0], self.int_right, 'b-',zorder=3)[0]
+        self.graph2 = ax.plot(self.data[0], self.int_down, 'r-',zorder=3)[0]
 
     def click(self,pos):
         super().click(pos)
         difference_array = np.absolute(self.figure_handeler.figures['center'].data[2]-pos[0])
         index1 = difference_array.argmin()
-        self.figure_handeler.figures['center'].intensity(index1)
+        self.figure_handeler.figures['center'].intensity(index1)#this is slow for some reason in kz space
         self.figure_handeler.figures['center'].plot(self.figure_handeler.figures['center'].ax)
         self.figure_handeler.figures['center'].redraw()
 
@@ -341,7 +341,21 @@ class DOS_right_down(Figure):
         pass
 
     def redraw(self):
-        pass
+        ymin=min(min(self.int_right),min(self.int_down))
+        ymax=max(max(self.int_right),max(self.int_down))
+        xmin=min(self.data[0])
+        xmax=max(self.data[0])
+
+        self.ax.set_xlim([xmin,xmax])
+        self.ax.set_ylim([ymin,ymax])
+
+        self.canvas.restore_region(self.blank_background)
+        self.ax.draw_artist(self.graph1)
+        self.ax.draw_artist(self.graph2)
+
+        self.canvas.blit(self.ax.bbox)
+        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        self.cursor.redraw()
 
 class Band(Figure):
     def __init__(self,figure_handeler,pos):
@@ -373,7 +387,7 @@ class Band(Figure):
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):
