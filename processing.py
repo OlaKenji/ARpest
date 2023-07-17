@@ -182,6 +182,7 @@ class Convert_k(Raw):
         #reshape the intensity
         intensity = np.zeros((len(axis_y),len(axis_x),len(self.figure.data[2])))#place holder for mesh
         inrange = False#a flag to check if in range
+        intensity[:] = np.NaN
         for col, x_cord in enumerate(axis_x):
             index_real = [0,0]#the index of the kspace coordinates
             for row,y_cord in enumerate(axis_y):#from below

@@ -15,16 +15,14 @@ import figure_handeler, data_loader
 #make same y,x limits/zoom
 #labels
 #colour bar (where?)
-#fermi level for photon ebergy scan?
-#kz -> convert to k, correct fermi level without interpolation?
+#fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
 #log scale
 
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #make so that mouse appears automatically at the begining
-#the cuts in kz space is a bit slow
-#update the axis when blitting corner?
+#the cuts in kz space is very slow
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)

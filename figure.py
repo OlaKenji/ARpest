@@ -59,14 +59,18 @@ class Figure(Functions):
         self.size = self.fig.get_size_inches()*self.fig.dpi
         self.ax = self.fig.add_subplot(111)
         self.fig.subplots_adjust(top=0.93,left=0.15,right=0.97)
+
+        self.ax.set_yticklabels([])#to make the blank BG without any axis numbers
+        self.ax.set_xticklabels([])
+        self.ax.set_xticks([])
+        self.ax.set_yticks([])
+
         self.canvas = FigureCanvasTkAgg(self.fig, master = self.sub_tab.tab)
         self.canvas.draw()
 
         offset = [0,0]
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
-        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-        self.blank_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-
+        self.blank_background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)#including the axis
 
     def mouse_range(self):#used for crusor
         self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]
@@ -80,7 +84,6 @@ class Figure(Functions):
         self.canvas.get_tk_widget().bind( "<Button-1>", self.cursor.on_mouse_click)#left click
         self.canvas.get_tk_widget().bind( "<Button-2>", self.right_click)#right click
         self.canvas.get_tk_widget().bind( "<Double-Button-1>", self.double_click)#double click
-        self.cursor.redraw()
 
     def define_export(self):
         button_calc = tk.ttk.Button(self.sub_tab.tab, text="Export", command = self.export)
@@ -134,7 +137,7 @@ class Figure(Functions):
 
     def redraw(self):
         self.update_colour_scale()
-        self.canvas.restore_region(self.curr_background)
+        self.canvas.restore_region(self.blank_background)
         self.ax.draw_artist(self.graph)
         self.canvas.blit(self.ax.bbox)
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
@@ -191,7 +194,6 @@ class FS(Figure):
         index1 = difference_array.argmin()
 
         self.figures['right'].intensity(index1)
-        #self.figures['right'].tilt = self.data[0][index1]
         self.figures['right'].plot(self.figures['right'].ax)
         self.figures['right'].redraw()
         self.figures['right'].click(pos)
@@ -199,7 +201,6 @@ class FS(Figure):
         difference_array = np.absolute(self.data[1]-pos[1])
         index2 = difference_array.argmin()
         self.figures['down'].intensity(index2)
-        #self.figures['down'].tilt = self.data[1][index2]
         self.figures['down'].plot(self.figures['down'].ax)
         self.figures['down'].redraw()
         self.figures['down'].click(pos)
@@ -341,8 +342,8 @@ class DOS_right_down(Figure):
         pass
 
     def redraw(self):
-        ymin=min(min(self.int_right),min(self.int_down))
-        ymax=max(max(self.int_right),max(self.int_down))
+        ymin=min(np.nanmin(self.int_right),np.nanmin(self.int_down))
+        ymax=max(np.nanmax(self.int_right),np.nanmax(self.int_down))
         xmin=min(self.data[0])
         xmax=max(self.data[0])
 
@@ -350,10 +351,14 @@ class DOS_right_down(Figure):
         self.ax.set_ylim([ymin,ymax])
 
         self.canvas.restore_region(self.blank_background)
+        self.ax.draw_artist(self.ax.get_yaxis())
+        self.ax.draw_artist(self.ax.get_xaxis())
+
         self.ax.draw_artist(self.graph1)
         self.ax.draw_artist(self.graph2)
 
-        self.canvas.blit(self.ax.bbox)
+        self.canvas.blit(self.ax.clipbox)
+
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
 
