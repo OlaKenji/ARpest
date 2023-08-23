@@ -1,5 +1,9 @@
+import matplotlib
+matplotlib.use('TkAgg')#needed to some reason on the none enviroment
+
 import tkinter as tk
 from tkinter import ttk
+import tkinter.filedialog#needed to some reason on the none enviroment
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -17,12 +21,17 @@ import figure_handeler, data_loader
 #colour bar (where?)
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
 #log scale
+#normalise based on some selected area?
+#symmetrise based on a reference?
+#select area
+#convert k based on the crusor position (for offset)
+#save/load
 
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #make so that mouse appears automatically at the begining
-#the cuts in kz space is very slow
+#the cuts in kz space is very slow!!!???
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -256,6 +265,7 @@ class Operations():
         self.define_smooth()
         self.define_anglecrusor()
         self.define_crusorslope()
+        self.define_crusor_position()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -267,14 +277,17 @@ class Operations():
             self.notebook.add(self.operation_tabs[operation],text=operation)
 
     def define_int_range(self):
-        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=5,orient='horizontal',command=self.update_line_width)#
+        scale = tk.ttk.Scale(self.operation_tabs['General'],from_ = 0,to = 100,orient='horizontal',command=self.update_line_width)#
         scale.place(x = 0, y = 50)
-        label=ttk.Label(self.operation_tabs['General'],text='int. range',background='white',foreground='black')
+        label = ttk.Label(self.operation_tabs['General'],text='int. range',background='white',foreground='black')
         label.place(x = 0, y = 30)
+        self.label = ttk.Label(self.operation_tabs['General'],text = str(1),background='white',foreground='black')#need to save it to updat the number next to the slide
+        self.label.place(x = 100, y = 50)
 
     def update_line_width(self,value):#the slider calls it
         self.overview.int_range = int(float(value))
         self.overview.figure_handeler.update_line_width()
+        self.label.configure(text=str(1 + 2*int(float(value))))#update the number next to int range slide
 
     def define_colour_scale(self):
         self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.overview.figure_handeler.update_colour_scale,value = 100)#
@@ -299,6 +312,10 @@ class Operations():
         scale.place(x = 0, y = 150)
         label=ttk.Label(self.operation_tabs['General'],text='slope',background='white',foreground='black')
         label.place(x = 0, y = 130)
+
+    def define_crusor_position(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset position", command = self.overview.figure_handeler.figures['center'].cursor.reset_position)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 250)
 
     def select_drop(self,event):
         self.overview.cmap = event
@@ -329,8 +346,8 @@ class Operations():
             tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_drivative[choise]).place(x=350,y=30*index)
 
     def define_reset(self):
-        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
-        button_calc.place(x = 480, y = 0)
+        button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
+        button_calc.place(x = 500, y = 260)
 
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)

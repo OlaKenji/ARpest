@@ -10,7 +10,7 @@ class Auto_cursor():
         self.xlimits = self.figure.xlimits
         self.ylimits = self.figure.ylimits
 
-        self.pos = [(self.xlimits[0]+self.xlimits[-1])/2,(self.ylimits[0]+self.ylimits[-1])/2]
+        self.pos = [(self.xlimits[0]+self.xlimits[-1])*0.5,(self.ylimits[0]+self.ylimits[-1])*0.5]
 
         thickness=0.8
         self.dyn_horizontal_line = self.figure.ax.axhline(self.pos[1],color='k', lw=thickness, ls='--',zorder=3)
@@ -24,6 +24,14 @@ class Auto_cursor():
         self.sta_horizontal_line.set_ydata(self.pos[1])
         self.sta_vertical_line.set_xdata(self.pos[0])
 
+    def reset_position(self):
+        self.pos = [(self.xlimits[0]+self.xlimits[-1])*0.5,(self.ylimits[0]+self.ylimits[-1])*0.5]
+        self.dyn_horizontal_line.set_ydata(self.pos[1])
+        self.dyn_vertical_line.set_xdata(self.pos[0])
+        self.sta_horizontal_line.set_ydata(self.pos[1])
+        self.sta_vertical_line.set_xdata(self.pos[0])
+        self.redraw()
+
     def update_event(self,event):
         self.xlimits = self.figure.xlimits
         self.ylimits = self.figure.ylimits
@@ -32,8 +40,8 @@ class Auto_cursor():
         return [scalex*(self.xlimits[1]-self.xlimits[0])+self.xlimits[0],scaley*(self.ylimits[0]-self.ylimits[1])+self.ylimits[1]]
 
     def update_line_width(self):
-        self.sta_horizontal_line.set_linewidth(self.figure.sub_tab.int_range+0.8)
-        self.sta_vertical_line.set_linewidth(self.figure.sub_tab.int_range+0.8)
+        self.sta_horizontal_line.set_linewidth(0.5*(self.figure.sub_tab.int_range*2+1))
+        self.sta_vertical_line.set_linewidth(0.5*(self.figure.sub_tab.int_range*2+1))
         self.redraw()
 
     def on_mouse_move(self, event):
@@ -84,7 +92,7 @@ class Angle_cursor():#the lines that tilts when slided
         self.figure.ax.draw_artist(self.text)
         self.figure.canvas.blit(self.figure.ax.bbox)
 
-class Range_cursor():
+class Range_cursor():#not in use
     def __init__(self, figure):
         self.figure = figure
 

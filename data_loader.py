@@ -230,7 +230,7 @@ class I05(Data_loader):
                         ('kinetic_energy_center', 'Center Energy', float),
                         ('kinetic_energy_start', 'Low Energy', float),
                         ('kinetic_energy_end', 'High Energy', float),
-                        #('Energy Step', 'Energy Step', float)
+                        ('kinetic_energy_step', 'Energy Step', float)
                         #('Thetay_StepSize', 'Thetay_StepSize', float),
                     #    ('Comments', 'Comments', str)
                         ]#acquisition_mode
@@ -333,6 +333,7 @@ class I05(Data_loader):
         for ana in np.array(infile['/entry1/instrument/analyser']):
             M2[ana] = np.array(infile['/entry1/instrument/analyser/'+ana])
 
+        #print(M2)
         metadata = {}
         for key,name,type in self.meta_keys:
             try:

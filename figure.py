@@ -49,6 +49,7 @@ class Figure(Functions):
         self.define_export()
         self.define_mouse()
         self.draw()
+        #self.define_normalise()
 
     def init_data(self):
         self.intensity()
@@ -145,14 +146,14 @@ class Figure(Functions):
 
     def int_range(self,index):
         if self.sub_tab.int_range == 0:#if no integrate
-            return index,index+1,1
+            return index, index + 1, 1
         else:#if integrate
             if index-self.sub_tab.int_range < 0:
-                index=self.sub_tab.int_range
-            start = index-self.sub_tab.int_range
-            stop = index+self.sub_tab.int_range+1
+                index = self.sub_tab.int_range
+            start = index - self.sub_tab.int_range
+            stop = index + self.sub_tab.int_range + 1
             step = stop - start
-            return start,stop,step
+            return start, stop, step
 
     def set_label(self):#called from draw
         self.ax.set_xlabel(self.label[0])
@@ -166,9 +167,6 @@ class Figure(Functions):
     def colour_limit(self):#called in init
         self.vmin = np.nanmin(self.int)
         self.vmax = np.nanmax(self.int)
-
-    def gold(self):#sort the data: called from fermi_level processing init
-        pass#self.data[0] is assumed to be kinetic energy need to transpose back and forth if this is not the case (not implemented)
 
 class FS(Figure):
     def __init__(self,figure_handeler,pos):
@@ -213,8 +211,8 @@ class FS(Figure):
     def define_hv(self):#called from procssing
         return self.data[1], np.array([self.tilt])
 
-    def define_angle2k(self):#called from procssing
-        return self.data[1], self.data[0]#theta, tilt
+    def define_angle2k(self):#called from procssing, convert k
+        return self.data[1], self.data[0]
 
 class Band_right(Figure):
     def __init__(self,figure_handeler,pos):
@@ -256,9 +254,6 @@ class Band_right(Figure):
         self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
         self.figure_handeler.figures['corner'].redraw()
 
-    def define_angle2k(self):#called from procssing
-        return self.data[1],np.array([self.tilt])
-
 class Band_down(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
@@ -298,9 +293,6 @@ class Band_down(Figure):
         #self.figure_handeler.figures['corner'].draw()
         self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
         self.figure_handeler.figures['corner'].redraw()
-
-    def define_angle2k(self):#called from procssing
-        return np.array([self.tilt]),self.data[0]
 
 class DOS_right_down(Figure):
     def __init__(self,figure_handeler,pos):

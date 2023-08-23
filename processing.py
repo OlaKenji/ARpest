@@ -114,10 +114,9 @@ class Derivative_y(Derivative_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        #self.figure.state.enter_state('K_space')
         self.hv = self.figure.sub_tab.data.metadata['hv']
 
-    def run(self):
+    def run(self):#called when pressing the botton
         self.convert2k()
         self.update_figure()
 
@@ -135,7 +134,11 @@ class Convert_k(Raw):
         #beta is the tilt
 
         # Angle to radian conversion
-        dalpha,dbeta = 0,0
+        pos1 = self.figure.cursor.sta_horizontal_line.get_data()
+        pos2 = self.figure.cursor.sta_vertical_line.get_data()
+        dalpha,dbeta = -pos1[1],-pos2[0]#the offsets
+
+
         alpha,beta = self.figure.define_angle2k()#depends on the figure
         a = (alpha+dalpha)*np.pi/180
         b = (beta+dbeta)*np.pi/180
@@ -277,9 +280,9 @@ class Convert_kz(Raw):
         ky = np.transpose(np.array(ky))
 
         #to let ppcolormesh handle the interpolation
-        #self.figure.data[0] = kz
-        #self.figure.data[1] = ky
-        #return
+        self.figure.data[0] = kz
+        self.figure.data[1] = ky
+        return
 
         #manually interpolate all layers so that cuts become easier
         self.new_mesh_all(kz,ky)
@@ -678,13 +681,13 @@ class Fermi_level_band(Raw):#only the main figure
         self.gold = self.figure.sub_tab.data_tab.data_loader.load_data(gold)
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
+        self.W = 4.38#work function [eV]
         self.hv = self.figure.sub_tab.data.metadata['hv']
-        self.e_0 = self.hv - 4.38#initial guess of fermi level
-        #self.figure.state.enter_state('Fermi_adjusted')
+        self.e_0 = self.hv - self.W#initial guess of fermi level
+        self.T = 10#K the temperature
 
     def run(self):
-        self.figure.gold()#cannot be in init
-        self.fit()
+        self.fit()#kevins stuff
         self.pixel_shift()
         self.update_figure()
 
@@ -695,6 +698,7 @@ class Fermi_level_band(Raw):#only the main figure
         self.figure.figure_handeler.update_mouse_range()
 
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
+        print('lets shift')
         energies = self.figure.data[0]
         fermi_levels = self.EF
         fermi_index = np.array([np.argmin(np.abs(energies - f)) for f in fermi_levels],dtype=int)
@@ -739,9 +743,6 @@ class Fermi_level_band(Raw):#only the main figure
         self.figure.int = new_intensity
 
     def fit(self):
-        e_0 = self.hv - 4.38#femi level guess
-        T = 10#K
-
         gold = self.gold.data[0]
         n_pixels, n_energies = gold.shape
         energies = self.gold.xscale
@@ -749,7 +750,7 @@ class Fermi_level_band(Raw):#only the main figure
         params = []
         functions = []
         for i,edc in enumerate(gold):
-            p, res_func = self.fit_fermi_dirac(energies, edc, self.e_0, T=T)
+            p, res_func = self.fit_fermi_dirac(energies, edc, self.e_0, T=self.T)
             params.append(p)
             self.e_0 = p[0]#update teh guess
             functions.append(res_func)
@@ -785,7 +786,7 @@ class Fermi_level_band(Raw):#only the main figure
     def FD_function(self,E, E_F, sigma, a, b, T=10):
         # Basic Fermi Dirac distribution at given T
         sigma =0
-        kT = self.kB * T / self.eV
+        kT = self.kB * self.T / self.eV
         y = 1 / (np.exp((E-E_F)/kT) + 1)
 
         # Add a linear contribution to the 'below-E_F' part
