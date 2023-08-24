@@ -8,7 +8,7 @@ import tkinter.filedialog#needed to some reason on the none enviroment
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 
-from argparse import Namespace
+#from argparse import Namespace
 import numpy as np
 
 import figure_handeler, data_loader
@@ -207,7 +207,7 @@ class Overview():
         self.data_tab.notebook.add(self.tab,text=name)
 
     def make_figure(self):
-        if self.data.zscale is None or len(self.data.zscale) == 1:#2D data
+        if self.data['zscale'] is None or len(self.data['zscale']) == 1:#2D data
             self.figure_handeler = figure_handeler.Twodimension(self)
         else:#3D data
             self.figure_handeler = figure_handeler.Threedimension(self)
@@ -221,9 +221,9 @@ class Overview():
     def logbook(self):
         columns=[]
         data=[]
-        for key in self.data.metadata:
+        for key in self.data['metadata']:
             columns.append(key)
-            data.append(self.data.metadata[key])
+            data.append(self.data['metadata'][key])
 
         tree = tk.ttk.Treeview(self.tab,columns=columns,show='headings',height=2)
         verscrlbar = tk.ttk.Scrollbar(self.tab,orient ="horizontal",command = tree.xview)
@@ -271,14 +271,14 @@ class Overview():
             loadded_data = getattr(data_loader, self.data_tab.gui.start_screen.instrument.get())(self.data_tab)#make an object based on string
             scan_data = loadded_data.load_data(self.data_tab.gui.start_path + '/' + data_name)
             #scan_data = dl.load_data(self.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
-            hv.append(scan_data.metadata['hv'])#the photon energy
+            hv.append(scan_data['metadata']['hv'])#the photon energy
             if num == 0:
-                int = np.atleast_3d(np.transpose(scan_data.data[0]))
+                int = np.atleast_3d(np.transpose(scan_data['data'][0]))
             else:
-                int = np.append(int,np.atleast_3d(np.transpose(scan_data.data[0])),axis=2)
+                int = np.append(int,np.atleast_3d(np.transpose(scan_data['data'][0])),axis=2)
 
-        scan_data.metadata['hv'] = hv
-        new_data = Namespace(xscale=np.array(hv), yscale=scan_data.yscale,zscale=scan_data.xscale,data=int,metadata=scan_data.metadata)#add meta data
+        scan_data['metadata']['hv'] = hv
+        new_data = {'xscale':np.array(hv), 'yscale':scan_data['yscale'],'zscale':scan_data['xscale'],'data':int,'metadata':scan_data['metadata']}
         tab = self.data_tab.append_tab(new_data)
 
 class Operations():

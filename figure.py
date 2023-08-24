@@ -6,7 +6,7 @@ from matplotlib.pyplot import get_cmap
 import tkinter as tk
 import numpy as np
 import json
-from argparse import Namespace
+#from argparse import Namespace
 
 import processing, cursor, data_loader
 
@@ -38,7 +38,7 @@ class Functions():#figure functionality not being used
 class Figure(Functions):
     def __init__(self,figure_handeler,pos):
         self.figure_handeler = figure_handeler
-        self.sub_tab = figure_handeler.data_tab#analysis or overview
+        self.sub_tab = figure_handeler.data_tab#overview
         self.pos = pos
         self.label = ['x','y']
         self.init_data()
@@ -107,7 +107,7 @@ class Figure(Functions):
         for file in files:
             loadded_data = getattr(data_loader, self.sub_tab.data_tab.gui.start_screen.instrument.get())(self.sub_tab)#make an object based on string
             data = loadded_data.load_data(file)
-            self.data[-1] = self.data[-1] + data.data
+            self.data[-1] = self.data[-1] + data['data']
 
         self.data[-1] = self.data[-1]/(len(files)+1)
         self.intensity()
@@ -173,8 +173,9 @@ class FS(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
         self.figures = figure_handeler.figures
-        self.tilt =  self.sub_tab.data.metadata['tilt']
-        self.define_add_data()
+        self.tilt =  self.sub_tab.data['metadata']['tilt']
+        self.define_add_data()#the botton to add data (e.g. several measurement but divided into several files)
+        #self.save_para = {'energy_cut':self.energy_cut}#things that should be saved and read from a file
 
     def init_data(self):
         self.sort_data()
@@ -185,7 +186,7 @@ class FS(Figure):
         #self.fig.colorbar(self.graph)
 
     def sort_data(self):
-        self.data = [self.sub_tab.data.xscale,self.sub_tab.data.yscale,self.sub_tab.data.zscale,self.sub_tab.data.data]
+        self.data = [self.sub_tab.data['xscale'],self.sub_tab.data['yscale'],self.sub_tab.data['zscale'],self.sub_tab.data['data']]
 
     def click(self,pos):
         super().click(pos)
@@ -227,7 +228,7 @@ class Band_right(Figure):
         self.figure_handeler.figures['center'].draw()
 
     def double_click(self,event):#called when doubleclicking
-        new_data = Namespace(xscale=self.data[0], yscale=self.data[1],zscale = None,data=np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),metadata=self.sub_tab.data.metadata)
+        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.sub_tab.data['metadata']}
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):
@@ -267,7 +268,7 @@ class Band_down(Figure):
         self.draw()
 
     def double_click(self,event):#called when doubleclicking
-        new_data = Namespace(xscale=self.data[0], yscale=self.data[1],zscale = None,data=np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),metadata=self.sub_tab.data.metadata)
+        new_data = Namespace(xscale=self.data[0], yscale=self.data[1],zscale = None,data=np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),metadata=self.sub_tab.data['metadata'])
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):#2D plot
@@ -340,8 +341,8 @@ class DOS_right_down(Figure):
         xmin=min(self.data[0])
         xmax=max(self.data[0])
 
-        self.ax.set_xlim([xmin,xmax])
-        self.ax.set_ylim([ymin,ymax])
+        self.ax.set_xbound([xmin,xmax])
+        self.ax.set_ybound([ymin,ymax])
 
         self.canvas.restore_region(self.blank_background)
         self.ax.draw_artist(self.ax.get_yaxis())
@@ -358,7 +359,7 @@ class DOS_right_down(Figure):
 class Band(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
-        self.tilt = self.sub_tab.data.metadata['tilt']
+        self.tilt = self.sub_tab.data['metadata']['tilt']
         self.figures = figure_handeler.figures
         self.define_add_data()
 
@@ -390,7 +391,7 @@ class Band(Figure):
         #ax.set_ylim(74.7, 75.3)
 
     def sort_data(self):
-        self.data = [self.sub_tab.data.xscale, self.sub_tab.data.yscale, self.sub_tab.data.data]
+        self.data = [self.sub_tab.data['xscale'], self.sub_tab.data['yscale'], self.sub_tab.data['data']]
 
     def click(self,pos):
         super().click(pos)

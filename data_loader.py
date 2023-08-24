@@ -152,6 +152,18 @@ class Data_loader():
 
         data,xscale,yscale,zscale = self.origanise_data(data,xscale,yscale,M2)
 
+        result = {}
+        result['data'] = data
+        result['xscale'] = yscale
+        result['yscale'] = xscale
+        result['zscale'] = zscale
+        result['angles'] = xscale
+        result['theta'] = 0
+        result['phi'] = 0
+        result['E_b'] = 0
+        result['metadata'] = metadata
+        return result
+
         res = Namespace(
                 data = data,
                 xscale = yscale,
@@ -341,6 +353,19 @@ class I05(Data_loader):
             except:
                 pass
 
+
+        result = {}
+        result['data'] = data
+        result['xscale'] = xscale
+        result['yscale'] = yscale
+        result['zscale'] = zscale
+        result['angles'] = angles
+        result['theta'] = theta
+        result['phi'] = phi
+        result['E_b'] = E_b
+        result['metadata'] = metadata
+        return result
+
         res = Namespace(
            data = data,
            xscale = xscale,
@@ -495,6 +520,19 @@ class SIS(Data_loader):
             metadata[name] = attributes[key]
         for key,name in self.meta_keys3:
             metadata[name] = manipulator[key][0]
+
+        result = {}
+        result['data'] = data
+        result['xscale'] = xscale
+        result['yscale'] = yscale
+        result['zscale'] = energies
+        result['angles'] = angles
+        result['theta'] = theta
+        result['phi'] = phi
+        result['E_b'] = E_b
+        result['metadata'] = metadata
+        return result
+
 
         res = Namespace(
                data = data,

@@ -114,7 +114,7 @@ class Derivative_y(Derivative_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        self.hv = self.figure.sub_tab.data.metadata['hv']
+        self.hv = self.figure.sub_tab.data['metadata']['hv']
 
     def run(self):#called when pressing the botton
         self.convert2k()
@@ -682,7 +682,7 @@ class Fermi_level_band(Raw):#only the main figure
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
         self.W = 4.38#work function [eV]
-        self.hv = self.figure.sub_tab.data.metadata['hv']
+        self.hv = self.figure.sub_tab.data['metadata']['hv']
         self.e_0 = self.hv - self.W#initial guess of fermi level
         self.T = 10#K the temperature
 
@@ -743,9 +743,9 @@ class Fermi_level_band(Raw):#only the main figure
         self.figure.int = new_intensity
 
     def fit(self):
-        gold = self.gold.data[0]
+        gold = self.gold['data'][0]
         n_pixels, n_energies = gold.shape
-        energies = self.gold.xscale
+        energies = self.gold['xscale']
 
         params = []
         functions = []
