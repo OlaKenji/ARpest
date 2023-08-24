@@ -41,6 +41,7 @@ class Figure(Functions):
         self.sub_tab = figure_handeler.data_tab#overview
         self.pos = pos
         self.label = ['x','y']
+        self.cut_index = self.sub_tab.data.get(type(self).__name__,0)
         self.init_data()
         self.original_int = self.int
 
@@ -175,11 +176,16 @@ class FS(Figure):
         self.figures = figure_handeler.figures
         self.tilt =  self.sub_tab.data['metadata']['tilt']
         self.define_add_data()#the botton to add data (e.g. several measurement but divided into several files)
-        #self.save_para = {'energy_cut':self.energy_cut}#things that should be saved and read from a file
 
     def init_data(self):
         self.sort_data()
         self.intensity()
+
+    def save(self):#to save the stuff: called when pressing the save botton thorugh the figure handlere
+        self.sub_tab.data['xscale'] = self.data[0]
+        self.sub_tab.data['yscale'] = self.data[1]
+        self.sub_tab.data['zscale'] = self.data[2]
+        self.sub_tab.data['data'] = self.data[3]
 
     def plot(self,ax):#pcolorfast
         self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1,cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
@@ -191,22 +197,23 @@ class FS(Figure):
     def click(self,pos):
         super().click(pos)
         difference_array = np.absolute(self.data[0]-pos[0])
-        index1 = difference_array.argmin()
+        self.figures['right'].cut_index = difference_array.argmin()
 
-        self.figures['right'].intensity(index1)
+        self.figures['right'].intensity()
         self.figures['right'].plot(self.figures['right'].ax)
         self.figures['right'].redraw()
         self.figures['right'].click(pos)
 
         difference_array = np.absolute(self.data[1]-pos[1])
-        index2 = difference_array.argmin()
-        self.figures['down'].intensity(index2)
+        self.figures['down'].cut_index = difference_array.argmin()
+
+        self.figures['down'].intensity()
         self.figures['down'].plot(self.figures['down'].ax)
         self.figures['down'].redraw()
         self.figures['down'].click(pos)
 
-    def intensity(self,z = 0):
-        start,stop,step = self.int_range(z)
+    def intensity(self):
+        start,stop,step = self.int_range(self.cut_index)
         self.int = np.nansum(self.data[3][start:stop:1],axis=0)/step#sum(self.data[3][start:stop:1])/step#this takes long tim for sum reason in kz space
         self.colour_limit()
 
@@ -234,8 +241,8 @@ class Band_right(Figure):
     def plot(self,ax):
         self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
 
-    def intensity(self,y=0):
-        start,stop,step = self.int_range(y)
+    def intensity(self):
+        start,stop,step = self.int_range(self.cut_index)
         self.int = []
         for ary in self.figure_handeler.figures['center'].data[3]:
             self.int.append(np.sum(ary[:,start:stop:1],axis=1)/step)
@@ -250,8 +257,8 @@ class Band_right(Figure):
         pos = self.cursor.sta_horizontal_line.get_data()
 
         difference_array1 = np.absolute(self.data[1]-pos[1])
-        index1 = difference_array1.argmin()
-        self.figure_handeler.figures['corner'].intensity_right(index1)
+        self.figure_handeler.figures['corner'].cut_index = difference_array1.argmin()
+        self.figure_handeler.figures['corner'].intensity_right()
         #self.figure_handeler.figures['corner'].draw()
         self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
         self.figure_handeler.figures['corner'].redraw()
@@ -274,8 +281,8 @@ class Band_down(Figure):
     def plot(self,ax):#2D plot
         self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band down
 
-    def intensity(self,y=0):
-        start,stop,step=self.int_range(y)
+    def intensity(self):
+        start,stop,step=self.int_range(self.cut_index)
         int = []
         for ary in self.figure_handeler.figures['center'].data[3]:
             int.append(sum(ary[start:stop:1])/step)
@@ -289,9 +296,9 @@ class Band_down(Figure):
         super().click(pos)
         pos = self.cursor.sta_vertical_line.get_data()
         difference_array1 = np.absolute(self.data[0]-pos[0])
-        index1 = difference_array1.argmin()
+        self.figure_handeler.figures['corner'].cut_index = difference_array1.argmin()
 
-        self.figure_handeler.figures['corner'].intensity_down(index1)
+        self.figure_handeler.figures['corner'].intensity_down()
         #self.figure_handeler.figures['corner'].draw()
         self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
         self.figure_handeler.figures['corner'].redraw()
@@ -303,18 +310,18 @@ class DOS_right_down(Figure):
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[2],self.int_right]
 
-    def intensity(self,idx=0):
-        self.intensity_right(idx)
-        self.intensity_down(idx)
+    def intensity(self):
+        self.intensity_right()
+        self.intensity_down()
         self.int = (self.int_right+self.int_down)*0.5
         self.colour_limit()
 
-    def intensity_right(self,idx=0):
-        start,stop,step=self.int_range(idx)
+    def intensity_right(self):
+        start,stop,step=self.int_range(self.cut_index)
         self.int_right = sum(self.figure_handeler.figures['right'].int[start:stop:1])/step
 
-    def intensity_down(self,idx=0):
-        start,stop,step=self.int_range(idx)
+    def intensity_down(self):
+        start,stop,step=self.int_range(self.cut_index)
         int_down=[]
         for ary in self.figure_handeler.figures['down'].int:
             int_down.append(sum(ary[start:stop:1])/step)
@@ -327,8 +334,8 @@ class DOS_right_down(Figure):
     def click(self,pos):
         super().click(pos)
         difference_array = np.absolute(self.figure_handeler.figures['center'].data[2]-pos[0])
-        index1 = difference_array.argmin()
-        self.figure_handeler.figures['center'].intensity(index1)#this is slow for some reason in kz space
+        self.figure_handeler.figures['center'].cut_index = difference_array.argmin()
+        self.figure_handeler.figures['center'].intensity()#this is slow for some reason in kz space
         self.figure_handeler.figures['center'].plot(self.figure_handeler.figures['center'].ax)
         self.figure_handeler.figures['center'].redraw()
 
@@ -386,9 +393,14 @@ class Band(Figure):
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def plot(self,ax):#2D plot
-        print(len(self.data[0]),len(self.data[1]))
+        print(self.data[0].shape, self.data[1].shape, self.int.shape)
         self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
         #ax.set_ylim(74.7, 75.3)
+
+    def save(self):#to save the stuff: called when pressing the save botton thorugh the figure handlere
+        self.sub_tab.data['xscale'] = self.data[0]
+        self.sub_tab.data['yscale'] = self.data[1]
+        self.sub_tab.data['data'] = np.transpose(np.atleast_3d(self.int),(2, 0, 1))
 
     def sort_data(self):
         self.data = [self.sub_tab.data['xscale'], self.sub_tab.data['yscale'], self.sub_tab.data['data']]

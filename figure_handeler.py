@@ -66,6 +66,9 @@ class Figure_handeler():
         adjust.run()
         self.draw()
 
+    def save(self):        
+        self.figures['center'].save()
+
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
         super().__init__(data_tab)

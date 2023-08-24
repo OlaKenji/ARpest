@@ -12,8 +12,8 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 import numpy as np
 
 import figure_handeler, data_loader
+import pickle
 
-#namespace or dict?
 
 #to implement:
 #save/load
@@ -79,8 +79,9 @@ class GUI():#master Gui
         botton = tk.ttk.Button(self.window,text='load',command=self.load)
         botton.place(x = 900, y = 0)
 
-    def load(self):
-        pass
+    def load(self):#read in a saved file
+        self.start_screen.instrument.set('Load')
+        self.open_file()
 
     def open_file(self):
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
@@ -185,16 +186,29 @@ class Data_tab():#holder for overview tabs. The data is stored here
         botton = tk.ttk.Button(self.tab,text='save',command=self.save)
         botton.place(x = 1400, y = 750)
 
-    def save(self):
-        pass
+    def save(self):#things to save
+        self.overview.figure_handeler.save()
+        save_data = {'int_range':self.overview.int_range,'cmap':self.overview.cmap}
+        save_data.update(self.save_cut_index())#combine the dicts
+        save_data.update(self.overview.data)#combine the dicts
+        path = self.gui.start_path + '/' + self.name
+
+        with open(path + "_save", "wb") as outfile:#should be a ble to change name by input
+            pickle.dump(save_data,outfile)
+
+    def save_cut_index(self):
+        index ={}
+        for key in self.overview.figure_handeler.figures.keys():
+            index[type(self.overview.figure_handeler.figures[key]).__name__] = self.overview.figure_handeler.figures[key].cut_index
+        return index
 
 class Overview():
-    def __init__(self,data_tab,data):
+    def __init__(self, data_tab, data):
         self.data_tab = data_tab
         self.data = data
-        self.int_range = 0
+        self.int_range = data.get('int_range',0)
+        self.cmap = data.get('cmap','RdYlBu_r')#default colour scale
         self.add_tab(type(self).__name__)
-        self.cmap = 'RdYlBu_r'#default colour scale
         self.make_figure()
         self.operations = Operations(self)
         self.logbook()
@@ -322,8 +336,9 @@ class Operations():
         scale.place(x = 0, y = 50)
         label = ttk.Label(self.operation_tabs['General'],text='int. range',background='white',foreground='black')
         label.place(x = 0, y = 30)
-        self.label = ttk.Label(self.operation_tabs['General'],text = str(1),background='white',foreground='black')#need to save it to updat the number next to the slide
+        self.label = ttk.Label(self.operation_tabs['General'],text = self.overview.int_range,background='white',foreground='black')#need to save it to updat the number next to the slide
         self.label.place(x = 100, y = 50)
+        scale.set(self.overview.int_range)#need to be after self.label
 
     def update_line_width(self,value):#the slider calls it
         self.overview.int_range = int(float(value))

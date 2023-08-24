@@ -875,7 +875,6 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
             new_array[index] = array
 
         dE = energies[1] - energies[0]
-        #new_axis = np.arange(new_array.min(), new_array.max()+dE, dE)
 
         new_intensity = np.array(new_intensity)
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:,0]))

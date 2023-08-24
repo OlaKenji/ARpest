@@ -11,6 +11,7 @@ import h5py
 import numpy as np
 #import astropy.io.fits as pyfits
 from igor import binarywave
+import pickle
 
 def start_step_n(start, step, n) :
     """
@@ -245,7 +246,7 @@ class I05(Data_loader):
                         ('kinetic_energy_step', 'Energy Step', float)
                         #('Thetay_StepSize', 'Thetay_StepSize', float),
                     #    ('Comments', 'Comments', str)
-                        ]#acquisition_mode
+                        ]
 
     def load_data(self, filename) :
         if filename.endswith('nxs') :
@@ -338,12 +339,12 @@ class I05(Data_loader):
             E_b = -np.mean(infile['entry1/analyser/energies'])
 
         M2 = {}
-        M2['Time'] = np.array(infile['/entry1/start_time'])
+        M2['Time'] = str(np.array(infile['/entry1/start_time']))
         M2['Excitation Energy'] = hv[0]#hv is a list
         for position in np.array(infile['/entry1/instrument/manipulator']):
             M2[position] = np.array(infile['/entry1/instrument/manipulator/'+position])[0]
         for ana in np.array(infile['/entry1/instrument/analyser']):
-            M2[ana] = np.array(infile['/entry1/instrument/analyser/'+ana])
+            M2[ana] = str(np.array(infile['/entry1/instrument/analyser/'+ana]))
 
         #print(M2)
         metadata = {}
@@ -352,7 +353,6 @@ class I05(Data_loader):
                 metadata[name] = M2[key]
             except:
                 pass
-
 
         result = {}
         result['data'] = data
@@ -546,3 +546,13 @@ class SIS(Data_loader):
                metadata = metadata
         )
         return res
+
+class Load():#loads the pickled file #my own thingy
+    def __init__(self,data_tab):
+        self.data_tab = data_tab
+
+    def load_data(self,file):
+        with open(file,'rb') as fp:
+            result = pickle.load(fp)
+        return result
+        #need to put things back to numpy arrays, somehow
