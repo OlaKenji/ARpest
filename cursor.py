@@ -10,26 +10,29 @@ class Auto_cursor():
         self.xlimits = self.figure.xlimits
         self.ylimits = self.figure.ylimits
 
-        self.pos = [(self.xlimits[0]+self.xlimits[-1])*0.5,(self.ylimits[0]+self.ylimits[-1])*0.5]
+        self.center = [(self.xlimits[0]+self.xlimits[-1])*0.5,(self.ylimits[0]+self.ylimits[-1])*0.5]
+        self.pos = self.center.copy()
 
-        thickness=0.8
-        self.dyn_horizontal_line = self.figure.ax.axhline(self.pos[1],color='k', lw=thickness, ls='--',zorder=3)
-        self.dyn_vertical_line = self.figure.ax.axvline(self.pos[0],color='k', lw=thickness, ls='--',zorder=3)
+        self.dyn_horizontal_line = self.figure.ax.axhline(self.pos[1],color='k', lw=1, ls='--',zorder=3)
+        self.dyn_vertical_line = self.figure.ax.axvline(self.pos[0],color='k', lw=1, ls='--',zorder=3)
 
-        self.sta_horizontal_line = self.figure.ax.axhline(self.pos[1],color='r', lw=thickness,zorder=2)
-        self.sta_vertical_line = self.figure.ax.axvline(self.pos[0],color='r', lw=thickness,zorder=2)
+        self.sta_horizontal_line = self.figure.ax.axhline(self.pos[1],color='r', lw=1,zorder=2)
+        self.sta_vertical_line = self.figure.ax.axvline(self.pos[0],color='r', lw=1,zorder=2)
 
-        self.dyn_horizontal_line.set_ydata(self.pos[1])
-        self.dyn_vertical_line.set_xdata(self.pos[0])
-        self.sta_horizontal_line.set_ydata(self.pos[1])
-        self.sta_vertical_line.set_xdata(self.pos[0])
+        self.angle_line = self.figure.ax.axline((self.pos[0],self.pos[1]),slope = 0)
 
     def reset_position(self):
-        self.pos = [(self.xlimits[0]+self.xlimits[-1])*0.5,(self.ylimits[0]+self.ylimits[-1])*0.5]
-        self.dyn_horizontal_line.set_ydata(self.pos[1])
-        self.dyn_vertical_line.set_xdata(self.pos[0])
-        self.sta_horizontal_line.set_ydata(self.pos[1])
-        self.sta_vertical_line.set_xdata(self.pos[0])
+        self.dyn_horizontal_line.set_ydata(self.center[1])
+        self.dyn_vertical_line.set_xdata(self.center[0])
+        self.sta_horizontal_line.set_ydata(self.center[1])
+        self.sta_vertical_line.set_xdata(self.center[0])
+        self.angle_line._xy1 = self.center
+        self.redraw()
+
+    def update_slope(self,angle):#called from slide in operations
+        pos2 = [self.xlimits[-1],math.tan(2*3.14159*float(angle)/360)*self.ylimits[-1]]
+        self.angle_line._slope = (self.center[1] - pos2[1])/(self.center[0] - pos2[0])
+        self.figure.sub_tab.operations.label2.configure(text=str(int(float(angle))))#update the number next to int range slide
         self.redraw()
 
     def update_event(self,event):
@@ -39,9 +42,9 @@ class Auto_cursor():
         scaley = event.y/self.figure.size[1]
         return [scalex*(self.xlimits[1]-self.xlimits[0])+self.xlimits[0],scaley*(self.ylimits[0]-self.ylimits[1])+self.ylimits[1]]
 
-    def update_line_width(self):
-        self.sta_horizontal_line.set_linewidth(0.5*(self.figure.sub_tab.int_range*2+1))
-        self.sta_vertical_line.set_linewidth(0.5*(self.figure.sub_tab.int_range*2+1))
+    def update_line_width(self):#254 seems to cover the whole plot. how to calculate exactly?
+        self.sta_horizontal_line.set_linewidth(254*(self.figure.sub_tab.int_range*2+1)/len(self.figure.data[1]))
+        self.sta_vertical_line.set_linewidth(254*(self.figure.sub_tab.int_range*2+1)/len(self.figure.data[0]))
         self.redraw()
 
     def on_mouse_move(self, event):
@@ -55,6 +58,7 @@ class Auto_cursor():
         self.pos = self.update_event(event)
         self.sta_horizontal_line.set_ydata(self.pos[1])
         self.sta_vertical_line.set_xdata(self.pos[0])
+        self.angle_line._xy1 = self.pos
         self.figure.click(self.pos)
 
     def redraw(self):
@@ -62,34 +66,10 @@ class Auto_cursor():
         self.figure.ax.draw_artist(self.text)
         self.figure.ax.draw_artist(self.dyn_horizontal_line)
         self.figure.ax.draw_artist(self.dyn_vertical_line)
+        self.figure.ax.draw_artist(self.angle_line)
         self.figure.ax.draw_artist(self.sta_horizontal_line)
         self.figure.ax.draw_artist(self.sta_vertical_line)
         #self.figure.range_cursor.redraw()
-        self.figure.canvas.blit(self.figure.ax.bbox)
-
-class Angle_cursor():#the lines that tilts when slided
-    def __init__(self, figure):
-        self.figure = figure
-
-        self.text = self.figure.ax.text(0.5, 1, '', zorder=4,transform = self.figure.ax.transAxes,horizontalalignment='center',verticalalignment='top')
-        self.figure.ax.add_artist(self.text)
-
-        self.xlimits = self.figure.xlimits
-        self.ylimits = self.figure.ylimits
-
-        self.pos = [(self.xlimits[0] + self.xlimits[-1])/2,(self.ylimits[0] + self.ylimits[-1])/2]#the middle
-        self.sta_line = self.figure.ax.axline((self.pos[0],self.pos[1]),slope = 0)
-
-    def update_slope(self,angle):#called from slide
-        pos2 = [self.xlimits[-1],math.tan(2*3.14159*float(angle)/360)*self.ylimits[-1]]
-        self.sta_line._slope = (self.pos[1]-pos2[1])/(self.pos[0]-pos2[0])
-        self.text.set_text('x=%1.2f' % (float(angle)))
-        self.redraw()
-
-    def redraw(self):
-        self.figure.canvas.restore_region(self.figure.curr_background)
-        self.figure.ax.draw_artist(self.sta_line)
-        self.figure.ax.draw_artist(self.text)
         self.figure.canvas.blit(self.figure.ax.bbox)
 
 class Range_cursor():#not in use

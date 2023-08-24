@@ -126,12 +126,13 @@ class Figure(Functions):
     def right_click(self,event):
         self.sub_tab.data_tab.gui.pop_up()#call gui to make a new window object
         self.plot(self.sub_tab.data_tab.gui.pop.ax)#plot the fraph onto the popup ax
+        self.sub_tab.data_tab.gui.pop.set_lim()
         self.sub_tab.data_tab.gui.pop.pop_canvas.draw()#draw it after plot
 
     def draw(self):
         self.ax.cla()
         self.plot(self.ax)
-        self.set_label()
+        self.set_label()#shuoldn't be here perhaps
         self.canvas.draw()
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
@@ -384,6 +385,7 @@ class Band(Figure):
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def plot(self,ax):#2D plot
+        print(len(self.data[0]),len(self.data[1]))
         self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
         #ax.set_ylim(74.7, 75.3)
 

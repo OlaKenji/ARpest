@@ -63,16 +63,8 @@ class Figure_handeler():
             adjust = processing.Smooth_x(self.figures['center'])
         else:
             adjust = processing.Smooth_y(self.figures['center'])
-
         adjust.run()
         self.draw()
-
-    def anglecrusor(self):
-        self.figures['center'].angle_crusor()
-
-    def update_slope(self,value):
-        self.figures['center'].anglecrusor.update_slope(value)
-
 
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):

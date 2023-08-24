@@ -16,16 +16,15 @@ import figure_handeler, data_loader
 #namespace or dict?
 
 #to implement:
-#make same y,x limits/zoom
+#save/load
 #labels
 #colour bar (where?)
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
-#log scale
+#log scale -> not supported by pcolorfast
 #normalise based on some selected area?
 #symmetrise based on a reference?
 #select area
-#convert k based on the crusor position (for offset)
-#save/load
+#fitting?
 
 #Bugs:
 #the slit issue
@@ -49,7 +48,8 @@ class GUI():#master Gui
         self.design()
 
         self.tabs()
-        self.botton()
+        self.open_botton()
+        self.load_botton()
 
         self.pop = None
         self.start_path = '/Users/olakenjiforslund/Library/CloudStorage/OneDrive-Chalmers/Work/Research/Experiment/Data/Photons'
@@ -71,9 +71,16 @@ class GUI():#master Gui
         self.notebook = tk.ttk.Notebook(master = self.window,width=self.size[0],height=self.size[1])#to make tabs
         self.notebook.pack()
 
-    def botton(self):
+    def open_botton(self):
         botton = tk.ttk.Button(self.window,text='open',command=self.open_file)
         botton.place(x = 700, y = 0)
+
+    def load_botton(self):
+        botton = tk.ttk.Button(self.window,text='load',command=self.load)
+        botton.place(x = 900, y = 0)
+
+    def load(self):
+        pass
 
     def open_file(self):
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
@@ -90,7 +97,30 @@ class GUI():#master Gui
 
     def pop_up(self):#called from figure right click
         if self.pop == None:
-            self.pop = Pop_up(self)
+            size_string = self.tab.overview.operations.fig_size_entry.get()#it returns a string
+            size = size_string.split(',')
+
+            lim_string = self.tab.overview.operations.fig_lim_entry.get()#it returns a string
+            lim_string2 = lim_string.split(';')
+            lim_x = lim_string2[0].split(',')
+            lim_y = lim_string2[1].split(',')
+
+            for index, x in enumerate(lim_x):
+                if x == 'None':
+                    lim_x[index] = None
+                else:
+                    lim_x[index] = float(x)
+
+            for index, y in enumerate(lim_y):
+                if y == 'None':
+                    lim_y[index] = None
+                else:
+                    lim_y[index] = float(y)
+
+            label_string = self.tab.overview.operations.fig_label_entry.get()#it returns a string
+            label = label_string.split(',')
+
+            self.pop = Pop_up(self,[float(size[0]),float(size[1])],[lim_x,lim_y],label)
 
 class Start_screen():#should add general information and such
     def __init__(self,gui):
@@ -110,13 +140,14 @@ class Start_screen():#should add general information and such
         drop.config(bg = "white")
         drop.place(x = 100, y = 300)
 
-class Data_tab():#holder for overview and analysis tabs. The data is stored here
+class Data_tab():#holder for overview tabs. The data is stored here
     def __init__(self,gui,file):
         self.gui = gui
         data = self.define_data_loader(file)#try the selected instrument. If it doesn't work, try the other ones
         self.define_tab(file)
         self.define_notebook()
         self.close_bottom()
+        self.save_botton()
         self.overview = Overview(self,data)#automatically open overview
 
     def define_data_loader(self, file):
@@ -141,7 +172,7 @@ class Data_tab():#holder for overview and analysis tabs. The data is stored here
         self.gui.notebook.add(self.tab,text=self.name)
 
     def append_tab(self,data):
-        self.analysis = Analysis(self,data)
+        overview = Overview(self,data)
 
     def close_bottom(self):#to close the datatab
         botton = tk.ttk.Button(self.tab,text='close',command=self.close)
@@ -150,22 +181,20 @@ class Data_tab():#holder for overview and analysis tabs. The data is stored here
     def close(self):
         self.tab.destroy()
 
-class Subtab():
+    def save_botton(self):
+        botton = tk.ttk.Button(self.tab,text='save',command=self.save)
+        botton.place(x = 1400, y = 750)
+
+    def save(self):
+        pass
+
+class Overview():
     def __init__(self,data_tab,data):
-        super().__init__()
         self.data_tab = data_tab
         self.data = data
         self.int_range = 0
         self.add_tab(type(self).__name__)
         self.cmap = 'RdYlBu_r'#default colour scale
-
-    def add_tab(self,name):
-        self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
-        self.data_tab.notebook.add(self.tab,text=name)
-
-class Overview(Subtab):
-    def __init__(self,data_tab,data):
-        super().__init__(data_tab,data)
         self.make_figure()
         self.operations = Operations(self)
         self.logbook()
@@ -173,8 +202,12 @@ class Overview(Subtab):
         self.append_data(self.data_tab.name)
         self.define_combine_data()
 
+    def add_tab(self,name):
+        self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
+        self.data_tab.notebook.add(self.tab,text=name)
+
     def make_figure(self):
-        if self.data.zscale is None or len(self.data.zscale)==1:#2D data
+        if self.data.zscale is None or len(self.data.zscale) == 1:#2D data
             self.figure_handeler = figure_handeler.Twodimension(self)
         else:#3D data
             self.figure_handeler = figure_handeler.Threedimension(self)
@@ -222,7 +255,7 @@ class Overview(Subtab):
             self.append_data(file)
 
     def append_data(self,file):
-        idx = file.rfind('/')+1
+        idx = file.rfind('/') + 1
         name = file[idx:]
         self.catalog.insert('',tk.END,values=name)
 
@@ -252,32 +285,40 @@ class Operations():
     def __init__(self,overview):
         self.overview = overview
         self.make_box()
+        #general
         self.define_dropdowns()
         self.define_BG()
         self.define_int_range()
-        self.define_fermilevel()
+        self.define_reset()
+        self.define_crusorslope()
+        self.define_crusor_position()
+
+        #operations
         self.define_colour_scale()
+        self.define_fermilevel()
         self.define_kz()
         self.define_k_convert()
         self.define_symmetrise()
         self.define_derivative()
-        self.define_reset()
         self.define_smooth()
-        self.define_anglecrusor()
-        self.define_crusorslope()
-        self.define_crusor_position()
+
+        #figures
+        self.define_fig_size()
+        self.define_fig_lim()
+        self.define_fig_label()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
         self.notebook.place(x=890,y=80)
-        operations = ['General','Operations']
+        operations = ['General','Operations','Figures']
         self.operation_tabs = {}
         for operation in operations:
-            self.operation_tabs[operation] = tk.ttk.Frame(self.notebook, style='My.TFrame')
+            self.operation_tabs[operation] = tk.ttk.Frame(self.notebook, style = 'My.TFrame')
             self.notebook.add(self.operation_tabs[operation],text=operation)
 
+    #general tab
     def define_int_range(self):
-        scale = tk.ttk.Scale(self.operation_tabs['General'],from_ = 0,to = 100,orient='horizontal',command=self.update_line_width)#
+        scale = tk.ttk.Scale(self.operation_tabs['General'],from_ = 0,to = 200,orient='horizontal',command=self.update_line_width)#
         scale.place(x = 0, y = 50)
         label = ttk.Label(self.operation_tabs['General'],text='int. range',background='white',foreground='black')
         label.place(x = 0, y = 30)
@@ -287,7 +328,7 @@ class Operations():
     def update_line_width(self,value):#the slider calls it
         self.overview.int_range = int(float(value))
         self.overview.figure_handeler.update_line_width()
-        self.label.configure(text=str(1 + 2*int(float(value))))#update the number next to int range slide
+        self.label.configure(text = str(1 + 2*int(float(value))))#update the number next to int range slide
 
     def define_colour_scale(self):
         self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.overview.figure_handeler.update_colour_scale,value = 100)#
@@ -303,15 +344,13 @@ class Operations():
         drop.config(bg="white")
         drop.place(x = 0, y = 0)
 
-    def define_anglecrusor(self):
-        button_calc = tk.ttk.Button(self.operation_tabs['General'], text="anglecrusor", command = self.overview.figure_handeler.anglecrusor)#which figures shoudl have access to this?
-        button_calc.place(x = 0, y = 180)
-
     def define_crusorslope(self):
-        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=-45,to=45,orient='horizontal',command = self.overview.figure_handeler.update_slope)#
+        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=-45,to=45,orient='horizontal',command = self.overview.figure_handeler.figures['center'].cursor.update_slope)#
         scale.place(x = 0, y = 150)
         label=ttk.Label(self.operation_tabs['General'],text='slope',background='white',foreground='black')
         label.place(x = 0, y = 130)
+        self.label2 = ttk.Label(self.operation_tabs['General'],text = str(0),background='white',foreground='black')#need to save it to updat the number next to the slide
+        self.label2.place(x = 100, y = 150)
 
     def define_crusor_position(self):
         button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset position", command = self.overview.figure_handeler.figures['center'].cursor.reset_position)#which figures shoudl have access to this?
@@ -321,6 +360,11 @@ class Operations():
         self.overview.cmap = event
         self.overview.draw()
 
+    def define_reset(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
+        button_calc.place(x = 500, y = 260)
+
+    #operation tab
     def define_BG(self):#generate botton, it will run the figure method
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.subtract_BG)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 0)
@@ -345,13 +389,9 @@ class Operations():
             self.checkbox_drivative[choise] = tk.IntVar()
             tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_drivative[choise]).place(x=350,y=30*index)
 
-    def define_reset(self):
-        button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
-        button_calc.place(x = 500, y = 260)
-
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
-        button_calc.place(x=0,y=70)
+        button_calc.place(x = 0, y = 70)
 
     def define_kz(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="kz", command = self.overview.figure_handeler.kz_convert)#which figures shoudl have access to this?
@@ -377,15 +417,57 @@ class Operations():
             self.checkbox_smooth[choise] = tk.IntVar()
             tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_smooth[choise]).place(x=150,y=190 + 30*index)
 
-class Analysis(Overview):
-    def __init__(self,data_tab,data):
-        super().__init__(data_tab,data)
+    #figure tab
+    def define_fig_size(self):
+        self.fig_size_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
+        self.fig_size_entry.insert(0, '3.3,3.3')#default text
+        self.fig_size_entry.place(x = 0, y = 50)
+        label = ttk.Label(self.operation_tabs['Figures'],text = 'figure size',background='white',foreground='black')#need to save it to updat the number next to the slide
+        label.place(x = 200, y = 50)
+
+        button_calc = tk.ttk.Button(self.operation_tabs['Figures'], text="reset", command = self.reset_fig_size)#which figures shoudl have access to this?
+        button_calc.place(x = 300, y = 50)
+
+    def define_fig_lim(self):
+        self.fig_lim_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 20)#
+        self.fig_lim_entry.insert(0, 'None,None;None,None')#default text
+        self.fig_lim_entry.place(x = 0, y = 80)
+        label = ttk.Label(self.operation_tabs['Figures'],text = 'figure limits',background='white',foreground='black')#need to save it to updat the number next to the slide
+        label.place(x = 200, y = 80)
+
+        button_calc = tk.ttk.Button(self.operation_tabs['Figures'], text="reset", command = self.reset_fig_lim)#which figures shoudl have access to this?
+        button_calc.place(x = 300, y = 80)
+
+    def define_fig_label(self):
+        self.fig_label_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
+        self.fig_label_entry.insert(0, 'x,y')#default text
+        self.fig_label_entry.place(x = 0, y = 110)
+        label = ttk.Label(self.operation_tabs['Figures'],text = 'figure label',background='white',foreground='black')#need to save it to updat the number next to the slide
+        label.place(x = 200, y = 110)
+
+        button_calc = tk.ttk.Button(self.operation_tabs['Figures'], text="reset", command = self.reset_fig_label)#which figures shoudl have access to this?
+        button_calc.place(x = 300, y = 110)
+
+    def reset_fig_lim(self):
+        self.fig_lim_entry.delete(0, "end")
+        self.fig_lim_entry.insert(0, 'None,None;None,None')#default text
+
+    def reset_fig_size(self):
+        self.fig_size_entry.delete(0, "end")
+        self.fig_size_entry.insert(0, '3.3,3.3')#default text
+
+    def reset_fig_label(self):
+        self.fig_label_entry.delete(0, "end")
+        self.fig_label_entry.insert(0, 'x,y')#default text
 
 class Pop_up():#the pop up window
-    def __init__(self,gui):
+    def __init__(self, gui, size, lim, label):
         self.gui = gui
-        self.fig = plt.Figure(figsize=(3.3,3.3))
+        self.fig = plt.Figure(figsize=size)
         self.ax = self.fig.add_subplot(111)
+        self.lim = lim#will  be updated from figure right clicj
+        self.ax.set_xlabel(label[0])
+        self.ax.set_ylabel(label[1])
 
         self.popup = tk.Toplevel()
         self.pop_canvas = FigureCanvasTkAgg(self.fig, master=self.popup)
@@ -394,8 +476,11 @@ class Pop_up():#the pop up window
         self.pop_canvas._tkcanvas.pack()
 
         self.popup.protocol("WM_DELETE_WINDOW", self.on_closing)
-
         self.popup.focus_set()
+
+    def set_lim(self):#called from figure ricj click
+        self.ax.set_xbound(self.lim[0])
+        self.ax.set_ybound(self.lim[1])
 
     def on_closing(self):
         self.popup.destroy()
