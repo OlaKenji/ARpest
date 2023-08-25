@@ -41,7 +41,7 @@ class Figure(Functions):
         self.sub_tab = figure_handeler.data_tab#overview
         self.pos = pos
         self.label = ['x','y']
-        self.cut_index = self.sub_tab.data.get(type(self).__name__,0)
+        self.cut_index = self.sub_tab.data.get(type(self).__name__+'cut_index',0)
         self.init_data()
         self.original_int = self.int
 
@@ -49,7 +49,7 @@ class Figure(Functions):
         self.define_canvas()
         self.define_export()
         self.define_mouse()
-        self.draw()
+        self.draw()        
         #self.define_normalise()
 
     def init_data(self):
@@ -164,7 +164,7 @@ class Figure(Functions):
     def update_colour_scale(self):#called in redraw
         value = self.sub_tab.operations.color_scale.get()
         self.vmax = np.nanmax(self.int)*int(float(value))/100
-        self.graph.set_clim(vmin=self.vmin, vmax=self.vmax)
+        self.graph.set_clim(vmin = self.vmin, vmax = self.vmax)
 
     def colour_limit(self):#called in init
         self.vmin = np.nanmin(self.int)

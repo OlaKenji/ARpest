@@ -13,11 +13,9 @@ import numpy as np
 
 import figure_handeler, data_loader
 import pickle
-
+import os
 
 #to implement:
-#save/load
-#labels
 #colour bar (where?)
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
 #log scale -> not supported by pcolorfast
@@ -49,7 +47,6 @@ class GUI():#master Gui
 
         self.tabs()
         self.open_botton()
-        self.load_botton()
 
         self.pop = None
         self.start_path = '/Users/olakenjiforslund/Library/CloudStorage/OneDrive-Chalmers/Work/Research/Experiment/Data/Photons'
@@ -74,14 +71,6 @@ class GUI():#master Gui
     def open_botton(self):
         botton = tk.ttk.Button(self.window,text='open',command=self.open_file)
         botton.place(x = 700, y = 0)
-
-    def load_botton(self):
-        botton = tk.ttk.Button(self.window,text='load',command=self.load)
-        botton.place(x = 900, y = 0)
-
-    def load(self):#read in a saved file
-        self.start_screen.instrument.set('Load')
-        self.open_file()
 
     def open_file(self):
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
@@ -142,7 +131,7 @@ class Start_screen():#should add general information and such
         drop.place(x = 100, y = 300)
 
 class Data_tab():#holder for overview tabs. The data is stored here
-    def __init__(self,gui,file):
+    def __init__(self, gui, file):
         self.gui = gui
         data = self.define_data_loader(file)#try the selected instrument. If it doesn't work, try the other ones
         self.define_tab(file)
@@ -157,10 +146,12 @@ class Data_tab():#holder for overview tabs. The data is stored here
         if data != None: return data#it means it succeeds. else, try another one
 
         for instrument in self.gui.start_screen.instruments:
-            if instrument == self.gui.start_screen.instrument.get(): continue#skip the one alreadt tried
+            if instrument == self.gui.start_screen.instrument.get(): continue#skip the one already tried
             self.data_loader = getattr(data_loader, instrument)(self)#make an object based on string
             data = self.data_loader.load_data(file)
-            if data != None: return data
+            if data != None: #sucess
+                self.gui.start_screen.instrument.set(instrument)
+                return data
 
     def define_notebook(self):
         self.notebook = tk.ttk.Notebook(master=self.tab,width=self.gui.size[0], height=self.gui.size[1])#to make tabs
@@ -177,7 +168,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
 
     def close_bottom(self):#to close the datatab
         botton = tk.ttk.Button(self.tab,text='close',command=self.close)
-        botton.place(x =1400, y = 850)
+        botton.place(x = 1400, y = 850)
 
     def close(self):
         self.tab.destroy()
@@ -187,20 +178,25 @@ class Data_tab():#holder for overview tabs. The data is stored here
         botton.place(x = 1400, y = 750)
 
     def save(self):#things to save
+        path = tk.filedialog.asksaveasfile(initialdir = self.gui.start_path ,title='data')
+        os.remove(path.name)#tk inter automatically makes a file. So this should be deleted becasuse we wil lmake a file with pickle
         self.overview.figure_handeler.save()
-        save_data = {'int_range':self.overview.int_range,'cmap':self.overview.cmap}
-        save_data.update(self.save_cut_index())#combine the dicts
-        save_data.update(self.overview.data)#combine the dicts
-        path = self.gui.start_path + '/' + self.name
 
-        with open(path + "_save", "wb") as outfile:#should be a ble to change name by input
+        save_data = {'int_range':self.overview.int_range,'cmap':self.overview.cmap,'instrument':self.gui.start_screen.instrument.get(),
+        'colour_scale':self.overview.operations.color_scale.get(),'fig_lim_entry':self.overview.operations.fig_lim_entry.get(),'fig_size_entry':self.overview.operations.fig_size_entry.get(),
+        'fig_label_entry':self.overview.operations.fig_label_entry.get()}
+
+        save_data.update(self.save_figure_specifics())#combine the dicts
+        save_data.update(self.overview.data)#combine the dicts
+        with open(path.name+'.okf', "wb") as outfile:
             pickle.dump(save_data,outfile)
 
-    def save_cut_index(self):
-        index ={}
+    def save_figure_specifics(self):
+        data ={}
         for key in self.overview.figure_handeler.figures.keys():
-            index[type(self.overview.figure_handeler.figures[key]).__name__] = self.overview.figure_handeler.figures[key].cut_index
-        return index
+            data[type(self.overview.figure_handeler.figures[key]).__name__ + 'cut_index'] = self.overview.figure_handeler.figures[key].cut_index
+            data[type(self.overview.figure_handeler.figures[key]).__name__ + 'cursor_pos'] = self.overview.figure_handeler.figures[key].cursor.pos
+        return data
 
 class Overview():
     def __init__(self, data_tab, data):
@@ -215,6 +211,7 @@ class Overview():
         self.append_data_botton()
         self.append_data(self.data_tab.name)
         self.define_combine_data()
+        self.redraw()
 
     def add_tab(self,name):
         self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
@@ -346,7 +343,7 @@ class Operations():
         self.label.configure(text = str(1 + 2*int(float(value))))#update the number next to int range slide
 
     def define_colour_scale(self):
-        self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.overview.figure_handeler.update_colour_scale,value = 100)#
+        self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.overview.figure_handeler.update_colour_scale,value = self.overview.data.get('colour_scale',100))#
         self.color_scale.place(x = 0, y = 100)
         label=ttk.Label(self.operation_tabs['General'],text='colour scale',background='white',foreground='black')
         label.place(x = 0, y = 80)
@@ -435,7 +432,8 @@ class Operations():
     #figure tab
     def define_fig_size(self):
         self.fig_size_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
-        self.fig_size_entry.insert(0, '3.3,3.3')#default text
+        default = self.overview.data.get('fig_size_entry','3.3,3.3')
+        self.fig_size_entry.insert(0, default)#default text
         self.fig_size_entry.place(x = 0, y = 50)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'figure size',background='white',foreground='black')#need to save it to updat the number next to the slide
         label.place(x = 200, y = 50)
@@ -445,7 +443,8 @@ class Operations():
 
     def define_fig_lim(self):
         self.fig_lim_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 20)#
-        self.fig_lim_entry.insert(0, 'None,None;None,None')#default text
+        default = self.overview.data.get('fig_lim_entry','None,None;None,None')
+        self.fig_lim_entry.insert(0, default)#default text
         self.fig_lim_entry.place(x = 0, y = 80)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'figure limits',background='white',foreground='black')#need to save it to updat the number next to the slide
         label.place(x = 200, y = 80)
@@ -455,7 +454,8 @@ class Operations():
 
     def define_fig_label(self):
         self.fig_label_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
-        self.fig_label_entry.insert(0, 'x,y')#default text
+        default = self.overview.data.get('fig_label_entry','x,y')
+        self.fig_label_entry.insert(0, default)#default text
         self.fig_label_entry.place(x = 0, y = 110)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'figure label',background='white',foreground='black')#need to save it to updat the number next to the slide
         label.place(x = 200, y = 110)

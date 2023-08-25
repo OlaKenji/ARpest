@@ -11,7 +11,7 @@ class Auto_cursor():
         self.ylimits = self.figure.ylimits
 
         self.center = [(self.xlimits[0]+self.xlimits[-1])*0.5,(self.ylimits[0]+self.ylimits[-1])*0.5]
-        self.pos = self.center.copy()
+        self.pos = self.figure.sub_tab.data.get(type(self.figure).__name__ + 'cursor_pos', self.center.copy())
 
         self.dyn_horizontal_line = self.figure.ax.axhline(self.pos[1],color='k', lw=1, ls='--',zorder=3)
         self.dyn_vertical_line = self.figure.ax.axvline(self.pos[0],color='k', lw=1, ls='--',zorder=3)
@@ -19,7 +19,7 @@ class Auto_cursor():
         self.sta_horizontal_line = self.figure.ax.axhline(self.pos[1],color='r', lw=1,zorder=2)
         self.sta_vertical_line = self.figure.ax.axvline(self.pos[0],color='r', lw=1,zorder=2)
 
-        self.angle_line = self.figure.ax.axline((self.pos[0],self.pos[1]),slope = 0)
+        self.angle_line = self.figure.ax.axline((self.pos[0],self.pos[1]),lw=1,slope = 0)
 
     def reset_position(self):
         self.dyn_horizontal_line.set_ydata(self.center[1])

@@ -3,7 +3,7 @@
 #import pickle
 #import re
 import zipfile
-from argparse import Namespace
+#from argparse import Namespace
 #from errno import ENOENT
 #from warnings import catch_warnings, simplefilter, warn
 
@@ -12,6 +12,7 @@ import numpy as np
 #import astropy.io.fits as pyfits
 from igor import binarywave
 import pickle
+import sys
 
 def start_step_n(start, step, n) :
     """
@@ -24,6 +25,14 @@ def start_step_n(start, step, n) :
 class Data_loader():
     def __init__(self,data_tab):
         self.data_tab = data_tab
+
+    def load_savefile(self,file):#load my picked files
+        with open(file,'rb') as fp:
+            result = pickle.load(fp)
+        #should these be here?
+        self.data_tab.gui.start_screen.instrument.set(result['instrument'])#update the instruent for this file
+        self.orientation =  getattr(sys.modules[__name__], result['instrument'])(None).orientation#set laso the orientation for this file
+        return result
 
     @staticmethod
     def read_metadata(keys, metadata_file):
@@ -221,6 +230,8 @@ class Bloch(Data_loader):
             return self.load_from_ibw(filename)
         elif filename.endswith('zip') :
             return self.load_zip(filename)
+        elif filename.endswith('okf'):
+            return self.load_savefile(filename)
         else:
             return None
 
@@ -251,6 +262,8 @@ class I05(Data_loader):
     def load_data(self, filename) :
         if filename.endswith('nxs') :
             return self.load_from_nxs(filename)
+        elif filename.endswith('okf'):
+            return self.load_savefile(filename)
         else:
             return None
 
@@ -408,6 +421,8 @@ class URANOS(Data_loader):
             return self.load_from_ibw(filename)
         elif filename.endswith('zip') :
             return self.load_zip(filename)
+        elif filename.endswith('okf'):
+            return self.load_savefile(filename)
         else:
             return None
 
@@ -429,6 +444,8 @@ class SIS(Data_loader):
             return self.load_zip(filename)
         elif filename.endswith('ibw') :
             return self.load_from_ibw(filename)
+        elif filename.endswith('okf'):
+            return self.load_savefile(filename)
         else:
             return None
 
@@ -546,13 +563,3 @@ class SIS(Data_loader):
                metadata = metadata
         )
         return res
-
-class Load():#loads the pickled file #my own thingy
-    def __init__(self,data_tab):
-        self.data_tab = data_tab
-
-    def load_data(self,file):
-        with open(file,'rb') as fp:
-            result = pickle.load(fp)
-        return result
-        #need to put things back to numpy arrays, somehow
