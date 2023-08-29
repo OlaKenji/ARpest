@@ -8,27 +8,27 @@ import tkinter.filedialog#needed to some reason on the none enviroment
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 
-#from argparse import Namespace
 import numpy as np
-
-import figure_handeler, data_loader
 import pickle
 import os
 
+import figure_handeler, data_loader
+
 #to implement:
-#colour bar (where?)
+#range plots
+#fitting?
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
 #log scale -> not supported by pcolorfast
-#normalise based on some selected area?
+#select area:
+    #normalise based on some selected area?
 #symmetrise based on a reference?
-#select area
-#fitting?
 
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #make so that mouse appears automatically at the begining
 #the cuts in kz space is very slow!!!???
+#cursor not showing at the beginnig
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -139,6 +139,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
         self.close_bottom()
         self.save_botton()
         self.overview = Overview(self,data)#automatically open overview
+        self.gui.notebook.select(self.tab)
 
     def define_data_loader(self, file):
         self.data_loader = getattr(data_loader, self.gui.start_screen.instrument.get())(self)#make an object based on string
@@ -171,7 +172,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
         botton.place(x = 1400, y = 850)
 
     def close(self):
-        self.tab.destroy()
+        self.gui.notebook.forget(self.tab)
 
     def save_botton(self):
         botton = tk.ttk.Button(self.tab,text='save',command=self.save)
@@ -211,23 +212,18 @@ class Overview():
         self.append_data_botton()
         self.append_data(self.data_tab.name)
         self.define_combine_data()
-        self.redraw()
+        self.figure_handeler.redraw()
+        self.data_tab.notebook.select(self.tab)
 
     def add_tab(self,name):
         self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
-        self.data_tab.notebook.add(self.tab,text=name)
+        self.data_tab.notebook.add(self.tab,text = name)
 
     def make_figure(self):
         if self.data['zscale'] is None or len(self.data['zscale']) == 1:#2D data
             self.figure_handeler = figure_handeler.Twodimension(self)
         else:#3D data
             self.figure_handeler = figure_handeler.Threedimension(self)
-
-    def draw(self):
-        self.figure_handeler.draw()
-
-    def redraw(self):
-        self.figure_handeler.redraw()
 
     def logbook(self):
         columns=[]
@@ -249,7 +245,7 @@ class Overview():
 
     def append_data_botton(self):#called frin init
         button = tk.ttk.Button(self.tab, text="append data", command = self.append_method)
-        button.place(x = 890, y = 470)
+        button.place(x = 890, y = 665)
         self.data_catalog()
 
     def data_catalog(self):#make a box containig data
@@ -258,7 +254,7 @@ class Overview():
         #verscrlbar.place(x = 900, y = 0, width=200+20)
         self.catalog.heading('Data')
         self.catalog.configure(yscrollcommand=verscrlbar.set)
-        self.catalog.place(x = 890, y = 500, width=300,height=300)
+        self.catalog.place(x = 890, y = 695, width=300,height=150)
 
     def append_method(self):
         files = tk.filedialog.askopenfilenames(initialdir=self.data_tab.gui.start_path ,title='data')
@@ -272,7 +268,7 @@ class Overview():
 
     def define_combine_data(self):
         button = tk.ttk.Button(self.tab, text="combine data", command = self.combine_data)
-        button.place(x = 1080, y = 470)
+        button.place(x = 1080, y = 665)
 
     def combine_data(self):#combining and putting the data in the data catalog: photon energy as x, angle as  y, kintex energy as z, intensity as data (3D)
         indices = self.catalog.selection()

@@ -21,6 +21,9 @@ class Auto_cursor():
 
         self.angle_line = self.figure.ax.axline((self.pos[0],self.pos[1]),lw=1,slope = 0)
 
+        self.sta_horizontal_line.set_ydata(self.pos[1])#this is needed to be set once. This is so that .get_data() return the same form (for some reason)
+        self.sta_vertical_line.set_xdata(self.pos[0])#this is needed to be set once. This is so that .get_data() return the same form (for some reason)
+
     def reset_position(self):
         self.dyn_horizontal_line.set_ydata(self.center[1])
         self.dyn_vertical_line.set_xdata(self.center[0])

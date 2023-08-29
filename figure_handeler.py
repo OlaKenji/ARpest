@@ -29,13 +29,14 @@ class Figure_handeler():
         for figure in self.figures.values():
             figure.draw()
 
-    def redraw(self):
+    def redraw(self,*arg):#called from overview (init), colour scale slide,
         for figure in self.figures.values():
             figure.redraw()
 
     def update_colour_scale(self,value):
         for figure in self.figures.values():
-            self.redraw()
+            figure.update_colour_scale()
+        self.redraw()
 
     #methods
     def k_convert(self):#called when pressed the botton

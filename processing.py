@@ -689,13 +689,24 @@ class Fermi_level_band(Raw):#only the main figure
     def run(self):
         self.fit()#kevins stuff
         self.pixel_shift()
+        self.normalise()
         self.update_figure()
 
     def update_figure(self):
         self.figure.figure_handeler.update_intensity()#update the cuts, but avoid for main figure
         self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure -> this is not wokring if you do k space first since the FS will be a 2D arrat, while band wants 1D
+        self.figure.figure_handeler.figures['center'].colour_limit()
+        self.figure.figure_handeler.figures['center'].update_colour_scale()
+
         self.figure.figure_handeler.draw()
         self.figure.figure_handeler.update_mouse_range()
+
+    def normalise(self):
+        difference_array = np.absolute(self.gold['xscale'] - self.EF.min())#subtract for each channel, works.
+        index1 = np.argmin(difference_array)
+        int = self.gold['data'][0][:,0:index1]/len(self.gold['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
+        total_MDC = np.nansum(int,axis=1)#of gold
+        self.figure.int = (self.figure.int.T/total_MDC).T#works for 2D
 
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
         print('lets shift')
@@ -706,7 +717,6 @@ class Fermi_level_band(Raw):#only the main figure
         max_shift = max(fermi_index)-min(fermi_index)
         new_data = np.array([energies - level for level in fermi_levels])#shifted data#s
         target_index = max(fermi_index)
-
 
         dE = energies[1] - energies[0]
 
@@ -881,6 +891,13 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
 
         self.figure.data[2] = new_axis
         self.figure.data[3] = np.transpose(new_intensity, (1, 0, 2))
+
+    def normalise(self):
+        difference_array = np.absolute(self.gold['xscale'] - self.EF.min())#subtract for each channel, works.
+        index1 = np.argmin(difference_array)
+        int = self.gold['data'][0][:,0:index1]/len(self.gold['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
+        total_MDC = np.nansum(int,axis=1)#of gold
+        self.figure.data[3] = self.figure.data[3]/total_MDC[:,None]
 
 class Range_plot(Raw):
     def __init__(self,parent_figure):
