@@ -5,7 +5,7 @@ from matplotlib.pyplot import get_cmap
 
 import tkinter as tk
 import numpy as np
-import json
+import json#for the export
 
 import processing, cursor, data_loader
 
@@ -72,6 +72,8 @@ class Figure(Functions):
         offset = [0,0]
         self.canvas.get_tk_widget().place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])#grid(row=1,column=self.column)
         self.blank_background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)#including the axis
+        self.canvas.get_tk_widget().bind( "<Button-2>", self.right_click)#right click
+        self.canvas.get_tk_widget().bind( "<Double-Button-1>", self.double_click)#double click
 
     def mouse_range(self):#used for crusor
         self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]
@@ -83,8 +85,6 @@ class Figure(Functions):
 
         self.canvas.get_tk_widget().bind( "<Motion>", self.cursor.on_mouse_move)
         self.canvas.get_tk_widget().bind( "<Button-1>", self.cursor.on_mouse_click)#left click
-        self.canvas.get_tk_widget().bind( "<Button-2>", self.right_click)#right click
-        self.canvas.get_tk_widget().bind( "<Double-Button-1>", self.double_click)#double click
 
     def define_export(self):
         button_calc = tk.ttk.Button(self.sub_tab.tab, text="Export", command = self.export)
@@ -120,8 +120,10 @@ class Figure(Functions):
         self.cursor.redraw()
 
     def right_click(self,event):
-        self.sub_tab.data_tab.gui.pop_up()#call gui to make a new window object
+        self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.fig_size_entry.get())#call gui to make a new window object
         self.plot(self.sub_tab.data_tab.gui.pop.ax)#plot the fraph onto the popup ax
+        self.sub_tab.data_tab.gui.pop.graph = self.graph
+        self.sub_tab.data_tab.gui.pop.set_vlim(self.vmin,self.vmax_set)
         self.sub_tab.data_tab.gui.pop.set_lim()
         self.sub_tab.data_tab.gui.pop.pop_canvas.draw()#draw it after plot
         self.plot(self.ax)#this is to re-updathe self.graph to the proper figure
@@ -160,7 +162,9 @@ class Figure(Functions):
     def update_colour_scale(self):#called from slider
         value = self.sub_tab.operations.color_scale.get()#value of the colour scale
         vmax = np.nanmax(self.vmax)*int(float(value))/100
-        self.graph.set_clim(vmin = self.vmin, vmax = vmax)#shoudl have comon vmax and vmin
+        self.vmax_set = vmax#for the pop up window
+        self.graph.set_clim(vmin = self.vmin, vmax = vmax)#all graphs have common have comon vmax and vmin
+        self.sub_tab.operations.label3.configure(text=(float(value)))#update the number next to int range slide
 
     def colour_limit(self):#called in init and processing
         pass
@@ -184,7 +188,7 @@ class FS(Figure):
         self.sub_tab.data['data'] = self.data[3]
 
     def plot(self,ax):#pcolorfast
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap=self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
 
     def sort_data(self):
         self.data = [self.sub_tab.data['xscale'],self.sub_tab.data['yscale'],self.sub_tab.data['zscale'],self.sub_tab.data['data']]
@@ -489,9 +493,17 @@ class Colour_bar(Figure):
         self.sub_tab = figure.sub_tab#overview
         self.pos = [812,400]
         self.define_canvas(size = [7.64,1], top = 0.6, left = 0.1, right = 0.9, bottom = 0.4)
-        self.bar = self.fig.colorbar(self.figure.graph,cax=self.ax,orientation='horizontal',label = 'Intensity')
+        self.bar = self.fig.colorbar(self.figure.graph,cax = self.ax,orientation='horizontal',label = 'Intensity')
 
     def update(self):
         self.bar.update_normal(self.figure.graph)
         self.bar.draw_all()
         self.canvas.draw()
+
+    def right_click(self,event):#the popup window
+        self.sub_tab.data_tab.gui.pop_up(size = self.figure.sub_tab.operations.colourbar_size_entry.get())#it returns a string)#call gui to make a new window object
+        orientation = self.sub_tab.operations.orientation.configure('text')[-1]
+        self.sub_tab.data_tab.gui.pop.fig.colorbar(self.figure.graph,cax = self.sub_tab.data_tab.gui.pop.ax,orientation=orientation,label = 'Intensity')
+        #self.sub_tab.data_tab.gui.pop.fig.subplots_adjust(top = kwarg['top'],left = kwarg['left'],right = kwarg['right'], bottom = kwarg['bottom'])
+        self.sub_tab.data_tab.gui.pop.set_lim()
+        self.sub_tab.data_tab.gui.pop.pop_canvas.draw()#draw it after plot

@@ -85,9 +85,9 @@ class GUI():#master Gui
             #self.window.update_idletasks()
             #self.window.update()
 
-    def pop_up(self):#called from figure right click
+    def pop_up(self,**kwarg):#called from figure right click or colour bar
         if self.pop == None:
-            size_string = self.tab.overview.operations.fig_size_entry.get()#it returns a string
+            size_string = kwarg['size']#depends on colur bar or figure
             size = size_string.split(',')
 
             lim_string = self.tab.overview.operations.fig_lim_entry.get()#it returns a string
@@ -185,7 +185,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
 
         save_data = {'int_range':self.overview.int_range,'cmap':self.overview.cmap,'instrument':self.gui.start_screen.instrument.get(),
         'colour_scale':self.overview.operations.color_scale.get(),'fig_lim_entry':self.overview.operations.fig_lim_entry.get(),'fig_size_entry':self.overview.operations.fig_size_entry.get(),
-        'fig_label_entry':self.overview.operations.fig_label_entry.get()}
+        'fig_label_entry':self.overview.operations.fig_label_entry.get(),'colourbar_size_entry':self.overview.operations.colourbar_size_entry.get(),'colourbar_orientation':self.orientation.configure('text')[-1]}
 
         save_data.update(self.save_figure_specifics())#combine the dicts
         save_data.update(self.overview.data)#combine the dicts
@@ -311,13 +311,17 @@ class Operations():
 
         #figures
         self.define_fig_size()
+        self.define_colourbar_size()
         self.define_fig_lim()
         self.define_fig_label()
+        self.define_colourbar_orientation()
+
+        #Arithmetic
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
         self.notebook.place(x=890,y=80)
-        operations = ['General','Operations','Figures']
+        operations = ['General','Operations','Figures','Arithmetic']
         self.operation_tabs = {}
         for operation in operations:
             self.operation_tabs[operation] = tk.ttk.Frame(self.notebook, style = 'My.TFrame')
@@ -343,6 +347,8 @@ class Operations():
         self.color_scale.place(x = 0, y = 100)
         label=ttk.Label(self.operation_tabs['General'],text='colour scale',background='white',foreground='black')
         label.place(x = 0, y = 80)
+        self.label3 = ttk.Label(self.operation_tabs['General'],text = self.overview.data.get('colour_scale',100),background='white',foreground='black')#need to save it to updat the number next to the slide
+        self.label3.place(x = 100, y = 100)
 
     def define_dropdowns(self):
         commands = ['RdYlBu_r','RdBu_r','terrain','binary', 'binary_r'] + sorted(['Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])
@@ -459,9 +465,35 @@ class Operations():
         button_calc = tk.ttk.Button(self.operation_tabs['Figures'], text="reset", command = self.reset_fig_label)#which figures shoudl have access to this?
         button_calc.place(x = 300, y = 110)
 
+    def define_colourbar_size(self):
+        self.colourbar_size_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
+        default = self.overview.data.get('colorbar_size_entry','4,1')
+        self.colourbar_size_entry.insert(0, default)#default text
+        self.colourbar_size_entry.place(x = 0, y = 150)
+        label = ttk.Label(self.operation_tabs['Figures'],text = 'colourbar size',background='white',foreground='black')#need to save it to updat the number next to the slide
+        label.place(x = 200, y = 150)
+
+        button_calc = tk.ttk.Button(self.operation_tabs['Figures'], text="reset", command = self.reset_colorbar_size)#which figures shoudl have access to this?
+        button_calc.place(x = 300, y = 150)
+
+    def define_colourbar_orientation(self):
+        default = self.overview.data.get('colourbar_orientation','horizontal')
+        self.orientation = tk.ttk.Button(self.operation_tabs['Figures'], text="horizontal", command = self.pressing,width = 10)#which figures shoudl have access to this?
+        self.orientation.place(x = 100, y = 150)
+
+    def pressing(self):
+        if self.orientation.configure('text')[-1] == 'horizontal':
+            self.orientation.configure(text="vertical")
+        else:
+            self.orientation.configure(text="horizontal")
+
     def reset_fig_lim(self):
         self.fig_lim_entry.delete(0, "end")
         self.fig_lim_entry.insert(0, 'None,None;None,None')#default text
+
+    def reset_colorbar_size(self):
+        self.colourbar_size_entry.delete(0, "end")
+        self.colourbar_size_entry.insert(0, '4,1')#default text
 
     def reset_fig_size(self):
         self.fig_size_entry.delete(0, "end")
@@ -479,7 +511,7 @@ class Pop_up():#the pop up window
         self.lim = lim#will  be updated from figure right clicj
         self.ax.set_xlabel(label[0])
         self.ax.set_ylabel(label[1])
-
+        #self.fig.subplots_adjust(top = 0.93,left = 0.15,right = 0.97, bottom = 0.11)
         self.popup = tk.Toplevel()
         self.pop_canvas = FigureCanvasTkAgg(self.fig, master=self.popup)
         self.pop_canvas.get_tk_widget().pack()
@@ -492,6 +524,9 @@ class Pop_up():#the pop up window
     def set_lim(self):#called from figure ricj click
         self.ax.set_xbound(self.lim[0])
         self.ax.set_ybound(self.lim[1])
+
+    def set_vlim(self,vmin,vmax):
+        self.graph.set_clim(vmin = vmin, vmax = vmax)#all graphs have common have comon vmax and vmin
 
     def on_closing(self):
         self.popup.destroy()
