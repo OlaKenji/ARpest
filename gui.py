@@ -1,9 +1,9 @@
 import matplotlib
-matplotlib.use('TkAgg')#needed to some reason on the none enviroment
+#matplotlib.use('TkAgg')#needed to some reason on the none enviroment
 
 import tkinter as tk
 from tkinter import ttk
-import tkinter.filedialog#needed to some reason on the none enviroment
+#import tkinter.filedialog#needed to some reason on the none enviroment
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -22,13 +22,13 @@ import figure_handeler, data_loader
 #select area:
     #normalise based on some selected area?
 #symmetrise based on a reference?
+#phi rotation in k convert?
 
 #Bugs:
 #the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
-#make so that mouse appears automatically at the begining
-#the cuts in kz space is very slow!!!???
 #cursor not showing at the beginnig
+#bg subtarct for fermi surface not applied on all energies
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -40,7 +40,7 @@ class GUI():#master Gui
     def __init__(self):
         self.size = [1920,1080]
         self.window = tk.Tk()
-        self.window.title('Apest')
+        self.window.title('ARpest')
         self.window.state('zoomed')
         self.window.configure(background='white')
         self.design()
@@ -89,6 +89,7 @@ class GUI():#master Gui
         if self.pop == None:
             size_string = kwarg['size']#depends on colur bar or figure
             size = size_string.split(',')
+            sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
 
             lim_string = self.tab.overview.operations.fig_lim_entry.get()#it returns a string
             lim_string2 = lim_string.split(';')
@@ -110,7 +111,7 @@ class GUI():#master Gui
             label_string = self.tab.overview.operations.fig_label_entry.get()#it returns a string
             label = label_string.split(',')
 
-            self.pop = Pop_up(self,[float(size[0]),float(size[1])],[lim_x,lim_y],label)
+            self.pop = Pop_up(self,sizes,[lim_x,lim_y],label)
 
 class Start_screen():#should add general information and such
     def __init__(self,gui):
@@ -185,7 +186,9 @@ class Data_tab():#holder for overview tabs. The data is stored here
 
         save_data = {'int_range':self.overview.int_range,'cmap':self.overview.cmap,'instrument':self.gui.start_screen.instrument.get(),
         'colour_scale':self.overview.operations.color_scale.get(),'fig_lim_entry':self.overview.operations.fig_lim_entry.get(),'fig_size_entry':self.overview.operations.fig_size_entry.get(),
-        'fig_label_entry':self.overview.operations.fig_label_entry.get(),'colourbar_size_entry':self.overview.operations.colourbar_size_entry.get(),'colourbar_orientation':self.orientation.configure('text')[-1]}
+        'fig_label_entry':self.overview.operations.fig_label_entry.get(),'colourbar_size_entry':self.overview.operations.colourbar_size_entry.get(),'colourbar_orientation':self.overview.operations.orientation.configure('text')[-1],
+        'vlim':self.overview.operations.vlim_entry.get(),'colourbar_margines':{margin:self.overview.operations.colourbar_margines[margin].get() for margin in self.overview.operations.colourbar_margines.keys()},
+        'fig_margines':{margin:self.overview.operations.fig_margines[margin].get() for margin in self.overview.operations.fig_margines.keys()}}
 
         save_data.update(self.save_figure_specifics())#combine the dicts
         save_data.update(self.overview.data)#combine the dicts
@@ -299,6 +302,8 @@ class Operations():
         self.define_reset()
         self.define_crusorslope()
         self.define_crusor_position()
+        self.define_vlim()
+        self.define_set_vlim()
 
         #operations
         self.define_colour_scale()
@@ -315,6 +320,7 @@ class Operations():
         self.define_fig_lim()
         self.define_fig_label()
         self.define_colourbar_orientation()
+        self.define_margines()
 
         #Arithmetic
 
@@ -343,7 +349,7 @@ class Operations():
         self.label.configure(text = str(1 + 2*int(float(value))))#update the number next to int range slide
 
     def define_colour_scale(self):
-        self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command=self.overview.figure_handeler.update_colour_scale,value = self.overview.data.get('colour_scale',100))#
+        self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command = self.overview.figure_handeler.update_colour_scale,value = self.overview.data.get('colour_scale',100))#
         self.color_scale.place(x = 0, y = 100)
         label=ttk.Label(self.operation_tabs['General'],text='colour scale',background='white',foreground='black')
         label.place(x = 0, y = 80)
@@ -377,6 +383,18 @@ class Operations():
     def define_reset(self):
         button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
         button_calc.place(x = 500, y = 260)
+
+    def define_vlim(self):
+        self.vlim_entry = tk.ttk.Entry(self.operation_tabs['General'], width= 10)#
+        default = self.overview.data.get('vlim','None,None')
+        self.vlim_entry.insert(0, default)#default text
+        self.vlim_entry.place(x = 150, y = 100)
+        label = ttk.Label(self.operation_tabs['General'],text = 'colour limits',background='white',foreground='black')#need to save it to updat the number next to the slide
+        label.place(x = 150, y = 80)
+
+    def define_set_vlim(self):
+        button = tk.ttk.Button(self.operation_tabs['General'], text="set colour limit", command = self.overview.figure_handeler.figures['center'].set_vlim)#which figures shoudl have access to this?
+        button.place(x = 250, y = 100)
 
     #operation tab
     def define_BG(self):#generate botton, it will run the figure method
@@ -467,19 +485,39 @@ class Operations():
 
     def define_colourbar_size(self):
         self.colourbar_size_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
-        default = self.overview.data.get('colorbar_size_entry','4,1')
+        default = self.overview.data.get('colorbar_size_entry','3.3,0.7')
         self.colourbar_size_entry.insert(0, default)#default text
-        self.colourbar_size_entry.place(x = 0, y = 150)
+        self.colourbar_size_entry.place(x = 0, y = 200)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'colourbar size',background='white',foreground='black')#need to save it to updat the number next to the slide
-        label.place(x = 200, y = 150)
+        label.place(x = 200, y = 200)
 
         button_calc = tk.ttk.Button(self.operation_tabs['Figures'], text="reset", command = self.reset_colorbar_size)#which figures shoudl have access to this?
-        button_calc.place(x = 300, y = 150)
+        button_calc.place(x = 300, y = 200)
 
     def define_colourbar_orientation(self):
         default = self.overview.data.get('colourbar_orientation','horizontal')
         self.orientation = tk.ttk.Button(self.operation_tabs['Figures'], text="horizontal", command = self.pressing,width = 10)#which figures shoudl have access to this?
-        self.orientation.place(x = 100, y = 150)
+        self.orientation.place(x = 100, y = 200)
+
+    def define_margines(self):
+        margines = ['top','left','right','bottom']
+        self.fig_margines = {}
+        self.colourbar_margines = {}
+        for index, margin in enumerate(margines):
+            self.fig_margines[margin] = tk.ttk.Entry(self.operation_tabs['Figures'], width= 3)#
+            self.colourbar_margines[margin] = tk.ttk.Entry(self.operation_tabs['Figures'], width= 3)#
+
+            default = self.overview.data.get('fig_margines',{'top':0.93,'left':0.18,'right':0.97,'bottom':0.13})
+            self.fig_margines[margin].insert(0, default[margin])#default text
+            self.fig_margines[margin].place(x = 50 + 50*index, y = 20)
+            label = ttk.Label(self.operation_tabs['Figures'],text = margin,background='white',foreground='black')#need to save it to updat the number next to the slide
+            label.place(x = 50 + 50*index, y = 0)
+
+            default = self.overview.data.get('colourbar_margines',{'top':0.9,'left':0.03,'right':0.96,'bottom':0.7})
+            self.colourbar_margines[margin].insert(0, default[margin])#default text
+            self.colourbar_margines[margin].place(x = 50 + 50*index, y = 170)
+            label = ttk.Label(self.operation_tabs['Figures'],text = margin,background='white',foreground='black')#need to save it to updat the number next to the slide
+            label.place(x = 50 + 50*index, y = 150)
 
     def pressing(self):
         if self.orientation.configure('text')[-1] == 'horizontal':
@@ -493,7 +531,7 @@ class Operations():
 
     def reset_colorbar_size(self):
         self.colourbar_size_entry.delete(0, "end")
-        self.colourbar_size_entry.insert(0, '4,1')#default text
+        self.colourbar_size_entry.insert(0, '3.3,0.7')#default text
 
     def reset_fig_size(self):
         self.fig_size_entry.delete(0, "end")
@@ -504,14 +542,14 @@ class Operations():
         self.fig_label_entry.insert(0, 'x,y')#default text
 
 class Pop_up():#the pop up window
-    def __init__(self, gui, size, lim, label):
+    def __init__(self, gui, sizes, lim, label):
         self.gui = gui
-        self.fig = plt.Figure(figsize=size)
+        self.fig = plt.Figure(figsize = sizes['size'])
         self.ax = self.fig.add_subplot(111)
         self.lim = lim#will  be updated from figure right clicj
         self.ax.set_xlabel(label[0])
         self.ax.set_ylabel(label[1])
-        #self.fig.subplots_adjust(top = 0.93,left = 0.15,right = 0.97, bottom = 0.11)
+        self.fig.subplots_adjust(top = float(sizes['top']),left = float(sizes['left']),right = float(sizes['right']), bottom = float(sizes['bottom']))
         self.popup = tk.Toplevel()
         self.pop_canvas = FigureCanvasTkAgg(self.fig, master=self.popup)
         self.pop_canvas.get_tk_widget().pack()

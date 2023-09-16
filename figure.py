@@ -45,7 +45,7 @@ class Figure(Functions):
         self.original_int = self.int
 
         self.colour_limit()
-        self.define_canvas(size = [4.45,4.3], top = 0.93, left = 0.15, right = 0.97, bottom = 0.11)
+        self.define_canvas(size = [4.4,4.3], top = 0.93, left = 0.15, right = 0.97, bottom = 0.11)
         self.define_export()
         self.define_mouse()
         self.draw()
@@ -120,7 +120,7 @@ class Figure(Functions):
         self.cursor.redraw()
 
     def right_click(self,event):
-        self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.fig_size_entry.get())#call gui to make a new window object
+        self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.fig_size_entry.get(),top = self.sub_tab.operations.fig_margines['top'].get(),left = self.sub_tab.operations.fig_margines['left'].get(),right = self.sub_tab.operations.fig_margines['right'].get(),bottom = self.sub_tab.operations.fig_margines['bottom'].get())#call gui to make a new window object
         self.plot(self.sub_tab.data_tab.gui.pop.ax)#plot the fraph onto the popup ax
         self.sub_tab.data_tab.gui.pop.graph = self.graph
         self.sub_tab.data_tab.gui.pop.set_vlim(self.vmin,self.vmax_set)
@@ -164,7 +164,7 @@ class Figure(Functions):
         vmax = np.nanmax(self.vmax)*int(float(value))/100
         self.vmax_set = vmax#for the pop up window
         self.graph.set_clim(vmin = self.vmin, vmax = vmax)#all graphs have common have comon vmax and vmin
-        self.sub_tab.operations.label3.configure(text=(float(value)))#update the number next to int range slide
+        self.sub_tab.operations.label3.configure(text=(round(float(value),1)))#update the number next to int range slide
 
     def colour_limit(self):#called in init and processing
         pass
@@ -228,6 +228,21 @@ class FS(Figure):
     def colour_limit(self):#called in init and processing
         self.vmin = np.nanmin(self.data[3])
         self.vmax = np.nanmax(self.data[3])
+
+    def set_vlim(self):#called from botton
+        values = self.sub_tab.operations.vlim_entry.get()
+        value = values.split(',')
+        if value[0] != 'None':
+            self.vmin = float(value[0])
+        else:
+            self.vmin = np.nanmin(self.data[3])
+        if value[1] != 'None':
+            self.vmax = float(value[1])
+        else:
+            self.vmax = np.nanmax(self.data[3])
+        self.colour_bar.update()
+        self.graph.set_clim(vmin = self.vmin, vmax = self.vmax)#all graphs have common have comon vmax and vmin
+        self.redraw()
 
 class Band_right(Figure):
     def __init__(self,figure_handeler,pos):
@@ -445,6 +460,21 @@ class Band(Figure):
         self.vmin = np.nanmin(self.int)
         self.vmax = np.nanmax(self.int)
 
+    def set_vlim(self):#called from botton
+        values = self.sub_tab.operations.vlim_entry.get()
+        value = values.split(',')
+        if value[0] != 'None':
+            self.vmin = np.nanmin(self.int)
+        else:
+            self.vmin = np.nanmin(self.data[3])
+        if value[1] != 'None':
+            self.vmax = float(value[1])
+        else:
+            self.vmax = np.nanmax(self.int)
+        self.colour_bar.update()
+        self.graph.set_clim(vmin = self.vmin, vmax = self.vmax)#all graphs have common have comon vmax and vmin
+        self.redraw()
+
 class DOS_right(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
@@ -491,8 +521,8 @@ class Colour_bar(Figure):
     def __init__(self,figure):
         self.figure = figure
         self.sub_tab = figure.sub_tab#overview
-        self.pos = [812,400]
-        self.define_canvas(size = [7.64,1], top = 0.6, left = 0.1, right = 0.9, bottom = 0.4)
+        self.pos = [780,410]
+        self.define_canvas(size = [7.4,1], top = 0.93, left = 0.15, right = 0.97, bottom = 0.5)
         self.bar = self.fig.colorbar(self.figure.graph,cax = self.ax,orientation='horizontal',label = 'Intensity')
 
     def update(self):
@@ -501,7 +531,7 @@ class Colour_bar(Figure):
         self.canvas.draw()
 
     def right_click(self,event):#the popup window
-        self.sub_tab.data_tab.gui.pop_up(size = self.figure.sub_tab.operations.colourbar_size_entry.get())#it returns a string)#call gui to make a new window object
+        self.sub_tab.data_tab.gui.pop_up(size = self.figure.sub_tab.operations.colourbar_size_entry.get(),top = self.sub_tab.operations.colourbar_margines['top'].get(),left = self.sub_tab.operations.colourbar_margines['left'].get(),right = self.sub_tab.operations.colourbar_margines['right'].get(),bottom = self.sub_tab.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
         orientation = self.sub_tab.operations.orientation.configure('text')[-1]
         self.sub_tab.data_tab.gui.pop.fig.colorbar(self.figure.graph,cax = self.sub_tab.data_tab.gui.pop.ax,orientation=orientation,label = 'Intensity')
         #self.sub_tab.data_tab.gui.pop.fig.subplots_adjust(top = kwarg['top'],left = kwarg['left'],right = kwarg['right'], bottom = kwarg['bottom'])

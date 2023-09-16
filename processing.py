@@ -130,8 +130,8 @@ class Convert_k(Raw):
         work_func = 4#usually 4
         k0 = 0.5124 * np.sqrt(self.hv - work_func)
 
-        #alpha is the polar or theta
-        #beta is the tilt
+        #alpha is the polar or theta -> SIS
+        #beta is the tilt -> SIS
 
         # Angle to radian conversion
         pos1 = self.figure.cursor.sta_horizontal_line.get_data()
@@ -140,8 +140,8 @@ class Convert_k(Raw):
 
 
         alpha,beta = self.figure.define_angle2k()#depends on the figure
-        a = (alpha+dalpha)*np.pi/180
-        b = (beta+dbeta)*np.pi/180
+        a = (alpha + dalpha)*np.pi/180
+        b = (beta + dbeta)*np.pi/180
 
         # place hodlers
         nkx = len(alpha)
@@ -149,6 +149,7 @@ class Convert_k(Raw):
         KX = np.empty((nkx, nky))
         KY = np.empty((nkx, nky))
 
+        phi=45
         if self.figure.sub_tab.data_tab.data_loader.orientation == 'horizontal':
             for i in range(nkx):
                 KX[i] = np.sin(b) * np.cos(a[i])
@@ -160,8 +161,7 @@ class Convert_k(Raw):
             cos_theta = np.cos(theta_k)
             sin_theta_cos_beta = np.sin(theta_k) * np.cos(dbeta*np.pi/180)
             for i in range(nkx):
-                KX[i] = sin_theta_cos_beta + cos_theta * np.cos(a[i]) * \
-                        np.sin(dbeta*np.pi/180)
+                KX[i] = sin_theta_cos_beta + cos_theta * np.cos(a[i]) * np.sin(dbeta*np.pi/180)
                 KY[i] = cos_theta * np.sin(a[i])
 
         if KY.shape[1] == 1:#2D, band
@@ -209,43 +209,6 @@ class Convert_k(Raw):
         self.figure.data[1] = axis_y
         self.figure.intensity()
 
-    def new_mesh_one(self,kx,ky):#for 3D data set, FS, correct only the current level
-        min_index = [np.argmin((kx[:,-1]-kx[:,0])),np.argmin((ky[-1]-ky[0]))]#the index in whihc there is the minimum distance between the intensity mesh
-
-        #min_distance = [kx[index[0]][1]-kx[index[0]][0], ky[1][index[1]]-ky[0][index[1]]]#minimum bin size
-        min_bin = [(np.amax(kx[min_index[0]]) - np.amin(kx[min_index[0]]))/len(kx[min_index[0]]),(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:,min_index[1]])]#min bin size
-
-        max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
-        max_distance = [np.amax(kx[max_index[0]]) - np.amin(kx[max_index[0]]),np.amax(ky[:,max_index[1]]) - np.amin(ky[:,max_index[1]])]
-        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
-
-        axis_y = np.linspace(np.amin(ky[:,max_index[1]]),np.amax(ky[:,max_index[1]]),num = int(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
-        axis_x =np.linspace(np.amin(kx[max_index[0]]),np.amax(kx[max_index[0]]),num = int(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
-
-        #reshape the intensity
-        intensity = np.zeros((len(axis_y),len(axis_x)))#place holder for mesh
-        inrange = False#a flag to check if in range
-        for col, x_cord in enumerate(axis_x):
-            index_real = [0,0]#the index of the kspace coordinates
-            for row,y_cord in enumerate(axis_y):#from below
-                if y_cord < ky[index_real[1]][col]:#below
-                    real_int = np.NaN
-                    if inrange:
-                        real_int = self.figure.int[index_real[1]][col]
-                elif y_cord > ky[-1][col]:#above
-                    inrange = False
-                    real_int = np.NaN
-                else:#if bigger
-                    real_int = self.figure.int[index_real[1]][col]
-                    index_real[1] += 1
-                    inrange = True
-
-                intensity[row][col] = real_int
-
-        self.figure.int = intensity
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-
 class Convert_kz(Raw):
     def __init__(self,figure):
         super().__init__(figure)
@@ -260,12 +223,11 @@ class Convert_kz(Raw):
         self.figure.figure_handeler.draw()
         self.figure.figure_handeler.update_mouse_range()
 
-    def converthv(self):
-        #convert to kz
+    def converthv(self):#convert to kz
         q = 1.60218*10**-19#charge
         m = 9.1093837*10**-31#kg
         hbar = (6.62607015*10**-34)/(2*np.pi)#m2 kg / s
-        V = 8*q#J
+        V = 8*q#J: inner potential
         W = 4.5#eV
         Eb = 0#eV binding energy
         kz = []
@@ -280,18 +242,49 @@ class Convert_kz(Raw):
         ky = np.transpose(np.array(ky))
 
         #to let ppcolormesh handle the interpolation
-        self.figure.data[0] = kz
-        self.figure.data[1] = ky
-        return
+        #self.figure.data[0] = kz
+        #self.figure.data[1] = ky
+        #return
 
         #manually interpolate all layers so that cuts become easier
-        self.new_mesh_all(kz,ky)
-
-        return
-        self.new_mesh_manual_interpolation(kz,ky)
         self.new_mesh_interpolation(kz,ky)
+        #self.new_mesh_all(kz,ky)
 
-    def new_mesh_all(self,kx,ky):
+    def new_mesh_interpolation(self,kx,ky):
+        min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
+
+        length = np.argmax(kx[:,min_index[0]])-np.argmin(kx[:,min_index[0]])
+        min_bin = [(np.amax(kx[:,min_index[0]]) - np.amin(kx[:,min_index[0]]))/length,(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:])]#min bin size
+
+        #max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
+        max_distance = [kx.max() - kx.min(),ky.max() - ky.min()]
+        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
+
+        axis_y = np.linspace(ky.min(),ky.max(),num = round(number[1]*0.5))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
+        axis_x =np.linspace(kx.min(),kx.max(),num = round(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
+        axis_z = np.linspace(self.figure.data[2].min(),self.figure.data[2].max(),num = 800)
+
+        X, Y = np.meshgrid(axis_x,axis_y)
+        points = np.column_stack((kx.flatten(),ky.flatten()))
+        Z = np.zeros((len(axis_x),len(axis_y),len(axis_z)))#place holder for mesh
+        Z[:] = np.NaN
+        for index, ev in enumerate(axis_z):
+            interp = interpolate.LinearNDInterpolator(points,self.figure.data[3][index].flatten())
+            Z[:,:,index] = interp(X,Y).T
+            print(index/len(axis_z))
+
+        #X,Y,Z = np.meshgrid(axis_x,axis_y,axis_z, indexing='ij')
+        #points = [self.figure.data[2],self.figure.data[1],self.figure.data[0]]
+        #interp = interpolate.RegularGridInterpolator(points,self.figure.data[3],bounds_error=False,fill_value = None)
+        #Z = interp((X,Y,Z))
+
+        self.figure.data[0] = axis_x
+        self.figure.data[1] = axis_y
+        self.figure.data[2] = axis_z
+        self.figure.data[3] = np.transpose(Z,(2, 1, 0))
+        self.figure.intensity()
+
+    def new_mesh_all(self,kx,ky):#manually interpolate each layer at once -> doesn't look perfect
         min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
 
         length = np.argmax(kx[:,min_index[0]])-np.argmin(kx[:,min_index[0]])
@@ -338,7 +331,7 @@ class Convert_kz(Raw):
 
         print("let's fill")
         new_data = np.zeros((len(axis_y),len(axis_x),len(self.figure.data[2])))#place holder for mesh
-        #new_data[:] = np.NaN
+        new_data[:] = np.NaN
         for col, x_cord in enumerate(axis_x):
             for row, y_cord in enumerate(axis_y):
                 if y_cord >= bottom[1][col] and y_cord <= top[1][col] :#are we above the bottom line and below the top line?
@@ -365,240 +358,6 @@ class Convert_kz(Raw):
         self.figure.data[0] = axis_x
         self.figure.data[1] = axis_y
         self.figure.intensity()
-
-    def new_mesh_new(self,kx,ky):
-        min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
-
-        length = np.argmax(kx[:,min_index[0]])-np.argmin(kx[:,min_index[0]])
-        min_bin = [(np.amax(kx[:,min_index[0]]) - np.amin(kx[:,min_index[0]]))/length,(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:])]#min bin size
-
-        #max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
-        max_distance = [kx.max() - kx.min(),ky.max() - ky.min()]
-        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
-
-        axis_y = np.linspace(ky.min(),ky.max(),num = round(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
-        axis_x =np.linspace(kx.min(),kx.max(),num = round(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
-
-        data = np.zeros((len(axis_y),len(axis_x)))#place holder for mesh
-        data[:] = np.NaN
-
-        #theoretical conversion
-        q = 1.60218*10**-19#charge
-        m = 9.1093837*10**-31#kg
-        hbar = (6.62607015*10**-34)/(2*np.pi)#m2 kg / s
-        V = 8*q#J
-        W = 4.5#eV
-        Eb = 0#eV binding energy
-        ky_theory = []
-        kz_theory = []
-        theta = np.linspace(self.figure.data[1].min(),self.figure.data[1].max(),num=len(axis_y))
-        hvs = np.linspace(self.figure.data[0].min(),self.figure.data[0].max(),num=len(axis_x))
-        for hv in hvs:#do it for each photon energy
-            Ek = (hv - W - Eb)*q#J -> can be extract the value from the figure?
-            test = self.convert2k_2(hv,theta)[:,0]
-            ky_theory.append(test)
-            kz_theory.append(10**-10*np.sqrt(2*m*(Ek*np.cos(np.pi*theta/180)**2+V))/hbar)
-
-        kz_theory = np.array(kz_theory)
-        ky_theory = np.array(ky_theory)
-
-        #the bounds
-        left = [kz_theory[0],ky_theory[0]]
-        right = [kz_theory[-1],ky_theory[-1]]
-        bottom = [kz_theory[:,0],ky_theory[:,0]]
-        top = [kz_theory[:,-1],ky_theory[:,-1]]
-
-        #plt.plot(kz_theory[0],ky_theory[0])
-        #plt.plot(kz_theory[-1],ky_theory[-1])
-        #plt.plot(kz_theory[:,0],ky_theory[:,0])
-        #plt.plot(kz_theory[:,-1],ky_theory[:,-1])
-        #plt.show()
-
-        print("let's fill")
-        new_data = data
-        index = [0,0]#pointer
-        for col, x_cord in enumerate(axis_x):
-            for row, y_cord in enumerate(axis_y):
-                if y_cord >= bottom[1][col] and y_cord <= top[1][col] :#are we above the bottom line and below the top line?
-                    if x_cord >= left[0][row] and x_cord <= right[0][row]:#are we right of the left boundary? #and are we left of the right boundary?#and y_cord <= left[1][row] # and y_cord >= right[1][row]
-                        #interpolation
-                        diff_y = np.abs(ky - y_cord)
-                        index_y = np.unravel_index(diff_y.argmin(), diff_y.shape)
-                        diff_x = np.abs(kx[index_y[0]] - x_cord)
-                        index_x = np.unravel_index(diff_x.argmin(), diff_x.shape)
-
-                        intensity = self.figure.int[index_y[0]][index_x]
-                    else:#if ourside
-                        intensity = np.NaN
-                else:#not above or below the top liens
-                    intensity = np.NaN
-
-                new_data[row][col] = intensity
-
-        self.figure.int = new_data
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-
-    def new_mesh_manual_interpolation(self,kx,ky):
-        min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
-
-        length = np.argmax(kx[:,min_index[0]])-np.argmin(kx[:,min_index[0]])
-        min_bin = [(np.amax(kx[:,min_index[0]]) - np.amin(kx[:,min_index[0]]))/length,(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:])]#min bin size
-
-        #max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
-        max_distance = [kx.max() - kx.min(),ky.max() - ky.min()]
-        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
-
-        axis_y = np.linspace(ky.min(),ky.max(),num = round(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
-        axis_x =np.linspace(kx.min(),kx.max(),num = round(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
-
-        data = np.zeros((len(axis_y),len(axis_x)))#place holder for mesh
-        data[:] = np.NaN
-        index=[0,0]
-
-        #bascially works but not perfect
-        for row_index, row in enumerate(kx):
-            for col, x in enumerate(row):
-                y = ky[row_index][col]
-                #translate to appropriate positions
-                index[0] = (x - axis_x[0])/min_bin[0]
-                index[1] = (y - axis_y[0])/min_bin[1]
-                index[0] = min(index[0],len(axis_x)-1)#why is this needed?
-                data[int(index[1])][int(index[0])] = self.figure.int[row_index][col]
-
-        #manual interpolation
-
-        #theoretical conversion
-        kz_theory = []
-        theta = np.linspace(self.figure.data[1].min(),self.figure.data[1].max(),num=len(axis_y))
-
-        q = 1.60218*10**-19#charge
-        m = 9.1093837*10**-31#kg
-        hbar = (6.62607015*10**-34)/(2*np.pi)#m2 kg / s
-        V = 8*q#J
-        W = 4.5#eV
-        Eb = 0#eV binding energy
-        hvs=self.figure.data[0]
-        hvs=np.append(hvs,self.figure.data[0][-1]+2)
-        for hv in hvs:#do it for each photon energy
-            Ek = (hv-W-Eb)*q#J -> can be extract the value from the figure?
-            kz_theory.append(10**-10*np.sqrt(2*m*(Ek*np.cos(np.pi*theta/180)**2+V))/hbar)
-
-        kz_theory = np.transpose(np.array(kz_theory))
-        theta = np.transpose(np.array(theta))
-        plt.plot(kz_theory,theta)
-        plt.show()
-        #theoretical border
-        new_data = data
-        index = [0,0]#pointer
-        for row, y_cord in enumerate(axis_y):
-            for col, x_cord in enumerate(axis_x):
-                for column in range(len(kz_theory[0])-1):#for each hv
-                    real_intensiry = np.NaN
-                    if x_cord >= kz_theory[row][column] and x_cord < kz_theory[row][column+1]:
-                        index_x = np.absolute(kx[:,column] - x_cord).argmin()
-                        index_y = np.absolute(ky[:,column] - y_cord).argmin()
-                        #print(index_x,index_y)
-                        real_intensiry = self.figure.int[index_y][column]
-                        break
-
-                new_data[row][col] = real_intensiry
-
-        #save the results
-        self.figure.int = new_data
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-
-    def new_mesh_interpolation(self,kx,ky):
-        min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
-
-        length = np.argmax(kx[:,min_index[0]])-np.argmin(kx[:,min_index[0]])
-        min_bin = [(np.amax(kx[:,min_index[0]]) - np.amin(kx[:,min_index[0]]))/length,(np.amax(ky[:,min_index[1]]) - np.amin(ky[:,min_index[1]]))/len(ky[:])]#min bin size
-
-        #max_index = [np.argmax((kx[:,-1]-kx[:,0])),np.argmax((ky[-1]-ky[0]))]#the index in whihc there is the max distance betwene the intensitie mesh
-        max_distance = [kx.max() - kx.min(),ky.max() - ky.min()]
-        number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
-
-        axis_y = np.linspace(ky.min(),ky.max(),num = round(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
-        axis_x =np.linspace(kx.min(),kx.max(),num = round(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
-
-        data = np.zeros((len(axis_y),len(axis_x)))#place holder for mesh
-        data[:] = np.NaN
-        index=[0,0]
-
-        #bascially workds but not perfect
-        for row_index, row in enumerate(kx):
-            for col, x in enumerate(row):
-                y = ky[row_index][col]
-                #translate to appropriate positions
-                index[0] = (x - axis_x[0])/min_bin[0]
-                index[1] = (y - axis_y[0])/min_bin[1]
-                index[0] = min(index[0],len(axis_x)-1)#why is this needed?
-                data[int(index[1])][int(index[0])] = self.figure.int[row_index][col]
-
-        #interpolate
-        xx, yy = np.meshgrid(axis_x, axis_y)
-        masked_intensity = np.ma.masked_invalid(data)
-        intensity= interpolate.griddata((xx[~masked_intensity.mask],yy[~masked_intensity.mask]), masked_intensity[~masked_intensity.mask].ravel(),(xx, yy),method='linear')
-
-        #save the results
-        self.figure.int = intensity
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-
-        return#below is for every energy. Very slow....
-
-        axis_z = self.figure.data[2]
-
-        data = np.zeros((len(axis_z),len(axis_y),len(axis_x)))#place holder for mesh
-        data[:] = np.NaN
-        index=[0,0]
-
-        #bascially workds but not perfect
-        for index_z, z in enumerate(axis_z):
-            for row_index, row in enumerate(kx):
-                for col, x in enumerate(row):
-                    y = ky[row_index][col]
-                    #translate to appropriate positions
-                    index[0] = (x - axis_x[0])/min_bin[0]
-                    index[1] = (y - axis_y[0])/min_bin[1]
-                    index[0] = min(index[0],3419)
-                    data[index_z][int(index[1])][int(index[0])] = self.figure.data[3][index_z][row_index][col]
-
-        #this works but insainly slow, works for up to 7 files, maybe?
-        intensity = []
-        xx, yy = np.meshgrid(axis_x, axis_y)
-        for layer in data:
-            masked_intensity = np.ma.masked_invalid(layer)
-            intensity.append(interpolate.griddata((xx[~masked_intensity.mask],yy[~masked_intensity.mask]), masked_intensity[~masked_intensity.mask].ravel(),(xx, yy),method='linear'))
-
-        self.figure.int = intensity[0]
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-        self.figure.data[3] = intensity
-
-        return
-
-        #this also works but is even lower...
-        new_intensity=np.array(data[0])
-        xx, yy = np.meshgrid(axis_x, axis_y)
-        for index, layer in enumerate(data):
-            intensity=np.array([layer[0]])
-
-            for col,array in enumerate(layer):
-                masked_intensity = np.ma.masked_invalid(array)
-                int2 = np.interp(axis_x,axis_x[~masked_intensity.mask],masked_intensity[~masked_intensity.mask])
-
-                intensity = np.append(intensity, [int2], axis=0)
-
-                if col == 0:
-                    intensity = np.delete(intensity, len(intensity)-1, 0)
-            new_intensity=np.dstack((new_intensity,intensity))
-
-        self.figure.int = new_intensity[0]
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-        self.figure.data[3] = new_intensity
 
     def convert2k_2(self,hv,theta):#for the theory
         work_func = 4#usually 4
