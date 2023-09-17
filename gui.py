@@ -8,7 +8,7 @@ import numpy as np
 import pickle
 import os
 
-import figure_handeler, data_loader, constants
+import figure_handeler, data_loader, constants, entities
 
 #to implement:
 #range plots
@@ -19,6 +19,7 @@ import figure_handeler, data_loader, constants
     #normalise based on some selected area?
 #symmetrise based on a reference?
 #phi rotation in k convert?
+#the inital start cut position
 
 #Bugs:
 #the slit issue
@@ -393,49 +394,27 @@ class Operations():
         label.place(x = 150, y = 80)
 
     def define_set_vlim(self):
-        button = tk.ttk.Button(self.operation_tabs['General'], text="set colour limit", command = self.overview.figure_handeler.figures['center'].set_vlim)#which figures shoudl have access to this?
+        button = tk.ttk.Button(self.operation_tabs['General'], text="set colour limit", command = self.overview.figure_handeler.colour_bar.set_vlim)#which figures shoudl have access to this?
         button.place(x = 250, y = 100)
 
     #operation tab
     def define_BG(self):#generate botton, it will run the figure method
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.subtract_BG)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 0)
-        self.BG_choise()
-
-    def BG_choise(self):
-        choises = ['horizontal','vertical','EDC']
-        self.checkbox = {}
-        for index, choise in enumerate(choises):
-            self.checkbox[choise] = tk.IntVar()
-            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=120,y=30*index)
+        self.BG_orientation = entities.Button(self, self.operation_tabs['Operations'],'BG_orientation',['horizontal','vertical','EDC'])
+        self.BG_orientation.place(x = 120, y = 0)
 
     def define_derivative(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="2nd derivative", command = self.overview.figure_handeler.derivative)#which figures shoudl have access to this?
         button_calc.place(x = 230, y = 0)
-
-        default = self.overview.data.get('derivatvive_orientation','horizontal')
-        self.derivatvive_orientation = tk.ttk.Button(self.operation_tabs['Operations'], text = default, command = self.derivative_press,width = 10)#which figures shoudl have access to this?
-        self.derivatvive_orientation.place(x = 350, y = 0)
-
-    def derivative_press(self):
-        if self.derivatvive_orientation.configure('text')[-1] == 'horizontal':
-            self.derivatvive_orientation.configure(text="vertical")
-        else:
-            self.derivatvive_orientation.configure(text="horizontal")
+        self.derivative_orientation = entities.Button(self, self.operation_tabs['Operations'],'derivatvive_orientation',['horizontal','vertical'])
+        self.derivative_orientation.place(x = 350, y = 0)
 
     def define_curvature(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Curvature", command = self.overview.figure_handeler.curvature)#which figures shoudl have access to this?
         button_calc.place(x = 230, y = 50)
-
-        default = self.overview.data.get('curvature_orientation','horizontal')
-        self.curvature_orientation = tk.ttk.Button(self.operation_tabs['Operations'], text = default, command = self.curvature_press,width = 10)#which figures shoudl have access to this?
+        self.curvature_orientation = entities.Button(self, self.operation_tabs['Operations'],'curvature_orientation',['horizontal','vertical'])
         self.curvature_orientation.place(x = 350, y = 50)
-
-    def curvature_press(self):
-        if self.curvature_orientation.configure('text')[-1] == 'horizontal':
-            self.curvature_orientation.configure(text="vertical")
-        else:
-            self.curvature_orientation.configure(text="horizontal")
 
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
@@ -456,16 +435,8 @@ class Operations():
     def define_smooth(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="smooth", command = self.overview.figure_handeler.smooth)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 190)
-
-        default = self.overview.data.get('smooth_orientation','horizontal')
-        self.smooth_orientation = tk.ttk.Button(self.operation_tabs['Operations'], text = default, command = self.smooth_press,width = 10)#which figures shoudl have access to this?
+        self.smooth_orientation = entities.Button(self, self.operation_tabs['Operations'],'smooth_orientation',['horizontal','vertical'])
         self.smooth_orientation.place(x = 150, y = 190)
-
-    def smooth_press(self):
-        if self.smooth_orientation.configure('text')[-1] == 'horizontal':
-            self.smooth_orientation.configure(text="vertical")
-        else:
-            self.smooth_orientation.configure(text="horizontal")
 
     #figure tab
     def define_fig_size(self):
@@ -513,9 +484,8 @@ class Operations():
         button_calc.place(x = 300, y = 200)
 
     def define_colourbar_orientation(self):
-        default = self.overview.data.get('colourbar_orientation','horizontal')
-        self.orientation = tk.ttk.Button(self.operation_tabs['Figures'], text="horizontal", command = self.pressing,width = 10)#which figures shoudl have access to this?
-        self.orientation.place(x = 100, y = 200)
+        self.colourbar_orientation = entities.Button(self, self.operation_tabs['Figures'],'colourbar_orientation',['horizontal','vertical'])
+        self.colourbar_orientation.place(x = 100, y = 200)
 
     def define_margines(self):
         margines = ['top','left','right','bottom']
@@ -536,12 +506,6 @@ class Operations():
             self.colourbar_margines[margin].place(x = 50 + 50*index, y = 170)
             label = ttk.Label(self.operation_tabs['Figures'],text = margin,background='white',foreground='black')#need to save it to updat the number next to the slide
             label.place(x = 50 + 50*index, y = 150)
-
-    def pressing(self):
-        if self.orientation.configure('text')[-1] == 'horizontal':
-            self.orientation.configure(text="vertical")
-        else:
-            self.orientation.configure(text="horizontal")
 
     def reset_fig_lim(self):
         self.fig_lim_entry.delete(0, "end")

@@ -99,8 +99,6 @@ class Derivative_x(Raw):
 
     def set_values(self,data2_x,data2_y):
         self.figure.int = data2_x
-        self.figure.vmin = np.nanmin(self.figure.int)
-        self.figure.vmax = np.nanmax(self.figure.int)
         self.figure.redraw()
 
 class Derivative_y(Derivative_x):
@@ -109,8 +107,6 @@ class Derivative_y(Derivative_x):
 
     def set_values(self,data2_x,data2_y):
         self.figure.int = -data2_y
-        self.figure.vmin = np.nanmin(self.figure.int)
-        self.figure.vmax = np.nanmax(self.figure.int)
         self.figure.redraw()
 
 class Curvature_x(Raw):
@@ -134,9 +130,7 @@ class Curvature_x(Raw):
         self.set_values(data2_x,data2_y,data1_x,data1_y)
 
     def set_values(self,data2_x,data2_y,data1_x,data1_y):
-        self.figure.int = data2_x/(1 + data1_x**2)**(1.5)
-        self.figure.vmin = np.nanmin(self.figure.int)
-        self.figure.vmax = np.nanmax(self.figure.int)
+        self.figure.int = data2_x/(1 + data1_x**2)**(1.5)#can change 1 to other values to optimise
         self.figure.redraw()
 
 class Curvature_y(Curvature_x):
@@ -144,9 +138,7 @@ class Curvature_y(Curvature_x):
         super().__init__(figure)
 
     def set_values(self,data2_x,data2_y,data1_x,data1_y):
-        self.figure.int = data2_y/(1 + data1_y**2)**(1.5)
-        self.figure.vmin = np.nanmin(self.figure.int)
-        self.figure.vmax = np.nanmax(self.figure.int)
+        self.figure.int = data2_y/(1 + data1_y**2)**(1.5)#can change 1 to other values to optimise
         self.figure.redraw()
 
 class Convert_k(Raw):

@@ -43,12 +43,10 @@ class Figure(Functions):
         self.init_data()
         self.original_int = self.int
 
-        self.colour_limit()
         self.define_canvas(size = constants.figure_size['size'], top = constants.figure_size['top'], left = constants.figure_size['left'], right = constants.figure_size['right'], bottom = constants.figure_size['bottom'])
         self.define_export()
         self.define_mouse()
         self.draw()
-        #self.define_normalise()
 
     def init_data(self):
         self.intensity()
@@ -122,7 +120,7 @@ class Figure(Functions):
         self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.fig_size_entry.get(),top = self.sub_tab.operations.fig_margines['top'].get(),left = self.sub_tab.operations.fig_margines['left'].get(),right = self.sub_tab.operations.fig_margines['right'].get(),bottom = self.sub_tab.operations.fig_margines['bottom'].get())#call gui to make a new window object
         self.plot(self.sub_tab.data_tab.gui.pop.ax)#plot the fraph onto the popup ax
         self.sub_tab.data_tab.gui.pop.graph = self.graph
-        self.sub_tab.data_tab.gui.pop.set_vlim(self.vmin,self.vmax_set)
+        self.sub_tab.data_tab.gui.pop.set_vlim(self.sub_tab.vlim_set[0],self.sub_tab.vlim_set[1])
         self.sub_tab.data_tab.gui.pop.set_lim()
         self.sub_tab.data_tab.gui.pop.pop_canvas.draw()#draw it after plot
         self.plot(self.ax)#this is to re-updathe self.graph to the proper figure
@@ -136,7 +134,6 @@ class Figure(Functions):
         self.cursor.redraw()
 
     def redraw(self):
-        self.update_colour_scale()
         self.canvas.restore_region(self.blank_background)
         self.ax.draw_artist(self.graph)
         self.canvas.blit(self.ax.bbox)
@@ -158,15 +155,8 @@ class Figure(Functions):
         self.ax.set_xlabel(self.label[0])
         self.ax.set_ylabel(self.label[1])
 
-    def update_colour_scale(self):#called from slider
-        value = self.sub_tab.operations.color_scale.get()#value of the colour scale
-        vmax = np.nanmax(self.vmax)*int(float(value))/100
-        self.vmax_set = vmax#for the pop up window
-        self.graph.set_clim(vmin = self.vmin, vmax = vmax)#all graphs have common have comon vmax and vmin
-        self.sub_tab.operations.label3.configure(text=(round(float(value),1)))#update the number next to int range slide
-
-    def colour_limit(self):#called in init and processing
-        pass
+    def update_colour_scale(self):#called from figure handlere
+        self.graph.set_clim(vmin = self.figure_handeler.colour_bar.vlim_set[0], vmax = self.figure_handeler.colour_bar.vlim_set[1])#all graphs have common have comon vmax and vmin
 
 class FS(Figure):
     def __init__(self,figure_handeler,pos):
@@ -174,9 +164,9 @@ class FS(Figure):
         self.figures = figure_handeler.figures
         self.tilt =  self.sub_tab.data['metadata']['tilt']
         self.define_add_data()#the botton to add data (e.g. several measurement but divided into several files)
-        self.colour_bar = Colour_bar(self)
+        #self.colour_bar = Colour_bar(self)
 
-    def init_data(self):
+    def init_data(self):#called in init
         self.sort_data()
         self.intensity()
 
@@ -187,7 +177,7 @@ class FS(Figure):
         self.sub_tab.data['data'] = self.data[3]
 
     def plot(self,ax):#pcolorfast
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin = self.vmin, vmax = self.vmax))#FS
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#FS
 
     def sort_data(self):
         self.data = [self.sub_tab.data['xscale'],self.sub_tab.data['yscale'],self.sub_tab.data['zscale'],self.sub_tab.data['data']]
@@ -198,7 +188,8 @@ class FS(Figure):
         self.figures['right'].cut_index = difference_array.argmin()
 
         self.figures['right'].intensity()
-        self.figures['right'].plot(self.figures['right'].ax)
+        self.figures['right'].graph.set_array(self.figures['right'].int)
+        #self.figures['right'].plot(self.figures['right'].ax)
         self.figures['right'].redraw()
         self.figures['right'].click(pos)
 
@@ -206,7 +197,8 @@ class FS(Figure):
         self.figures['down'].cut_index = difference_array.argmin()
 
         self.figures['down'].intensity()
-        self.figures['down'].plot(self.figures['down'].ax)
+        self.figures['down'].graph.set_array(self.figures['down'].int)
+        #self.figures['down'].plot(self.figures['down'].ax)
         self.figures['down'].redraw()
         self.figures['down'].click(pos)
 
@@ -219,29 +211,6 @@ class FS(Figure):
 
     def define_angle2k(self):#called from procssing, convert k
         return self.data[1], self.data[0]
-
-    def update_colour_scale(self):
-        super().update_colour_scale()
-        self.colour_bar.update()
-
-    def colour_limit(self):#called in init and processing
-        self.vmin = np.nanmin(self.data[3])
-        self.vmax = np.nanmax(self.data[3])
-
-    def set_vlim(self):#called from botton
-        values = self.sub_tab.operations.vlim_entry.get()
-        value = values.split(',')
-        if value[0] != 'None':
-            self.vmin = float(value[0])
-        else:
-            self.vmin = np.nanmin(self.data[3])
-        if value[1] != 'None':
-            self.vmax = float(value[1])
-        else:
-            self.vmax = np.nanmax(self.data[3])
-        self.colour_bar.update()
-        self.graph.set_clim(vmin = self.vmin, vmax = self.vmax)#all graphs have common have comon vmax and vmin
-        self.redraw()
 
 class Band_right(Figure):
     def __init__(self,figure_handeler,pos):
@@ -259,7 +228,7 @@ class Band_right(Figure):
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band_right
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#band_right
 
     def intensity(self):
         start,stop,step = self.int_range(self.cut_index)
@@ -267,25 +236,21 @@ class Band_right(Figure):
         for ary in self.figure_handeler.figures['center'].data[3]:
             self.int.append(np.sum(ary[:,start:stop:1],axis=1)/step)
         self.int = np.transpose(self.int)
-        self.colour_limit()
 
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[1],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
-        pos = self.cursor.sta_horizontal_line.get_data()
+        #pos = self.cursor.sta_horizontal_line.get_data()
 
         difference_array1 = np.absolute(self.data[1]-pos[1])
         self.figure_handeler.figures['corner'].cut_index = difference_array1.argmin()
         self.figure_handeler.figures['corner'].intensity_right()
         #self.figure_handeler.figures['corner'].draw()
-        self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
+        self.figure_handeler.figures['corner'].graph1.set_ydata(self.figure_handeler.figures['corner'].int_right)
+        #self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
         self.figure_handeler.figures['corner'].redraw()
-
-    def colour_limit(self):#called in init and processing
-        self.vmin = self.figure_handeler.figures['center'].vmin
-        self.vmax = self.figure_handeler.figures['center'].vmax
 
 class Band_down(Figure):
     def __init__(self,figure_handeler,pos):
@@ -303,7 +268,7 @@ class Band_down(Figure):
         self.sub_tab.data_tab.append_tab(new_data)
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap,norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band down
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.sub_tab.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#band down
 
     def intensity(self):
         start,stop,step=self.int_range(self.cut_index)
@@ -311,25 +276,21 @@ class Band_down(Figure):
         for ary in self.figure_handeler.figures['center'].data[3]:
             int.append(sum(ary[start:stop:1])/step)
         self.int = np.array(int)
-        self.colour_limit()
 
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[0], self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
-        pos = self.cursor.sta_vertical_line.get_data()
+        #pos = self.cursor.sta_vertical_line.get_data()
         difference_array1 = np.absolute(self.data[0]-pos[0])
         self.figure_handeler.figures['corner'].cut_index = difference_array1.argmin()
 
         self.figure_handeler.figures['corner'].intensity_down()
         #self.figure_handeler.figures['corner'].draw()
-        self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
+        self.figure_handeler.figures['corner'].graph2.set_ydata(self.figure_handeler.figures['corner'].int_down)
+        #self.figure_handeler.figures['corner'].plot(self.figure_handeler.figures['corner'].ax)
         self.figure_handeler.figures['corner'].redraw()
-
-    def colour_limit(self):#called in init and processing
-        self.vmin = self.figure_handeler.figures['center'].vmin
-        self.vmax = self.figure_handeler.figures['center'].vmax
 
 class DOS_right_down(Figure):
     def __init__(self,figure_handeler,pos):
@@ -342,7 +303,6 @@ class DOS_right_down(Figure):
         self.intensity_right()
         self.intensity_down()
         self.int = (self.int_right+self.int_down)*0.5
-        self.colour_limit()
 
     def intensity_right(self):
         start,stop,step=self.int_range(self.cut_index)
@@ -364,7 +324,8 @@ class DOS_right_down(Figure):
         difference_array = np.absolute(self.figure_handeler.figures['center'].data[2]-pos[0])
         self.figure_handeler.figures['center'].cut_index = difference_array.argmin()
         self.figure_handeler.figures['center'].intensity()#this is slow for some reason in kz space
-        self.figure_handeler.figures['center'].plot(self.figure_handeler.figures['center'].ax)
+        self.figure_handeler.figures['center'].graph.set_array(self.figure_handeler.figures['center'].int)
+        #self.figure_handeler.figures['center'].plot(self.figure_handeler.figures['center'].ax)
         self.figure_handeler.figures['center'].redraw()
 
     def update_colour_scale(self):
@@ -397,29 +358,28 @@ class Band(Figure):
         self.tilt = self.sub_tab.data['metadata']['tilt']
         self.figures = figure_handeler.figures
         self.define_add_data()
-        self.colour_bar = Colour_bar(self)
 
-    def init_data(self):
+    def init_data(self):#called in init
         self.sort_data()
         self.intensity()
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap, norm = colors.Normalize(vmin=self.vmin, vmax=self.vmax))#band
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.sub_tab.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#band
         #ax.set_ylim(74.7, 75.3)
 
     def subtract_BG(self):#the BG botton calls it
-        if self.sub_tab.operations.checkbox['vertical'].get():#vertical bg subtract
+        if self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'vertical':#vertical bg subtract
             difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
             index1 = difference_array1.argmin()
             bg = np.nanmean(self.int[index1:-1,:],axis=0)#axis = 0is vertical, axis =1 is horizontal means
             self.int = self.int - bg
-        elif self.sub_tab.operations.checkbox['horizontal'].get():#horizontal bg subtract
+        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'horizontal':#horizontal bg subtract
             difference_array1 = np.absolute(self.data[0] - self.cursor.sta_vertical_line.get_data()[0])
             index1 = difference_array1.argmin()
             bg = np.nanmean(self.int[:,index1:-1],axis=1)#axis = 0is vertical, axis =1 is horizontal means
             int = np.transpose(self.int) - bg
             self.int = np.transpose(int)
-        elif self.sub_tab.operations.checkbox['EDC'].get():#EDC bg subtract
+        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
             self.int = self.int - self.figures['down'].int[None,:]#subtract the EDC from each row in data
 
         self.draw()
@@ -438,41 +398,20 @@ class Band(Figure):
         difference_array = np.absolute(self.data[0] - pos[0])#subtract for each channel, works.
         index1 = np.argmin(difference_array)
         self.figures['right'].intensity(index1)
-        self.figures['right'].draw()
+        self.figures['right'].graph.set_xdata(self.figures['right'].int)
+        self.figures['right'].redraw()
 
         difference_array = np.absolute(self.data[1] - pos[1])
         index2 = np.argmin(difference_array)
         self.figures['down'].intensity(index2)
-        self.figures['down'].draw()
+        self.figures['down'].graph.set_ydata(self.figures['down'].int)
+        self.figures['down'].redraw()
 
     def intensity(self,y = 0):
         self.int = self.data[-1][0]
 
     def define_angle2k(self):#called from procssing
         return self.data[1],np.array([self.tilt])
-
-    def update_colour_scale(self):
-        super().update_colour_scale()
-        self.colour_bar.update()
-
-    def colour_limit(self):#called in init and processing
-        self.vmin = np.nanmin(self.int)
-        self.vmax = np.nanmax(self.int)
-
-    def set_vlim(self):#called from botton
-        values = self.sub_tab.operations.vlim_entry.get()
-        value = values.split(',')
-        if value[0] != 'None':
-            self.vmin = np.nanmin(self.int)
-        else:
-            self.vmin = np.nanmin(self.data[3])
-        if value[1] != 'None':
-            self.vmax = float(value[1])
-        else:
-            self.vmax = np.nanmax(self.int)
-        self.colour_bar.update()
-        self.graph.set_clim(vmin = self.vmin, vmax = self.vmax)#all graphs have common have comon vmax and vmin
-        self.redraw()
 
 class DOS_right(Figure):
     def __init__(self,figure_handeler,pos):
@@ -493,8 +432,25 @@ class DOS_right(Figure):
     def plot(self,ax):#2D plot
         self.graph = ax.plot(self.int,self.figure_handeler.figures['center'].data[1])[0]#DOS right
 
-    def update_colour_scale(self):
-        pass
+    def redraw(self):
+        xmin=np.nanmin(self.int)
+        xmax=np.nanmax(self.int)
+        ymin=min(self.data[1])
+        ymax=max(self.data[1])
+
+        self.ax.set_xbound([xmin,xmax])
+        self.ax.set_ybound([ymin,ymax])
+
+        self.canvas.restore_region(self.blank_background)
+        self.ax.draw_artist(self.ax.get_yaxis())
+        self.ax.draw_artist(self.ax.get_xaxis())
+
+        self.ax.draw_artist(self.graph)
+
+        self.canvas.blit(self.ax.clipbox)
+
+        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        self.cursor.redraw()
 
 class DOS_down(Figure):
     def __init__(self,figure_handeler,pos):
@@ -513,26 +469,65 @@ class DOS_down(Figure):
     def plot(self,ax):#2D plot
         self.graph = ax.plot(self.figure_handeler.figures['center'].data[0], self.int)[0]#DOS down
 
-    def update_colour_scale(self):
-        pass
+    def redraw(self):
+        ymin=np.nanmin(self.int)
+        ymax=np.nanmax(self.int)
+        xmin=min(self.data[0])
+        xmax=max(self.data[0])
+
+        self.ax.set_xbound([xmin,xmax])
+        self.ax.set_ybound([ymin,ymax])
+
+        self.canvas.restore_region(self.blank_background)
+        self.ax.draw_artist(self.ax.get_yaxis())
+        self.ax.draw_artist(self.ax.get_xaxis())
+
+        self.ax.draw_artist(self.graph)
+
+        self.canvas.blit(self.ax.clipbox)
+
+        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        self.cursor.redraw()
 
 class Colour_bar(Figure):
-    def __init__(self,figure):
-        self.figure = figure
-        self.sub_tab = figure.sub_tab#overview
+    def __init__(self,figure_handler):
+        self.figure_handler = figure_handler
+        self.sub_tab = figure_handler.data_tab#overview
         self.pos = constants.colourbar_position
         self.define_canvas(size = constants.colourbar_size['size'], top = constants.colourbar_size['top'], left = constants.colourbar_size['left'], right = constants.colourbar_size['right'], bottom = constants.colourbar_size['bottom'])
-        self.bar = self.fig.colorbar(self.figure.graph,cax = self.ax,orientation='horizontal',label = 'Intensity')
+        self.bar = self.fig.colorbar(self.figure_handler.figures['center'].graph,cax = self.ax,orientation='horizontal',label = 'Intensity')
 
-    def update(self):
-        self.bar.update_normal(self.figure.graph)
+        self.vlim = [np.nanmin(self.figure_handler.figures['center'].int),np.nanmax(self.figure_handler.figures['center'].int)]#set common vlim
+        self.vlim_set = self.vlim.copy()#save original one seperately
+
+    def update(self):#called from figure handlere
+        self.bar.update_normal(self.figure_handler.figures['center'].graph)
         self.bar.draw_all()
         self.canvas.draw()
 
     def right_click(self,event):#the popup window
-        self.sub_tab.data_tab.gui.pop_up(size = self.figure.sub_tab.operations.colourbar_size_entry.get(),top = self.sub_tab.operations.colourbar_margines['top'].get(),left = self.sub_tab.operations.colourbar_margines['left'].get(),right = self.sub_tab.operations.colourbar_margines['right'].get(),bottom = self.sub_tab.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
-        orientation = self.sub_tab.operations.orientation.configure('text')[-1]
-        self.sub_tab.data_tab.gui.pop.fig.colorbar(self.figure.graph,cax = self.sub_tab.data_tab.gui.pop.ax,orientation=orientation,label = 'Intensity')
+        self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.colourbar_size_entry.get(),top = self.sub_tab.operations.colourbar_margines['top'].get(),left = self.sub_tab.operations.colourbar_margines['left'].get(),right = self.sub_tab.operations.colourbar_margines['right'].get(),bottom = self.sub_tab.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
+        orientation = self.sub_tab.operations.colourbar_orientation.configure('text')[-1]
+        self.sub_tab.data_tab.gui.pop.fig.colorbar(self.figure_handler.figures['center'].graph,cax = self.sub_tab.data_tab.gui.pop.ax,orientation=orientation,label = 'Intensity')
         #self.sub_tab.data_tab.gui.pop.fig.subplots_adjust(top = kwarg['top'],left = kwarg['left'],right = kwarg['right'], bottom = kwarg['bottom'])
         self.sub_tab.data_tab.gui.pop.set_lim()
         self.sub_tab.data_tab.gui.pop.pop_canvas.draw()#draw it after plot
+
+    def set_vlim(self):#called from botton
+        values = self.sub_tab.operations.vlim_entry.get()
+        value = values.split(',')
+
+        if value[0] != 'None':
+            self.vlim_set[0] = float(value[0])
+        else:
+            self.vlim_set[0] = np.nanmin(self.figure_handler.figures['center'].int)
+        if value[1] != 'None':
+            self.vlim_set[1] = float(value[1])
+        else:
+            self.vlim_set[1] = np.nanmax(self.figure_handler.figures['center'].int)
+
+        self.vlim = self.vlim_set.copy()#update to new reference
+        for figure in self.figure_handler.twoD:#update the figures
+            self.figure_handler.figures[figure].update_colour_scale()
+        self.update()#update the colourbar
+        self.figure_handler.redraw()
