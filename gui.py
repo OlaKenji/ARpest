@@ -1,9 +1,5 @@
-import matplotlib
-#matplotlib.use('TkAgg')#needed to some reason on the none enviroment
-
 import tkinter as tk
 from tkinter import ttk
-#import tkinter.filedialog#needed to some reason on the none enviroment
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -12,7 +8,7 @@ import numpy as np
 import pickle
 import os
 
-import figure_handeler, data_loader
+import figure_handeler, data_loader, constants
 
 #to implement:
 #range plots
@@ -38,7 +34,7 @@ import figure_handeler, data_loader
 
 class GUI():#master Gui
     def __init__(self):
-        self.size = [1920,1080]
+        self.size = constants.window_size
         self.window = tk.Tk()
         self.window.title('ARpest')
         self.window.state('zoomed')
@@ -49,7 +45,7 @@ class GUI():#master Gui
         self.open_botton()
 
         self.pop = None
-        self.start_path = '/Users/olakenjiforslund/Library/CloudStorage/OneDrive-Chalmers/Work/Research/Experiment/Data/Photons'
+        self.start_path = constants.start_path
         self.start_screen = Start_screen(self)
 
     def design(self):
@@ -74,6 +70,7 @@ class GUI():#master Gui
 
     def open_file(self):
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
+        if not files: return
         for file in files:
             self.tab = Data_tab(self,file)
         idx = file.rfind('/')+1
@@ -261,6 +258,7 @@ class Overview():
 
     def append_method(self):
         files = tk.filedialog.askopenfilenames(initialdir=self.data_tab.gui.start_path ,title='data')
+        if not files: return
         for file in files:
             self.append_data(file)
 
@@ -313,6 +311,7 @@ class Operations():
         self.define_symmetrise()
         self.define_derivative()
         self.define_smooth()
+        self.define_curvature()
 
         #figures
         self.define_fig_size()
@@ -378,7 +377,8 @@ class Operations():
 
     def select_drop(self,event):
         self.overview.cmap = event
-        self.overview.draw()
+        self.overview.figure_handeler.draw()
+        self.overview.figure_handeler.figures['center'].colour_bar.update()
 
     def define_reset(self):
         button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
@@ -412,14 +412,30 @@ class Operations():
     def define_derivative(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="2nd derivative", command = self.overview.figure_handeler.derivative)#which figures shoudl have access to this?
         button_calc.place(x = 230, y = 0)
-        self.derivative_choise()
 
-    def derivative_choise(self):
-        choises = ['horizontal','vertical']
-        self.checkbox_drivative = {}
-        for index, choise in enumerate(choises):
-            self.checkbox_drivative[choise] = tk.IntVar()
-            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_drivative[choise]).place(x=350,y=30*index)
+        default = self.overview.data.get('derivatvive_orientation','horizontal')
+        self.derivatvive_orientation = tk.ttk.Button(self.operation_tabs['Operations'], text = default, command = self.derivative_press,width = 10)#which figures shoudl have access to this?
+        self.derivatvive_orientation.place(x = 350, y = 0)
+
+    def derivative_press(self):
+        if self.derivatvive_orientation.configure('text')[-1] == 'horizontal':
+            self.derivatvive_orientation.configure(text="vertical")
+        else:
+            self.derivatvive_orientation.configure(text="horizontal")
+
+    def define_curvature(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Curvature", command = self.overview.figure_handeler.curvature)#which figures shoudl have access to this?
+        button_calc.place(x = 230, y = 50)
+
+        default = self.overview.data.get('curvature_orientation','horizontal')
+        self.curvature_orientation = tk.ttk.Button(self.operation_tabs['Operations'], text = default, command = self.curvature_press,width = 10)#which figures shoudl have access to this?
+        self.curvature_orientation.place(x = 350, y = 50)
+
+    def curvature_press(self):
+        if self.curvature_orientation.configure('text')[-1] == 'horizontal':
+            self.curvature_orientation.configure(text="vertical")
+        else:
+            self.curvature_orientation.configure(text="horizontal")
 
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
@@ -440,14 +456,16 @@ class Operations():
     def define_smooth(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="smooth", command = self.overview.figure_handeler.smooth)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 190)
-        self.smooth_choise()
 
-    def smooth_choise(self):
-        choises = ['horizontal','vertical']
-        self.checkbox_smooth = {}
-        for index, choise in enumerate(choises):
-            self.checkbox_smooth[choise] = tk.IntVar()
-            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_smooth[choise]).place(x=150,y=190 + 30*index)
+        default = self.overview.data.get('smooth_orientation','horizontal')
+        self.smooth_orientation = tk.ttk.Button(self.operation_tabs['Operations'], text = default, command = self.smooth_press,width = 10)#which figures shoudl have access to this?
+        self.smooth_orientation.place(x = 150, y = 190)
+
+    def smooth_press(self):
+        if self.smooth_orientation.configure('text')[-1] == 'horizontal':
+            self.smooth_orientation.configure(text="vertical")
+        else:
+            self.smooth_orientation.configure(text="horizontal")
 
     #figure tab
     def define_fig_size(self):

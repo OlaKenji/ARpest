@@ -1,10 +1,10 @@
-import figure, processing
+import figure, processing, constants
 
 class Figure_handeler():
     def __init__(self,data_tab):
         self.data_tab = data_tab
-        self.pos = [0,0]#posirion of the main figure
-        self.size = [445,430]#figure canvas size
+        self.pos = constants.figure_position#posirion of the main figure
+        self.size = constants.figure_grid#figure canvas size
         self.make_figures()
 
     def update_intensity(self):#called after k convert or fermi adjust
@@ -33,7 +33,7 @@ class Figure_handeler():
         for figure in self.figures.values():
             figure.redraw()
 
-    def update_colour_scale(self,value):
+    def update_colour_scale(self,value=0):#is this used?
         for figure in self.figures.values():
             figure.update_colour_scale()
         self.redraw()
@@ -47,20 +47,28 @@ class Figure_handeler():
         pass
 
     def derivative(self):#called when pushing the 2nd derivative botton
-        if self.data_tab.operations.checkbox_drivative['horizontal'].get():
+        if self.data_tab.operations.smooth_orientation.configure('text')[-1] == 'horizontal':
             adjust = processing.Derivative_x(self.figures['center'])
         else:#vertical
             adjust = processing.Derivative_y(self.figures['center'])
         adjust.run()
         self.draw()
 
-    def reset(self):#the reset bottom
+    def curvature(self):#called when pushing the 2nd derivative botton
+        if self.data_tab.operations.smooth_orientation.configure('text')[-1] == 'horizontal':
+            adjust = processing.Curvature_x(self.figures['center'])
+        else:#vertical
+            adjust = processing.Curvature_y(self.figures['center'])
+        adjust.run()
+        self.draw()
+
+    def reset(self):#the reset bottom -> need to also set the original axes
         self.figures['center'].int = self.figures['center'].original_int
         self.figures['center'].update_colour_scale()
         self.draw()
 
     def smooth(self):#the smooth botton
-        if self.data_tab.operations.checkbox_smooth['horizontal'].get():
+        if self.data_tab.operations.smooth_orientation.configure('text')[-1] == 'horizontal':
             adjust = processing.Smooth_x(self.figures['center'])
         else:
             adjust = processing.Smooth_y(self.figures['center'])

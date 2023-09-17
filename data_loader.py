@@ -1,16 +1,7 @@
-#import ast
-#import os
-#import pickle
-#import re
 import zipfile
-#from argparse import Namespace
-#from errno import ENOENT
-#from warnings import catch_warnings, simplefilter, warn
-
 import h5py
 import numpy as np
-#import astropy.io.fits as pyfits
-from igor import binarywave
+from igor import binarywave#implement reading igor file
 import pickle
 import sys
 
@@ -36,7 +27,7 @@ class Data_loader():
 
     @staticmethod
     def read_metadata(keys, metadata_file):
-        metadata = Namespace()
+        metadata = {}
         for line in metadata_file.readlines() :
             # Split at 'equals' sign
             tokens = line.decode('utf-8').split('=')
@@ -46,7 +37,7 @@ class Data_loader():
                     value = tokens[1].split()[0]
                     # And cast to right type
                     value = dtype(value)
-                    metadata.__setattr__(name, value)
+                    metadata[name] = value
         return metadata
 
     def load_zip(self, filename) :
@@ -79,30 +70,29 @@ class Data_loader():
             with z.open('Spectrum_' + file_id + '.bin') as f :
                 data_flat = np.frombuffer(f.read(), dtype='float32')
         # Put the data back into its actual shape
-        data = np.reshape(data_flat, (int(M.n_y), int(M.n_x), int(M.n_energy)))
+        data = np.reshape(data_flat, (int(M['n_y']), int(M['n_x']), int(M['n_energy'])))
         # Cut off unswept region
-        data = data[:,:,M.first_energy:M.last_energy+1]
+        data = data[:,:,M['first_energy']:M['last_energy']+1]
         # Put into shape (energy, other angle, angle along analyzer)
         data = np.moveaxis(data, 2, 0)
 
         # Create axes
-        xscale = start_step_n(M.start_x, M.step_x, M.n_x)
-        yscale = start_step_n(M.start_y, M.step_y, M.n_y)
-        energies = start_step_n(M.start_energy, M.step_energy, M.n_energy)
-        energies = energies[M.first_energy:M.last_energy+1]
+        xscale = start_step_n(M['start_x'], M['step_x'], M['n_x'])
+        yscale = start_step_n(M['start_y'], M['step_y'], M['n_y'])
+        energies = start_step_n(M['start_energy'], M['step_energy'], M['n_energy'])
+        energies = energies[M['first_energy']:M['last_energy']+1]
 
         metadata = {}
         for key,name,type in self.meta_keys:
-            metadata[name] = vars(M2)[name]
+            metadata[name] = M2[name]
 
-        res = Namespace(#switched y and x for maxiv, so that the measuerd cut is on the right for 3D data set
-            data = np.transpose(data,(0, 2, 1)),
-            xscale = yscale,
-            yscale = xscale,
-            zscale = energies,
-            metadata = metadata
-        )
-        return res
+        result = {}
+        result['data'] = np.transpose(data,(0, 2, 1))
+        result['xscale'] = yscale
+        result['yscale'] = xscale
+        result['zscale'] = energies
+        result['metadata'] = metadata
+        return result
 
     @staticmethod
     def read_viewer(viewer) :
@@ -173,18 +163,6 @@ class Data_loader():
         result['E_b'] = 0
         result['metadata'] = metadata
         return result
-
-        res = Namespace(
-                data = data,
-                xscale = yscale,
-                yscale = xscale,
-                zscale = zscale,
-                angles = xscale,
-                theta = 0,
-                phi = 0,
-                E_b = 0,
-                metadata = metadata)
-        return res
 
     def origanise_data(self,data,xscale,yscale,M2):#for max iv
         return data, xscale, yscale, None
@@ -379,19 +357,6 @@ class I05(Data_loader):
         result['metadata'] = metadata
         return result
 
-        res = Namespace(
-           data = data,
-           xscale = xscale,
-           yscale = yscale,
-           zscale = zscale,
-           angles = angles,
-           theta = theta,
-           phi = phi,
-           E_b = E_b,
-           metadata = metadata
-        )
-        return res
-
 class URANOS(Data_loader):
     def __init__(self,data_tab):
         super().__init__(data_tab)
@@ -548,18 +513,3 @@ class SIS(Data_loader):
         result['phi'] = phi
         result['E_b'] = E_b
         result['metadata'] = metadata
-        return result
-
-
-        res = Namespace(
-               data = data,
-               xscale = xscale,
-               yscale = yscale,
-               zscale = energies,
-               angles = angles,
-               theta = theta,
-               phi = phi,
-               E_b = E_b,
-               metadata = metadata
-        )
-        return res

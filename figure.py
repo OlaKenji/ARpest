@@ -1,13 +1,12 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib.pyplot import get_cmap
 
 import tkinter as tk
 import numpy as np
 import json#for the export
 
-import processing, cursor, data_loader
+import processing, cursor, data_loader, constants
 
 class Functions():#figure functionality not being used
     def __init__(self):
@@ -45,7 +44,7 @@ class Figure(Functions):
         self.original_int = self.int
 
         self.colour_limit()
-        self.define_canvas(size = [4.4,4.3], top = 0.93, left = 0.15, right = 0.97, bottom = 0.11)
+        self.define_canvas(size = constants.figure_size['size'], top = constants.figure_size['top'], left = constants.figure_size['left'], right = constants.figure_size['right'], bottom = constants.figure_size['bottom'])
         self.define_export()
         self.define_mouse()
         self.draw()
@@ -521,8 +520,8 @@ class Colour_bar(Figure):
     def __init__(self,figure):
         self.figure = figure
         self.sub_tab = figure.sub_tab#overview
-        self.pos = [780,410]
-        self.define_canvas(size = [7.4,1], top = 0.93, left = 0.15, right = 0.97, bottom = 0.5)
+        self.pos = constants.colourbar_position
+        self.define_canvas(size = constants.colourbar_size['size'], top = constants.colourbar_size['top'], left = constants.colourbar_size['left'], right = constants.colourbar_size['right'], bottom = constants.colourbar_size['bottom'])
         self.bar = self.fig.colorbar(self.figure.graph,cax = self.ax,orientation='horizontal',label = 'Intensity')
 
     def update(self):

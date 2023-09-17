@@ -1,13 +1,11 @@
 import numpy as np
 import tkinter as tk
 
-import figure, cursor
+import figure, cursor#for range plot
 from scipy import ndimage
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
 from scipy import interpolate
 import data_loader
-from scipy.interpolate import griddata
 
 class Raw():
     def __init__(self,figure):
@@ -101,7 +99,9 @@ class Derivative_x(Raw):
 
     def set_values(self,data2_x,data2_y):
         self.figure.int = data2_x
-        self.figure.update_colour_scale()
+        self.figure.vmin = np.nanmin(self.figure.int)
+        self.figure.vmax = np.nanmax(self.figure.int)
+        self.figure.redraw()
 
 class Derivative_y(Derivative_x):
     def __init__(self,figure):
@@ -109,7 +109,45 @@ class Derivative_y(Derivative_x):
 
     def set_values(self,data2_x,data2_y):
         self.figure.int = -data2_y
-        self.figure.update_colour_scale()
+        self.figure.vmin = np.nanmin(self.figure.int)
+        self.figure.vmax = np.nanmax(self.figure.int)
+        self.figure.redraw()
+
+class Curvature_x(Raw):
+    def __init__(self,figure):
+        super().__init__(figure)
+
+    def run(self):#numpy method
+        if len(self.figure.int.shape) == 2:
+            axis0 = 0
+        else:
+            axis0 = 1
+
+        #1st derivatives in both directions
+        data1_x = np.gradient(self.figure.int, axis=axis0+1)
+        data1_y = np.gradient(self.figure.int, axis=axis0)
+
+        # 2nd derivatives in both directions
+        data2_x  = np.gradient(data1_x, axis=axis0+1)
+        data2_y = np.gradient(data1_y, axis=axis0)
+
+        self.set_values(data2_x,data2_y,data1_x,data1_y)
+
+    def set_values(self,data2_x,data2_y,data1_x,data1_y):
+        self.figure.int = data2_x/(1 + data1_x**2)**(1.5)
+        self.figure.vmin = np.nanmin(self.figure.int)
+        self.figure.vmax = np.nanmax(self.figure.int)
+        self.figure.redraw()
+
+class Curvature_y(Curvature_x):
+    def __init__(self,figure):
+        super().__init__(figure)
+
+    def set_values(self,data2_x,data2_y,data1_x,data1_y):
+        self.figure.int = data2_y/(1 + data1_y**2)**(1.5)
+        self.figure.vmin = np.nanmin(self.figure.int)
+        self.figure.vmax = np.nanmax(self.figure.int)
+        self.figure.redraw()
 
 class Convert_k(Raw):
     def __init__(self,figure):
@@ -437,6 +475,7 @@ class Fermi_level_band(Raw):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
         gold = tk.filedialog.askopenfilename(initialdir=self.figure.sub_tab.data_tab.gui.start_path ,title='gold please')
+        if not gold: return
         self.gold = self.figure.sub_tab.data_tab.data_loader.load_data(gold)
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
