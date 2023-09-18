@@ -232,17 +232,19 @@ class Band_right(Figure):
 
     def intensity(self):
         start,stop,step = self.int_range(self.cut_index)
-        self.int = []
-        for ary in self.figure_handeler.figures['center'].data[3]:
-            self.int.append(np.sum(ary[:,start:stop:1],axis=1)/step)
-        self.int = np.transpose(self.int)
+        temp = np.transpose(self.figure_handeler.figures['center'].data[3])
+        self.int = np.sum(temp[start:stop:1,:,:],axis=0)/step
+        #self.int = []
+        #for ary in self.figure_handeler.figures['center'].data[3]:
+    #        self.int.append(np.sum(ary[:,start:stop:1],axis=1)/step)
+        #self.int = np.transpose(self.int)
 
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[1],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
-        #pos = self.cursor.sta_horizontal_line.get_data()
+        pos = self.cursor.sta_horizontal_line.get_data()#needed to redraw when clicking on FS
 
         difference_array1 = np.absolute(self.data[1]-pos[1])
         self.figure_handeler.figures['corner'].cut_index = difference_array1.argmin()
@@ -272,20 +274,20 @@ class Band_down(Figure):
 
     def intensity(self):
         start,stop,step=self.int_range(self.cut_index)
-        int = []
-        for ary in self.figure_handeler.figures['center'].data[3]:
-            int.append(sum(ary[start:stop:1])/step)
-        self.int = np.array(int)
+        self.int = np.sum(self.figure_handeler.figures['center'].data[3][:,start:stop:1,:],axis=1)/step
+    #    int = []
+    #    for ary in self.figure_handeler.figures['center'].data[3]:
+    #        int.append(sum(ary[start:stop:1])/step)
+    #    self.int = np.array(int)
 
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[0], self.figure_handeler.figures['center'].data[2],self.figure_handeler.figures['center'].data[3]]
 
     def click(self,pos):
         super().click(pos)
-        #pos = self.cursor.sta_vertical_line.get_data()
+        pos = self.cursor.sta_vertical_line.get_data()#needed to redraw when clicking on FS
         difference_array1 = np.absolute(self.data[0]-pos[0])
         self.figure_handeler.figures['corner'].cut_index = difference_array1.argmin()
-
         self.figure_handeler.figures['corner'].intensity_down()
         #self.figure_handeler.figures['corner'].draw()
         self.figure_handeler.figures['corner'].graph2.set_ydata(self.figure_handeler.figures['corner'].int_down)
@@ -346,7 +348,6 @@ class DOS_right_down(Figure):
 
         self.ax.draw_artist(self.graph1)
         self.ax.draw_artist(self.graph2)
-
         self.canvas.blit(self.ax.clipbox)
 
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
