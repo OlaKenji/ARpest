@@ -1,5 +1,9 @@
+import matplotlib
+matplotlib.use('TkAgg')#needed to some reason on the none enviroment
+
 import tkinter as tk
 from tkinter import ttk
+import tkinter.filedialog#needed to some reason on the none enviroment
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -8,10 +12,9 @@ import numpy as np
 import pickle
 import os
 
-import figure_handeler, data_loader, constants, entities
+import figure_handeler, data_loader
 
 #to implement:
-#kz normalise
 #range plots
 #fitting?
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
@@ -19,15 +22,13 @@ import figure_handeler, data_loader, constants, entities
 #select area:
     #normalise based on some selected area?
 #symmetrise based on a reference?
-#phi rotation in k convert?
-#the inital start cut position
-#change colour of specific buttons?
 
 #Bugs:
-#hv scan from SIS is transposed with respect to e.g. bloch
+#the slit issue
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
+#make so that mouse appears automatically at the begining
+#the cuts in kz space is very slow!!!???
 #cursor not showing at the beginnig
-#bg subtarct for fermi surface not applied on all energies
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -37,9 +38,9 @@ import figure_handeler, data_loader, constants, entities
 
 class GUI():#master Gui
     def __init__(self):
-        self.size = constants.window_size
+        self.size = [1920,1080]
         self.window = tk.Tk()
-        self.window.title('ARpest')
+        self.window.title('Apest')
         self.window.state('zoomed')
         self.window.configure(background='white')
         self.design()
@@ -48,38 +49,31 @@ class GUI():#master Gui
         self.open_botton()
 
         self.pop = None
-        self.start_path = constants.start_path
+        self.start_path = '/Users/olakenjiforslund/Library/CloudStorage/OneDrive-Chalmers/Work/Research/Experiment/Data/Photons'
         self.start_screen = Start_screen(self)
 
     def design(self):
         self.style = tk.ttk.Style()
         self.style.theme_use('alt')
         self.style.configure('TButton', background = 'white', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
-
-        self.style.map('gold.TButton', background=[('active','gold')])#when hovering
-        self.style.configure('gold.TButton', background = 'gold', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
-
-        self.style.map('royalblue1.TButton', background=[('active','Royalblue1')])#when hovering
-        self.style.configure('royalblue1.TButton', background = 'Royalblue1', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
-
+        self.style.map('TButton', background=[('active','white')])
         self.style.configure('TFrame', background='white')#makes th frame where plots are white
         self.style.map('TNotebook.Tab', background= [("selected", "white")])#makes the selected tab white
         self.style.configure("TNotebook", background= 'white')#makes ther notebook bg white
-        #self.style.configure('TCheckbutton',indicatorbackground="black", indicatorforeground="white",background="white", foreground="white")
-        #self.style.map('TCheckbutton', foreground=[('disabled', 'blue'),('selected', 'blue'),('!selected', 'grey')],background=[("active", "white")])
-        #self.style.configure("TMenubutton", background="white")
+        self.style.configure('TCheckbutton',indicatorbackground="black", indicatorforeground="white",background="white", foreground="white")
+        self.style.map('TCheckbutton', foreground=[('disabled', 'blue'),('selected', 'blue'),('!selected', 'grey')],background=[("active", "white")])
+        self.style.configure("TMenubutton", background="white")
 
     def tabs(self):
         self.notebook = tk.ttk.Notebook(master = self.window,width=self.size[0],height=self.size[1])#to make tabs
         self.notebook.pack()
 
     def open_botton(self):
-        botton = tk.ttk.Button(self.window,text='open',command=self.open_file,style='royalblue1.TButton')
+        botton = tk.ttk.Button(self.window,text='open',command=self.open_file)
         botton.place(x = 700, y = 0)
 
     def open_file(self):
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
-        if not files: return
         for file in files:
             self.tab = Data_tab(self,file)
         idx = file.rfind('/')+1
@@ -95,7 +89,6 @@ class GUI():#master Gui
         if self.pop == None:
             size_string = kwarg['size']#depends on colur bar or figure
             size = size_string.split(',')
-            sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
 
             lim_string = self.tab.overview.operations.fig_lim_entry.get()#it returns a string
             lim_string2 = lim_string.split(';')
@@ -117,7 +110,7 @@ class GUI():#master Gui
             label_string = self.tab.overview.operations.fig_label_entry.get()#it returns a string
             label = label_string.split(',')
 
-            self.pop = Pop_up(self,sizes,[lim_x,lim_y],label)
+            self.pop = Pop_up(self,[float(size[0]),float(size[1])],[lim_x,lim_y],label)
 
 class Start_screen():#should add general information and such
     def __init__(self,gui):
@@ -182,7 +175,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
         self.gui.notebook.forget(self.tab)
 
     def save_botton(self):
-        botton = tk.ttk.Button(self.tab,text='save',command=self.save, style='gold.TButton')
+        botton = tk.ttk.Button(self.tab,text='save',command=self.save)
         botton.place(x = 1400, y = 750)
 
     def save(self):#things to save
@@ -192,10 +185,8 @@ class Data_tab():#holder for overview tabs. The data is stored here
 
         save_data = {'int_range':self.overview.int_range,'cmap':self.overview.cmap,'instrument':self.gui.start_screen.instrument.get(),
         'colour_scale':self.overview.operations.color_scale.get(),'fig_lim_entry':self.overview.operations.fig_lim_entry.get(),'fig_size_entry':self.overview.operations.fig_size_entry.get(),
-        'fig_label_entry':self.overview.operations.fig_label_entry.get(),'colourbar_size_entry':self.overview.operations.colourbar_size_entry.get(),'colourbar_orientation':self.overview.operations.colourbar_orientation.configure('text')[-1],
-        'vlim':self.overview.operations.vlim_entry.get(),'colourbar_margines':{margin:self.overview.operations.colourbar_margines[margin].get() for margin in self.overview.operations.colourbar_margines.keys()},
-        'fig_margines':{margin:self.overview.operations.fig_margines[margin].get() for margin in self.overview.operations.fig_margines.keys()},'arithmetic_x':self.overview.operations.arithmetic['x'].get(),
-        'arithmetic_y':self.overview.operations.arithmetic['y'].get()}
+        'fig_label_entry':self.overview.operations.fig_label_entry.get(),'colourbar_size_entry':self.overview.operations.colourbar_size_entry.get(),'colourbar_orientation':self.overview.operations.orientation.configure('text')[-1],
+        'vlim':self.overview.operations.vlim_entry.get()}
 
         save_data.update(self.save_figure_specifics())#combine the dicts
         save_data.update(self.overview.data)#combine the dicts
@@ -224,7 +215,6 @@ class Overview():
         self.define_combine_data()
         self.figure_handeler.redraw()
         self.data_tab.notebook.select(self.tab)
-        self.define_update_logbook()
 
     def add_tab(self,name):
         self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
@@ -243,27 +233,16 @@ class Overview():
             columns.append(key)
             data.append(self.data['metadata'][key])
 
-        self.tree = tk.ttk.Treeview(self.tab,columns=columns,show='headings',height=2)
-        verscrlbar = tk.ttk.Scrollbar(self.tab,orient ="horizontal",command = self.tree.xview)
-        self.tree.configure(xscrollcommand=verscrlbar.set)
+        tree = tk.ttk.Treeview(self.tab,columns=columns,show='headings',height=2)
+        verscrlbar = tk.ttk.Scrollbar(self.tab,orient ="horizontal",command = tree.xview)
+        #verscrlbar.place(x = 900, y = 0, width=200+20)
+        tree.configure(xscrollcommand=verscrlbar.set)
 
         for texts in columns:
-            self.tree.heading(texts,text=texts)
-            self.tree.column(texts,width=100,stretch=False)
-        self.tree.insert('',tk.END,values=data,iid = 'log')
-        self.tree.place(x = 890, y = 0, width=610)
-        self.tree.bind("<Double-1>",self.update_logbook)
-
-    def define_update_logbook(self):
-        self.log_entry = tk.ttk.Entry(self.tab, width= 3)#
-        self.log_entry.place(x = 1460, y = 60)
-
-    def update_logbook(self,event):
-        column = self.tree.identify_column(event.x)#where did you click?
-        value = self.log_entry.get()
-        if value == '': return#if nothing there, do nothing
-        self.tree.set('log', column = column, value = value)
-        self.data['metadata'] = self.tree.set('log')
+            tree.heading(texts,text=texts)
+            tree.column(texts,width=100,stretch=False)
+        tree.insert('',tk.END,values=data)
+        tree.place(x = 890, y = 0, width=610)
 
     def append_data_botton(self):#called frin init
         button = tk.ttk.Button(self.tab, text="append data", command = self.append_method)
@@ -280,7 +259,6 @@ class Overview():
 
     def append_method(self):
         files = tk.filedialog.askopenfilenames(initialdir=self.data_tab.gui.start_path ,title='data')
-        if not files: return
         for file in files:
             self.append_data(file)
 
@@ -300,8 +278,8 @@ class Overview():
             data_name = self.catalog.item(index)['values'][0]
             loadded_data = getattr(data_loader, self.data_tab.gui.start_screen.instrument.get())(self.data_tab)#make an object based on string
             scan_data = loadded_data.load_data(self.data_tab.gui.start_path + '/' + data_name)
-            #hv.append(scan_data['metadata']['hv'])#the photon energy
-            hv.append(64+2*num)
+            #scan_data = dl.load_data(self.data_tab.gui.start_path + '/' + data_name)#store the data in the catalog into a dict
+            hv.append(scan_data['metadata']['hv'])#the photon energy
             if num == 0:
                 int = np.atleast_3d(np.transpose(scan_data['data'][0]))
             else:
@@ -315,7 +293,6 @@ class Operations():
     def __init__(self,overview):
         self.overview = overview
         self.make_box()
-
         #general
         self.define_dropdowns()
         self.define_BG()
@@ -325,7 +302,6 @@ class Operations():
         self.define_crusor_position()
         self.define_vlim()
         self.define_set_vlim()
-        self.define_grid()
 
         #operations
         self.define_colour_scale()
@@ -335,7 +311,6 @@ class Operations():
         self.define_symmetrise()
         self.define_derivative()
         self.define_smooth()
-        self.define_curvature()
 
         #figures
         self.define_fig_size()
@@ -343,14 +318,12 @@ class Operations():
         self.define_fig_lim()
         self.define_fig_label()
         self.define_colourbar_orientation()
-        self.define_margines()
 
         #Arithmetic
-        self.define_multiply()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
-        self.notebook.place(x = 890, y = 80)
+        self.notebook.place(x=890,y=80)
         operations = ['General','Operations','Figures','Arithmetic']
         self.operation_tabs = {}
         for operation in operations:
@@ -402,8 +375,7 @@ class Operations():
 
     def select_drop(self,event):
         self.overview.cmap = event
-        self.overview.figure_handeler.draw()
-        self.overview.figure_handeler.colour_bar.update()
+        self.overview.draw()
 
     def define_reset(self):
         button_calc = tk.ttk.Button(self.operation_tabs['General'], text="reset", command = self.overview.figure_handeler.reset)#which figures shoudl have access to this?
@@ -418,31 +390,33 @@ class Operations():
         label.place(x = 150, y = 80)
 
     def define_set_vlim(self):
-        button = tk.ttk.Button(self.operation_tabs['General'], text="set colour limit", command = self.overview.figure_handeler.colour_bar.set_vlim)#which figures shoudl have access to this?
+        button = tk.ttk.Button(self.operation_tabs['General'], text="set colour limit", command = self.overview.figure_handeler.figures['center'].set_vlim)#which figures shoudl have access to this?
         button.place(x = 250, y = 100)
-
-    def define_grid(self):
-        self.grid_button = entities.Button(self, self.operation_tabs['General'],'grid_button',['grid on','grid off'], command = self.overview.figure_handeler.make_grid)
-        self.grid_button.place(x = 250, y = 200)
 
     #operation tab
     def define_BG(self):#generate botton, it will run the figure method
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.subtract_BG)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 0)
-        self.BG_orientation = entities.Button(self, self.operation_tabs['Operations'],'BG_orientation',['horizontal','vertical','EDC'])
-        self.BG_orientation.place(x = 120, y = 0)
+        self.BG_choise()
+
+    def BG_choise(self):
+        choises = ['horizontal','vertical','EDC']
+        self.checkbox = {}
+        for index, choise in enumerate(choises):
+            self.checkbox[choise] = tk.IntVar()
+            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox[choise]).place(x=120,y=30*index)
 
     def define_derivative(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="2nd derivative", command = self.overview.figure_handeler.derivative)#which figures shoudl have access to this?
         button_calc.place(x = 230, y = 0)
-        self.derivative_orientation = entities.Button(self, self.operation_tabs['Operations'],'derivatvive_orientation',['horizontal','vertical'])
-        self.derivative_orientation.place(x = 350, y = 0)
+        self.derivative_choise()
 
-    def define_curvature(self):
-        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Curvature", command = self.overview.figure_handeler.curvature)#which figures shoudl have access to this?
-        button_calc.place(x = 230, y = 50)
-        self.curvature_orientation = entities.Button(self, self.operation_tabs['Operations'],'curvature_orientation',['horizontal','vertical'])
-        self.curvature_orientation.place(x = 350, y = 50)
+    def derivative_choise(self):
+        choises = ['horizontal','vertical']
+        self.checkbox_drivative = {}
+        for index, choise in enumerate(choises):
+            self.checkbox_drivative[choise] = tk.IntVar()
+            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_drivative[choise]).place(x=350,y=30*index)
 
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
@@ -463,8 +437,14 @@ class Operations():
     def define_smooth(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="smooth", command = self.overview.figure_handeler.smooth)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 190)
-        self.smooth_orientation = entities.Button(self, self.operation_tabs['Operations'],'smooth_orientation',['horizontal','vertical'])
-        self.smooth_orientation.place(x = 150, y = 190)
+        self.smooth_choise()
+
+    def smooth_choise(self):
+        choises = ['horizontal','vertical']
+        self.checkbox_smooth = {}
+        for index, choise in enumerate(choises):
+            self.checkbox_smooth[choise] = tk.IntVar()
+            tk.ttk.Checkbutton(self.operation_tabs['Operations'], text=choise, variable=self.checkbox_smooth[choise]).place(x=150,y=190 + 30*index)
 
     #figure tab
     def define_fig_size(self):
@@ -502,38 +482,25 @@ class Operations():
 
     def define_colourbar_size(self):
         self.colourbar_size_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
-        default = self.overview.data.get('colorbar_size_entry','3.3,0.7')
+        default = self.overview.data.get('colorbar_size_entry','4,1')
         self.colourbar_size_entry.insert(0, default)#default text
-        self.colourbar_size_entry.place(x = 0, y = 200)
+        self.colourbar_size_entry.place(x = 0, y = 150)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'colourbar size',background='white',foreground='black')#need to save it to updat the number next to the slide
-        label.place(x = 200, y = 200)
+        label.place(x = 200, y = 150)
 
         button_calc = tk.ttk.Button(self.operation_tabs['Figures'], text="reset", command = self.reset_colorbar_size)#which figures shoudl have access to this?
-        button_calc.place(x = 300, y = 200)
+        button_calc.place(x = 300, y = 150)
 
     def define_colourbar_orientation(self):
-        self.colourbar_orientation = entities.Button(self, self.operation_tabs['Figures'],'colourbar_orientation',['horizontal','vertical'])
-        self.colourbar_orientation.place(x = 100, y = 200)
+        default = self.overview.data.get('colourbar_orientation','horizontal')
+        self.orientation = tk.ttk.Button(self.operation_tabs['Figures'], text="horizontal", command = self.pressing,width = 10)#which figures shoudl have access to this?
+        self.orientation.place(x = 100, y = 150)
 
-    def define_margines(self):
-        margines = ['top','left','right','bottom']
-        self.fig_margines = {}
-        self.colourbar_margines = {}
-        for index, margin in enumerate(margines):
-            self.fig_margines[margin] = tk.ttk.Entry(self.operation_tabs['Figures'], width= 3)#
-            self.colourbar_margines[margin] = tk.ttk.Entry(self.operation_tabs['Figures'], width= 3)#
-
-            default = self.overview.data.get('fig_margines',{'top':0.93,'left':0.18,'right':0.97,'bottom':0.13})
-            self.fig_margines[margin].insert(0, default[margin])#default text
-            self.fig_margines[margin].place(x = 50 + 50*index, y = 20)
-            label = ttk.Label(self.operation_tabs['Figures'],text = margin,background='white',foreground='black')#need to save it to updat the number next to the slide
-            label.place(x = 50 + 50*index, y = 0)
-
-            default = self.overview.data.get('colourbar_margines',{'top':0.9,'left':0.03,'right':0.96,'bottom':0.7})
-            self.colourbar_margines[margin].insert(0, default[margin])#default text
-            self.colourbar_margines[margin].place(x = 50 + 50*index, y = 170)
-            label = ttk.Label(self.operation_tabs['Figures'],text = margin,background='white',foreground='black')#need to save it to updat the number next to the slide
-            label.place(x = 50 + 50*index, y = 150)
+    def pressing(self):
+        if self.orientation.configure('text')[-1] == 'horizontal':
+            self.orientation.configure(text="vertical")
+        else:
+            self.orientation.configure(text="horizontal")
 
     def reset_fig_lim(self):
         self.fig_lim_entry.delete(0, "end")
@@ -541,7 +508,7 @@ class Operations():
 
     def reset_colorbar_size(self):
         self.colourbar_size_entry.delete(0, "end")
-        self.colourbar_size_entry.insert(0, '3.3,0.7')#default text
+        self.colourbar_size_entry.insert(0, '4,1')#default text
 
     def reset_fig_size(self):
         self.fig_size_entry.delete(0, "end")
@@ -551,60 +518,20 @@ class Operations():
         self.fig_label_entry.delete(0, "end")
         self.fig_label_entry.insert(0, 'x,y')#default text
 
-    #Arithmetic
-    def define_multiply(self):
-        self.arithmetic = {'x':None,'y':None}
-        self.arithmetic_botton = {'x':None,'y':None}
-        for index, dir in enumerate(self.arithmetic.keys()):
-            self.arithmetic[dir] = tk.ttk.Entry(self.operation_tabs['Arithmetic'], width= 10)#
-            default = self.overview.data.get('arithmetic_' + dir,'1')
-            self.arithmetic[dir].insert(0, default)#default text
-            self.arithmetic[dir].place(x = 0, y = 50 + index*20)
-            label = ttk.Label(self.operation_tabs['Arithmetic'],text = dir + ' axis',background='white',foreground='black')#need to save it to updat the number next to the slide
-            label.place(x = 200, y = 50 + index*20)
-
-            label2 = ttk.Label(self.operation_tabs['Arithmetic'],text = '/',background='white',foreground='black')#need to save it to updat the number next to the slide
-            label2.place(x = 100, y = 50 + index*20)
-
-            self.arithmetic_botton[dir] = entities.Button(self, self.operation_tabs['Arithmetic'],'arithmetic_scale',['1','pi','2pi'],width = 3)
-            self.arithmetic_botton[dir].place(x = 120, y = 50 + index*20)
-
-        mult_calc = tk.ttk.Button(self.operation_tabs['Arithmetic'], text="multiply", command = self.multiply)
-        mult_calc.place(x = 10, y = 10)
-
-        mult_calc = tk.ttk.Button(self.operation_tabs['Arithmetic'], text="divide", command = self.divide)
-        mult_calc.place(x = 150, y = 10)
-
-    def multiply(self):
-        for index, dir in enumerate(self.arithmetic.keys()):
-            scale = np.pi*int(self.arithmetic_botton[dir].index) #0 -> 0, 1 -> pi, 2 -> 2pi
-            scale = max(scale,1)#if 0, make it 1
-            value = float(self.arithmetic[dir].get())
-            self.overview.figure_handeler.figures['center'].data[index] *= (value/scale)
-        self.overview.figure_handeler.draw()
-
-    def divide(self):
-        for index, dir in enumerate(self.arithmetic.keys()):
-            scale = np.pi*int(self.arithmetic_botton[dir].index) #0 -> 0, 1 -> pi, 2 -> 2pi
-            scale = max(scale,1)#if 0, make it 1
-            value = float(self.arithmetic[dir].get())
-            self.overview.figure_handeler.figures['center'].data[index] /= (value/scale)
-        self.overview.figure_handeler.draw()
-
 class Pop_up():#the pop up window
-    def __init__(self, gui, sizes, lim, label):
+    def __init__(self, gui, size, lim, label):
         self.gui = gui
-        self.fig = plt.Figure(figsize = sizes['size'])
+        self.fig = plt.Figure(figsize=size)
         self.ax = self.fig.add_subplot(111)
         self.lim = lim#will  be updated from figure right clicj
         self.ax.set_xlabel(label[0])
         self.ax.set_ylabel(label[1])
-        self.fig.subplots_adjust(top = float(sizes['top']),left = float(sizes['left']),right = float(sizes['right']), bottom = float(sizes['bottom']))
+        #self.fig.subplots_adjust(top = 0.93,left = 0.15,right = 0.97, bottom = 0.11)
         self.popup = tk.Toplevel()
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.popup)
-        self.canvas.get_tk_widget().pack()
-        NavigationToolbar2Tk(self.canvas, self.popup).update()
-        self.canvas._tkcanvas.pack()
+        self.pop_canvas = FigureCanvasTkAgg(self.fig, master=self.popup)
+        self.pop_canvas.get_tk_widget().pack()
+        NavigationToolbar2Tk(self.pop_canvas, self.popup).update()
+        self.pop_canvas._tkcanvas.pack()
 
         self.popup.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.popup.focus_set()

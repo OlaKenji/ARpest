@@ -13,7 +13,7 @@ class Raw():
         self.original_int = self.figure.int.copy()
 
     def exit(self):
-        pass
+         pass
 
     def run(self):
         self.figure.int = self.original_int.copy()
@@ -144,7 +144,7 @@ class Curvature_y(Curvature_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        self.hv = self.figure.sub_tab.data['metadata']['hv']
+        self.hv = float(self.figure.sub_tab.data['metadata']['hv'])
 
     def run(self):#called when pressing the botton
         self.convert2k()
@@ -159,7 +159,6 @@ class Convert_k(Raw):
     def convert2k(self):
         work_func = 4#usually 4
         k0 = 0.5124 * np.sqrt(self.hv - work_func)
-
         #alpha is the polar or theta -> SIS
         #beta is the tilt -> SIS
 
@@ -167,7 +166,6 @@ class Convert_k(Raw):
         pos1 = self.figure.cursor.sta_horizontal_line.get_data()
         pos2 = self.figure.cursor.sta_vertical_line.get_data()
         dalpha,dbeta = -pos1[1],-pos2[0]#the offsets
-
 
         alpha,beta = self.figure.define_angle2k()#depends on the figure
         a = (alpha + dalpha)*np.pi/180
@@ -179,7 +177,6 @@ class Convert_k(Raw):
         KX = np.empty((nkx, nky))
         KY = np.empty((nkx, nky))
 
-        phi=45
         if self.figure.sub_tab.data_tab.data_loader.orientation == 'horizontal':
             for i in range(nkx):
                 KX[i] = np.sin(b) * np.cos(a[i])
@@ -210,9 +207,9 @@ class Convert_k(Raw):
         number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
 
         axis_y = np.linspace(np.amin(ky[:,max_index[1]]),np.amax(ky[:,max_index[1]]),num = int(number[1]))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
-        axis_x =np.linspace(np.amin(kx[max_index[0]]),np.amax(kx[max_index[0]]),num = int(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
+        axis_x =np.linspace(np.amin(kx[max_index[0]]),np.amax(kx[max_index[0]]),num = int(kx.shape[1]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
 
-        #reshape the intensity
+        #reshape the intensity: under the assumption that x-axis doen't shrink
         intensity = np.zeros((len(axis_y),len(axis_x),len(self.figure.data[2])))#place holder for mesh
         inrange = False#a flag to check if in range
         intensity[:] = np.NaN
@@ -272,9 +269,9 @@ class Convert_kz(Raw):
         ky = np.transpose(np.array(ky))
 
         #to let ppcolormesh handle the interpolation
-        #self.figure.data[0] = kz
-        #self.figure.data[1] = ky
-        #return
+        self.figure.data[0] = kz
+        self.figure.data[1] = ky
+        return
 
         #manually interpolate all layers so that cuts become easier
         self.new_mesh_interpolation(kz,ky)
@@ -290,8 +287,8 @@ class Convert_kz(Raw):
         max_distance = [kx.max() - kx.min(),ky.max() - ky.min()]
         number = [max_distance[0]/min_bin[0],max_distance[1]/min_bin[1]]
 
-        axis_y = np.linspace(ky.min(),ky.max(),num = round(number[1]*0.5))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
-        axis_x =np.linspace(kx.min(),kx.max(),num = round(number[0]))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
+        axis_y = np.linspace(ky.min(),ky.max(),num = min(round(number[1]),800))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
+        axis_x =np.linspace(kx.min(),kx.max(),num = min(round(number[0]),800))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
         axis_z = np.linspace(self.figure.data[2].min(),self.figure.data[2].max(),num = 800)
 
         X, Y = np.meshgrid(axis_x,axis_y)

@@ -85,13 +85,21 @@ class Data_loader():
         metadata = {}
         for key,name,type in self.meta_keys:
             metadata[name] = M2[name]
+        metadata['tilt'] = metadata.get('tilt',0)#for sis data, doesn't seem to store tilt?
 
         result = {}
-        result['data'] = np.transpose(data,(0, 2, 1))
-        result['xscale'] = yscale
-        result['yscale'] = xscale
-        result['zscale'] = energies
-        result['metadata'] = metadata
+        if len(yscale) == 1:#2D ->  some zip data are 2D
+            result['data'] = np.transpose(data,(1, 2, 0))
+            result['xscale'] = energies
+            result['yscale'] = xscale
+            result['zscale'] = yscale
+            result['metadata'] = metadata
+        else:#3D
+            result['data'] = np.transpose(data,(0, 2, 1))
+            result['xscale'] = yscale
+            result['yscale'] = xscale
+            result['zscale'] = energies
+            result['metadata'] = metadata
         return result
 
     @staticmethod
@@ -157,10 +165,10 @@ class Data_loader():
         result['xscale'] = yscale
         result['yscale'] = xscale
         result['zscale'] = zscale
-        result['angles'] = xscale
-        result['theta'] = 0
-        result['phi'] = 0
-        result['E_b'] = 0
+        #result['angles'] = xscale
+        #result['theta'] = 0
+        #result['phi'] = 0
+        #result['E_b'] = 0
         result['metadata'] = metadata
         return result
 
@@ -181,6 +189,7 @@ class Bloch(Data_loader):
                         ('X', 'X', float),
                         ('Y', 'Y', float),
                         ('Z', 'Z', float),
+                        ('ThetaY', 'Deflector', float),
                         ('Pass Energy', 'Pass Energy', int),
                         ('Number of Sweeps', 'Number of Sweeps', int),
                         ('Acquisition Mode', 'Acquisition Mode', str),
@@ -396,11 +405,11 @@ class SIS(Data_loader):
         super().__init__(data_tab)
         self.orientation = 'horizontal'
         self.min_cuts_for_map = 10# Number of cuts that need to be present to assume the data as a map instead of a series of cuts
-        self.meta_keys = [('Excitation Energy', 'hv', float)]#zip files
+        self.meta_keys = [('Excitation Energy', 'hv', float),('Thetay_Low','deflector_low',float),('Thetay_High','deflector_high',float),('Pass Energy','pass energy',float),('Number of Sweeps','number of sweeps',float)]#zip files
 
         #h5 files
         self.meta_keys2 = [('Date Created','Date Created'),('Acquisition Mode','Acquisition Mode'),('Excitation Energy (eV)','hv'),('Pass Energy (eV)','Pass Energy (eV)'),('Specified Number of Sweeps','Specified Number of Sweeps')]
-        self.meta_keys3 = [('Temperature A','Temperature A'),('Temperature B','Temperature B'),('Exit Slit','Exit Slit'),('Phi','azimuth'),('Theta','theta'),('Tilt','tilt'),('X','x'),('Y','y'),('Z','z')]
+        self.meta_keys3 = [('Temperature A (Cryostat)','Temperature A'),('Temperature B (Sample 1)','Temperature B'),('Exit Slit','Exit Slit'),('Phi','azimuth'),('Theta','theta'),('Tilt','tilt'),('X','x'),('Y','y'),('Z','z')]
 
     def load_data(self, filename) :
         if filename.endswith('h5') :
@@ -489,7 +498,6 @@ class SIS(Data_loader):
         # Extract some data for ang2k conversion
         manipulator = self.datfile['Other Instruments']
 
-
         theta = manipulator['Theta'][0]
         #theta = metadata['Tilt'][0]
         phi = manipulator['Phi'][0]
@@ -504,12 +512,13 @@ class SIS(Data_loader):
             metadata[name] = manipulator[key][0]
 
         result = {}
-        result['data'] = data
-        result['xscale'] = xscale
-        result['yscale'] = yscale
+        result['data'] = np.transpose(data,(0, 2, 1))#transpose it to make it same shape as for bloch or diamond
+        result['xscale'] = yscale
+        result['yscale'] = xscale
         result['zscale'] = energies
         result['angles'] = angles
         result['theta'] = theta
         result['phi'] = phi
         result['E_b'] = E_b
         result['metadata'] = metadata
+        return result

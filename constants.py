@@ -8,5 +8,5 @@ figure_grid = [448,430]
 figure_size = {'size':[4.4,4.3], 'top': 0.93, 'left': 0.15, 'right': 0.97, 'bottom' : 0.11}
 
 #colour bar
-colourbar_position = [780,410]
-colourbar_size = {'size':[7.4,1], 'top': 0.93, 'left': 0.15, 'right': 0.97, 'bottom' : 0.5}
+colourbar_position = [885,410]
+colourbar_size = {'size':[6.35,1], 'top': 0.93, 'left': 0.01, 'right': 0.97, 'bottom' : 0.5}

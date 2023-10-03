@@ -1,12 +1,11 @@
-import figure, processing, constants
+import figure, processing
 
 class Figure_handeler():
     def __init__(self,data_tab):
-        self.data_tab = data_tab#overview
-        self.pos = constants.figure_position#posirion of the main figure
-        self.size = constants.figure_grid#figure canvas size
+        self.data_tab = data_tab
+        self.pos = [0,0]#posirion of the main figure
+        self.size = [445,430]#figure canvas size
         self.make_figures()
-        self.colour_bar = figure.Colour_bar(self)
 
     def update_intensity(self):#called after k convert or fermi adjust
         for key in self.figures.keys():
@@ -34,6 +33,11 @@ class Figure_handeler():
         for figure in self.figures.values():
             figure.redraw()
 
+    def update_colour_scale(self,value):
+        for figure in self.figures.values():
+            figure.update_colour_scale()
+        self.redraw()
+
     #methods
     def k_convert(self):#called when pressed the botton
         adjust = processing.Convert_k(self.figures['center'])
@@ -43,28 +47,20 @@ class Figure_handeler():
         pass
 
     def derivative(self):#called when pushing the 2nd derivative botton
-        if self.data_tab.operations.derivative_orientation.configure('text')[-1] == 'horizontal':
+        if self.data_tab.operations.checkbox_drivative['horizontal'].get():
             adjust = processing.Derivative_x(self.figures['center'])
         else:#vertical
             adjust = processing.Derivative_y(self.figures['center'])
         adjust.run()
         self.draw()
 
-    def curvature(self):#called when pushing the 2nd derivative botton
-        if self.data_tab.operations.curvature_orientation.configure('text')[-1] == 'horizontal':
-            adjust = processing.Curvature_x(self.figures['center'])
-        else:#vertical
-            adjust = processing.Curvature_y(self.figures['center'])
-        adjust.run()
-        self.draw()
-
-    def reset(self):#the reset bottom -> need to also set the original axes
+    def reset(self):#the reset bottom
         self.figures['center'].int = self.figures['center'].original_int
         self.figures['center'].update_colour_scale()
         self.draw()
 
     def smooth(self):#the smooth botton
-        if self.data_tab.operations.smooth_orientation.configure('text')[-1] == 'horizontal':
+        if self.data_tab.operations.checkbox_smooth['horizontal'].get():
             adjust = processing.Smooth_x(self.figures['center'])
         else:
             adjust = processing.Smooth_y(self.figures['center'])
@@ -74,28 +70,9 @@ class Figure_handeler():
     def save(self):
         self.figures['center'].save()
 
-    def update_colour_scale(self,value = 0):#called from slider
-        value = self.data_tab.operations.color_scale.get()#value of the colour scale
-        vmax = self.colour_bar.vlim[1]*float(value)/100
-        self.colour_bar.vlim_set = [self.colour_bar.vlim[0],vmax]#for the pop up window -> should just be called once
-        self.data_tab.operations.label3.configure(text = (round(float(value),1)))#update the number next to int range slide -> should just be called once
-
-        for figure in self.twoD:#update the 2D figures
-            self.figures[figure].update_colour_scale()
-        self.colour_bar.update()
-        self.redraw()
-
-    def make_grid(self):#called from botton
-        self.figures['center'].grid = not self.figures['center'].grid#this shoudl only be called when pressing the botton....        
-        self.figures['center'].make_grid(self.figures['center'].ax)
-
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
         super().__init__(data_tab)
-        self.twoD = ['center','right','down']
-
-        for fig in self.twoD:#update the 2D figures
-            self.figures[fig].update_colour_scale()
 
     def make_figures(self):
         figures = {'center':figure.FS,'right':figure.Band_right,'down':figure.Band_down,'corner':figure.DOS_right_down}
@@ -118,10 +95,6 @@ class Threedimension(Figure_handeler):#fermi surface
 class Twodimension(Figure_handeler):#band
     def __init__(self,data_tab):
         super().__init__(data_tab)
-        self.twoD = ['center']
-
-        for fig in self.twoD:#update the 2D figures
-            self.figures[fig].update_colour_scale()
 
     def make_figures(self):
         figures = {'center':figure.Band,'right':figure.DOS_right,'down':figure.DOS_down}
