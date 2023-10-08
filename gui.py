@@ -21,10 +21,10 @@ import figure_handeler, data_loader, constants, entities
 #symmetrise based on a reference?
 #phi rotation in k convert?
 #the inital start cut position
-#change colour of specific buttons?
+#compare 1D graphs
 
 #Bugs:
-#hv scan from SIS is transposed with respect to e.g. bloch
+#binding energy plots are transposed with respect to kinetic energy
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #cursor not showing at the beginnig
 #bg subtarct for fermi surface not applied on all energies
@@ -44,10 +44,9 @@ class GUI():#master Gui
         self.window.configure(background='white')
         self.design()
 
-        self.tabs()
+        self.notebook()
         self.open_botton()
 
-        self.pop = None
         self.start_path = constants.start_path
         self.start_screen = Start_screen(self)
 
@@ -62,14 +61,20 @@ class GUI():#master Gui
         self.style.map('royalblue1.TButton', background=[('active','Royalblue1')])#when hovering
         self.style.configure('royalblue1.TButton', background = 'Royalblue1', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
 
+        self.style.map('toggle.TButton', background=[('active','powderblue')])#when hovering
+        self.style.configure('toggle.TButton', background = 'powderblue', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
+
         self.style.configure('TFrame', background='white')#makes th frame where plots are white
         self.style.map('TNotebook.Tab', background= [("selected", "white")])#makes the selected tab white
         self.style.configure("TNotebook", background= 'white')#makes ther notebook bg white
+
+        self.style.configure("TScale", background="white")#makes ther notebook bg white
+
         #self.style.configure('TCheckbutton',indicatorbackground="black", indicatorforeground="white",background="white", foreground="white")
         #self.style.map('TCheckbutton', foreground=[('disabled', 'blue'),('selected', 'blue'),('!selected', 'grey')],background=[("active", "white")])
         #self.style.configure("TMenubutton", background="white")
 
-    def tabs(self):
+    def notebook(self):
         self.notebook = tk.ttk.Notebook(master = self.window,width=self.size[0],height=self.size[1])#to make tabs
         self.notebook.pack()
 
@@ -81,43 +86,12 @@ class GUI():#master Gui
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
         if not files: return
         for file in files:
-            self.tab = Data_tab(self,file)
+            tab = Data_tab(self,file)
         idx = file.rfind('/')+1
         self.start_path = file[:idx]#save the folder path so you start here next time
 
     def run(self):
         self.window.mainloop()
-        #while True:
-            #self.window.update_idletasks()
-            #self.window.update()
-
-    def pop_up(self,**kwarg):#called from figure right click or colour bar
-        if self.pop == None:
-            size_string = kwarg['size']#depends on colur bar or figure
-            size = size_string.split(',')
-            sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
-
-            lim_string = self.tab.overview.operations.fig_lim_entry.get()#it returns a string
-            lim_string2 = lim_string.split(';')
-            lim_x = lim_string2[0].split(',')
-            lim_y = lim_string2[1].split(',')
-
-            for index, x in enumerate(lim_x):
-                if x == 'None':
-                    lim_x[index] = None
-                else:
-                    lim_x[index] = float(x)
-
-            for index, y in enumerate(lim_y):
-                if y == 'None':
-                    lim_y[index] = None
-                else:
-                    lim_y[index] = float(y)
-
-            label_string = self.tab.overview.operations.fig_label_entry.get()#it returns a string
-            label = label_string.split(',')
-
-            self.pop = Pop_up(self,sizes,[lim_x,lim_y],label)
 
 class Start_screen():#should add general information and such
     def __init__(self,gui):
@@ -147,6 +121,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
         self.save_botton()
         self.overview = Overview(self,data)#automatically open overview
         self.gui.notebook.select(self.tab)
+        self.pop = None
 
     def define_data_loader(self, file):
         self.data_loader = getattr(data_loader, self.gui.start_screen.instrument.get())(self)#make an object based on string
@@ -209,6 +184,34 @@ class Data_tab():#holder for overview tabs. The data is stored here
             data[type(self.overview.figure_handeler.figures[key]).__name__ + 'cursor_pos'] = self.overview.figure_handeler.figures[key].cursor.pos
         return data
 
+    def pop_up(self,**kwarg):#called from figure right click or colour bar
+        if self.pop == None:
+            size_string = kwarg['size']#depends on colur bar or figure
+            size = size_string.split(',')
+            sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
+
+            lim_string = self.overview.operations.fig_lim_entry.get()#it returns a string
+            lim_string2 = lim_string.split(';')
+            lim_x = lim_string2[0].split(',')
+            lim_y = lim_string2[1].split(',')
+
+            for index, x in enumerate(lim_x):
+                if x == 'None':
+                    lim_x[index] = None
+                else:
+                    lim_x[index] = float(x)
+
+            for index, y in enumerate(lim_y):
+                if y == 'None':
+                    lim_y[index] = None
+                else:
+                    lim_y[index] = float(y)
+
+            label_string = self.overview.operations.fig_label_entry.get()#it returns a string
+            label = label_string.split(',')
+
+            self.pop = Pop_up(self,sizes,[lim_x,lim_y],label)
+
 class Overview():
     def __init__(self, data_tab, data):
         self.data_tab = data_tab
@@ -224,7 +227,7 @@ class Overview():
         self.define_combine_data()
         self.figure_handeler.redraw()
         self.data_tab.notebook.select(self.tab)
-        self.define_update_logbook()
+        self.define_update_logbook()     
 
     def add_tab(self,name):
         self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
@@ -336,6 +339,8 @@ class Operations():
         self.define_derivative()
         self.define_smooth()
         self.define_curvature()
+        self.define_normalise()
+        self.define_orientation_botton()
 
         #figures
         self.define_fig_size()
@@ -389,7 +394,7 @@ class Operations():
         drop.place(x = 0, y = 0)
 
     def define_crusorslope(self):
-        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=-45,to=45,orient='horizontal',command = self.overview.figure_handeler.figures['center'].cursor.update_slope)#
+        scale = tk.ttk.Scale(self.operation_tabs['General'],from_=-45,to=45,orient='horizontal',command = self.overview.figure_handeler.figures['center'].cursor.update_slope,style="TScale")#
         scale.place(x = 0, y = 150)
         label=ttk.Label(self.operation_tabs['General'],text='slope',background='white',foreground='black')
         label.place(x = 0, y = 130)
@@ -423,26 +428,30 @@ class Operations():
 
     def define_grid(self):
         self.grid_button = entities.Button(self, self.operation_tabs['General'],'grid_button',['grid on','grid off'], command = self.overview.figure_handeler.make_grid)
-        self.grid_button.place(x = 250, y = 200)
+        self.grid_button.place(x = 150, y = 50)
 
     #operation tab
-    def define_BG(self):#generate botton, it will run the figure method
-        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.subtract_BG)#which figures shoudl have access to this?
-        button_calc.place(x = 0, y = 0)
-        self.BG_orientation = entities.Button(self, self.operation_tabs['Operations'],'BG_orientation',['horizontal','vertical','EDC'])
-        self.BG_orientation.place(x = 120, y = 0)
+    def define_orientation_botton(self):
+        self.orientation_botton = entities.Button(self, self.operation_tabs['Operations'],'orientation_botton',['horizontal','vertical'])
+        self.orientation_botton.place(x = 350, y = 0)
 
     def define_derivative(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="2nd derivative", command = self.overview.figure_handeler.derivative)#which figures shoudl have access to this?
-        button_calc.place(x = 230, y = 0)
-        self.derivative_orientation = entities.Button(self, self.operation_tabs['Operations'],'derivatvive_orientation',['horizontal','vertical'])
-        self.derivative_orientation.place(x = 350, y = 0)
+        button_calc.place(x = 350, y = 70)
+
+    def define_smooth(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="smooth", command = self.overview.figure_handeler.smooth)#which figures shoudl have access to this?
+        button_calc.place(x = 350, y = 100)
 
     def define_curvature(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Curvature", command = self.overview.figure_handeler.curvature)#which figures shoudl have access to this?
-        button_calc.place(x = 230, y = 50)
-        self.curvature_orientation = entities.Button(self, self.operation_tabs['Operations'],'curvature_orientation',['horizontal','vertical'])
-        self.curvature_orientation.place(x = 350, y = 50)
+        button_calc.place(x = 350, y = 130)
+
+    def define_BG(self):#generate botton, it will run the figure method
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="BG", command = self.overview.figure_handeler.subtract_BG)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 0)
+        self.BG_orientation = entities.Button(self, self.operation_tabs['Operations'],'BG_orientation',['horizontal','vertical','EDC','bg Matt'])
+        self.BG_orientation.place(x = 120, y = 0)
 
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
@@ -460,11 +469,10 @@ class Operations():
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="symmetrise", command = self.overview.figure_handeler.symmetrise)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 160)
 
-    def define_smooth(self):
-        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="smooth", command = self.overview.figure_handeler.smooth)#which figures shoudl have access to this?
-        button_calc.place(x = 0, y = 190)
-        self.smooth_orientation = entities.Button(self, self.operation_tabs['Operations'],'smooth_orientation',['horizontal','vertical'])
-        self.smooth_orientation.place(x = 150, y = 190)
+    #not in use
+    def define_normalise(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Normalise slice", command = self.overview.figure_handeler.normalise)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 220)
 
     #figure tab
     def define_fig_size(self):
@@ -592,8 +600,8 @@ class Operations():
         self.overview.figure_handeler.draw()
 
 class Pop_up():#the pop up window
-    def __init__(self, gui, sizes, lim, label):
-        self.gui = gui
+    def __init__(self, data_tab, sizes, lim, label):
+        self.data_tab = data_tab
         self.fig = plt.Figure(figsize = sizes['size'])
         self.ax = self.fig.add_subplot(111)
         self.lim = lim#will  be updated from figure right clicj
@@ -618,7 +626,7 @@ class Pop_up():#the pop up window
 
     def on_closing(self):
         self.popup.destroy()
-        self.gui.pop = None
+        self.data_tab.pop = None
 
 if __name__ == "__main__":
     gui = GUI()

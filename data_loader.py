@@ -1,9 +1,12 @@
+
 import zipfile
 import h5py
 import numpy as np
 from igor import binarywave#implement reading igor file
 import pickle
 import sys
+from datetime import datetime
+from dateutil import parser
 
 def start_step_n(start, step, n) :
     """
@@ -227,8 +230,11 @@ class I05(Data_loader):
         super().__init__(data_tab)
         self.orientation = 'vertical'
         self.meta_keys = [#the metadata to show in GUI: it will show in this order with the name accotidng yo second column
-                        ('Time', 'Time', str),
+                        ('time', 'count time', float),
                         ('Excitation Energy', 'hv', float),
+                        ('polarisation', 'polarisation', float),
+                        ('temperature', 'temperature', float),
+                        ('deflector_x', 'deflector_x', float),
                         ('saazimuth', 'azimuth', float),
                         ('sapolar', 'polar', float),
                         ('satilt', 'tilt', float),
@@ -241,8 +247,8 @@ class I05(Data_loader):
                         ('kinetic_energy_center', 'Center Energy', float),
                         ('kinetic_energy_start', 'Low Energy', float),
                         ('kinetic_energy_end', 'High Energy', float),
-                        ('kinetic_energy_step', 'Energy Step', float)
-                        #('Thetay_StepSize', 'Thetay_StepSize', float),
+                        ('kinetic_energy_step', 'Energy Step', float),
+                        ('Time', 'Time', str)
                     #    ('Comments', 'Comments', str)
                         ]
 
@@ -262,6 +268,9 @@ class I05(Data_loader):
         angles = np.array(infile['/entry1/analyser/angles'])
         energies = np.array(infile['/entry1/analyser/energies'])
         hv = np.array(infile['/entry1/instrument/monochromator/energy'])
+        start = infile['/entry1/start_time'][()].decode('utf-8')
+        end = infile['/entry1/end_time'][()].decode('utf-8')
+        total_time = parser.parse(end)-parser.parse(start)
 
         if len(energies.shape)==2:#I have added, needed for new data
             energies = energies[0]
@@ -340,11 +349,15 @@ class I05(Data_loader):
 
         M2 = {}
         M2['Time'] = str(np.array(infile['/entry1/start_time']))
-        M2['Excitation Energy'] = hv[0]#hv is a list
+        M2['Excitation Energy'] = hv#hv is a list
+        M2['polarisation'] = np.array(infile['/entry1/instrument/insertion_device/beam/final_polarisation_label'])
+        M2['time'] = total_time
         for position in np.array(infile['/entry1/instrument/manipulator']):
             M2[position] = np.array(infile['/entry1/instrument/manipulator/'+position])[0]
         for ana in np.array(infile['/entry1/instrument/analyser']):
             M2[ana] = str(np.array(infile['/entry1/instrument/analyser/'+ana]))
+        for sample in np.array(infile['/entry1/sample']):
+            M2[sample] = str(np.array(infile['/entry1/sample/'+sample]))
 
         #print(M2)
         metadata = {}

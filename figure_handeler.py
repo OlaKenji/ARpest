@@ -1,4 +1,5 @@
 import figure, processing, constants
+import numpy as np
 
 class Figure_handeler():
     def __init__(self,data_tab):
@@ -43,7 +44,7 @@ class Figure_handeler():
         pass
 
     def derivative(self):#called when pushing the 2nd derivative botton
-        if self.data_tab.operations.derivative_orientation.configure('text')[-1] == 'horizontal':
+        if self.data_tab.operations.orientation_botton.configure('text')[-1] == 'horizontal':
             adjust = processing.Derivative_x(self.figures['center'])
         else:#vertical
             adjust = processing.Derivative_y(self.figures['center'])
@@ -51,7 +52,7 @@ class Figure_handeler():
         self.draw()
 
     def curvature(self):#called when pushing the 2nd derivative botton
-        if self.data_tab.operations.curvature_orientation.configure('text')[-1] == 'horizontal':
+        if self.data_tab.operations.orientation_botton.configure('text')[-1] == 'horizontal':
             adjust = processing.Curvature_x(self.figures['center'])
         else:#vertical
             adjust = processing.Curvature_y(self.figures['center'])
@@ -64,7 +65,7 @@ class Figure_handeler():
         self.draw()
 
     def smooth(self):#the smooth botton
-        if self.data_tab.operations.smooth_orientation.configure('text')[-1] == 'horizontal':
+        if self.data_tab.operations.orientation_botton.configure('text')[-1] == 'horizontal':
             adjust = processing.Smooth_x(self.figures['center'])
         else:
             adjust = processing.Smooth_y(self.figures['center'])
@@ -86,7 +87,7 @@ class Figure_handeler():
         self.redraw()
 
     def make_grid(self):#called from botton
-        self.figures['center'].grid = not self.figures['center'].grid#this shoudl only be called when pressing the botton....        
+        self.figures['center'].grid = not self.figures['center'].grid#this shoudl only be called when pressing the botton....
         self.figures['center'].make_grid(self.figures['center'].ax)
 
 class Threedimension(Figure_handeler):#fermi surface
@@ -114,6 +115,15 @@ class Threedimension(Figure_handeler):#fermi surface
 
     def subtract_BG(self):
         self.figures['right'].subtract_BG()
+
+    def normalise(self):
+        temp = np.transpose(self.figures['center'].data[3],(2, 0, 1))
+        for index, ary in enumerate(temp):#divide each angle with maximum
+            self.figures['center'].data[3][:,:,index] = ary/np.amax(ary)#now it just devide it with maximum. should take the average below EF
+        self.figures['center'].intensity()#updayte the intensoty
+        self.update_intensity()#updayte the intensoty
+        self.colour_bar.update()#update colour bar
+        self.draw()#update self.graph
 
 class Twodimension(Figure_handeler):#band
     def __init__(self,data_tab):
@@ -143,3 +153,6 @@ class Twodimension(Figure_handeler):#band
 
     def subtract_BG(self):
         self.figures['center'].subtract_BG()
+
+    def normalise(self):
+        pass

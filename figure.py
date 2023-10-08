@@ -15,24 +15,6 @@ class Functions():#figure functionality not being used
     def subtract_BG(self):#the BG botton calls it
         pass
 
-    #not in use
-    def define_normalise(self):
-        self.define_norm_entry()
-        button_calc = tk.Button(self.sub_tab.tab, text="Normalise", command = self.normalise)
-        offset = [200,0]
-        button_calc.place(x = self.pos[0]+offset[0], y = self.pos[1]+offset[1])
-
-    def define_norm_entry(self):
-        self.e1 = tk.Entry(self.sub_tab.tab,width=2)#the step size
-        offset = [300,0]
-        self.e1.place(x = self.pos[0] + offset[0], y = self.pos[1] + offset[1])
-        self.e1.insert(0, 1)#default value 1
-
-    def normalise(self):
-        norm = float(self.e1.get())
-        self.int = self.int/norm
-        self.draw()
-
     def make_grid(self,ax):#called when pressing the botton, from figure handlere
         ax.grid(self.grid)#self.grid toggles when pressing the botton
         self.canvas.draw()#would like to blit it instead somehow
@@ -77,6 +59,10 @@ class Figure(Functions):
         self.blank_background = self.fig.canvas.copy_from_bbox(self.ax.get_figure().bbox)#including the axis
         self.canvas.get_tk_widget().bind( "<Button-2>", self.right_click)#right click
         self.canvas.get_tk_widget().bind( "<Double-Button-1>", self.double_click)#double click
+
+        self.menue = tk.Menu(self.sub_tab.tab, tearoff = 0)
+        self.menue.add_command(label = "new", command=self.pop_up)
+        self.menue.add_command(label = "add")
 
     def mouse_range(self):#used for crusor
         self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]
@@ -124,13 +110,19 @@ class Figure(Functions):
         self.cursor.redraw()
 
     def right_click(self,event):
-        self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.fig_size_entry.get(),top = self.sub_tab.operations.fig_margines['top'].get(),left = self.sub_tab.operations.fig_margines['left'].get(),right = self.sub_tab.operations.fig_margines['right'].get(),bottom = self.sub_tab.operations.fig_margines['bottom'].get())#call gui to make a new window object
-        self.plot(self.sub_tab.data_tab.gui.pop.ax)#plot the fraph onto the popup ax
-        self.make_grid(self.sub_tab.data_tab.gui.pop.ax)
-        self.sub_tab.data_tab.gui.pop.graph = self.graph
-        self.sub_tab.data_tab.gui.pop.set_vlim(self.figure_handeler.colour_bar.vlim_set[0],self.figure_handeler.colour_bar.vlim_set[1])
-        self.sub_tab.data_tab.gui.pop.set_lim()
-        self.sub_tab.data_tab.gui.pop.canvas.draw()#draw it after plot
+        try:
+            self.menue.tk_popup(event.x_root, event.y_root)
+        finally:#called when selecting
+            self.menue.grab_release()
+
+    def pop_up(self):
+        self.sub_tab.data_tab.pop_up(size = self.sub_tab.operations.fig_size_entry.get(),top = self.sub_tab.operations.fig_margines['top'].get(),left = self.sub_tab.operations.fig_margines['left'].get(),right = self.sub_tab.operations.fig_margines['right'].get(),bottom = self.sub_tab.operations.fig_margines['bottom'].get())#call gui to make a new window object
+        self.plot(self.sub_tab.data_tab.pop.ax)#plot the fraph onto the popup ax
+        self.make_grid(self.sub_tab.data_tab.pop.ax)
+        self.sub_tab.data_tab.pop.graph = self.graph
+        self.sub_tab.data_tab.pop.set_vlim(self.figure_handeler.colour_bar.vlim_set[0],self.figure_handeler.colour_bar.vlim_set[1])
+        self.sub_tab.data_tab.pop.set_lim()
+        self.sub_tab.data_tab.pop.canvas.draw()#draw it after plot
         self.plot(self.ax)#this is to re-updathe self.graph to the proper figure
 
     def draw(self):
@@ -391,6 +383,11 @@ class Band(Figure):
             self.int = np.transpose(int)
         elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
             self.int = self.int - self.figures['down'].int[None,:]#subtract the EDC from each row in data
+        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'bg Matt':#EDC bg subtract
+            for index, ary in enumerate(np.transpose(self.int[200:600,:])):#MDCs -> deifine the area...
+                self.int[:,index] -= np.nanmin(ary)
+                #plt.plot(ary)
+                #plt.show()
 
         self.draw()
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
@@ -515,7 +512,7 @@ class Colour_bar(Figure):
         self.bar.draw_all()
         self.canvas.draw()
 
-    def right_click(self,event):#the popup window
+    def pop_up(self):#the popup window
         self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.colourbar_size_entry.get(),top = self.sub_tab.operations.colourbar_margines['top'].get(),left = self.sub_tab.operations.colourbar_margines['left'].get(),right = self.sub_tab.operations.colourbar_margines['right'].get(),bottom = self.sub_tab.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
         orientation = self.sub_tab.operations.colourbar_orientation.configure('text')[-1]
         self.sub_tab.data_tab.gui.pop.fig.colorbar(self.figure_handler.figures['center'].graph,cax = self.sub_tab.data_tab.gui.pop.ax,orientation=orientation,label = 'Intensity')
