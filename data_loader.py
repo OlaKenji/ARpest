@@ -249,7 +249,6 @@ class I05(Data_loader):
                         ('kinetic_energy_end', 'High Energy', float),
                         ('kinetic_energy_step', 'Energy Step', float),
                         ('Time', 'Time', str)
-                    #    ('Comments', 'Comments', str)
                         ]
 
     def load_data(self, filename) :
@@ -262,15 +261,17 @@ class I05(Data_loader):
 
     def load_from_nxs(self, filename) :
         # Read file with h5py reader
-
         infile = h5py.File(filename, 'r')
         data = np.array(infile['/entry1/analyser/data']).T
         angles = np.array(infile['/entry1/analyser/angles'])
         energies = np.array(infile['/entry1/analyser/energies'])
-        hv = np.array(infile['/entry1/instrument/monochromator/energy'])
-        start = infile['/entry1/start_time'][()].decode('utf-8')
-        end = infile['/entry1/end_time'][()].decode('utf-8')
-        total_time = parser.parse(end)-parser.parse(start)
+
+        try:
+            start = infile['/entry1/start_time'][()].decode('utf-8')
+            end = infile['/entry1/end_time'][()].decode('utf-8')
+            total_time = parser.parse(end)-parser.parse(start)
+        except:
+            total_time = 0
 
         if len(energies.shape)==2:#I have added, needed for new data
             energies = energies[0]
@@ -338,18 +339,9 @@ class I05(Data_loader):
                 xscale = np.arange(start, stop+0.5*step, step)
 
         # What we usually call theta is tilt in this beamline
-        theta = infile['entry1/instrument/manipulator/satilt'][0]
-        phi = infile['entry1/instrument/manipulator/sapolar'][0]
-
-        # Take the mean of the given binding energies as an estimate
-        try :
-            E_b = -np.mean(infile['entry1/analyser/binding_energies'])
-        except KeyError :
-            E_b = -np.mean(infile['entry1/analyser/energies'])
-
         M2 = {}
         M2['Time'] = str(np.array(infile['/entry1/start_time']))
-        M2['Excitation Energy'] = hv#hv is a list
+        M2['Excitation Energy'] = np.array(infile['/entry1/instrument/monochromator/energy'])#it is a list
         M2['polarisation'] = np.array(infile['/entry1/instrument/insertion_device/beam/final_polarisation_label'])
         M2['time'] = total_time
         for position in np.array(infile['/entry1/instrument/manipulator']):
@@ -359,9 +351,8 @@ class I05(Data_loader):
         for sample in np.array(infile['/entry1/sample']):
             M2[sample] = str(np.array(infile['/entry1/sample/'+sample]))
 
-        #print(M2)
         metadata = {}
-        for key,name,type in self.meta_keys:
+        for key,name,types in self.meta_keys:
             try:
                 metadata[name] = M2[key]
             except:
@@ -372,10 +363,6 @@ class I05(Data_loader):
         result['xscale'] = xscale
         result['yscale'] = yscale
         result['zscale'] = zscale
-        result['angles'] = angles
-        result['theta'] = theta
-        result['phi'] = phi
-        result['E_b'] = E_b
         result['metadata'] = metadata
         return result
 

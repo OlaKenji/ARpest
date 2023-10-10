@@ -90,6 +90,9 @@ class Figure_handeler():
         self.figures['center'].grid = not self.figures['center'].grid#this shoudl only be called when pressing the botton....
         self.figures['center'].make_grid(self.figures['center'].ax)
 
+    def subtract_BG(self):
+        self.figures['center'].subtract_BG()
+
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
         super().__init__(data_tab)
@@ -113,17 +116,17 @@ class Threedimension(Figure_handeler):#fermi surface
         adjust = processing.Convert_kz(self.figures['center'])
         adjust.run()
 
-    def subtract_BG(self):
-        self.figures['right'].subtract_BG()
-
     def normalise(self):
         temp = np.transpose(self.figures['center'].data[3],(2, 0, 1))
         for index, ary in enumerate(temp):#divide each angle with maximum
-            self.figures['center'].data[3][:,:,index] = ary/np.amax(ary)#now it just devide it with maximum. should take the average below EF
+            self.figures['center'].data[3][:,:,index] =  100000000*len(ary)*ary/np.sum(ary)#need to multiply woth large number to compensate for the fact that it becomes int, and not float
         self.figures['center'].intensity()#updayte the intensoty
         self.update_intensity()#updayte the intensoty
         self.colour_bar.update()#update colour bar
         self.draw()#update self.graph
+
+    def integrate(self):
+        pass
 
 class Twodimension(Figure_handeler):#band
     def __init__(self,data_tab):
@@ -144,15 +147,17 @@ class Twodimension(Figure_handeler):#band
         adjust = processing.Fermi_level_band(self.figures['center'])
         adjust.run()
 
-    def kz_convert(self):#called when pressed the botton -> make can be diabled if it is 2D?
+    def kz_convert(self):#called when pressed the botton -> can be diabled if it is 2D?
         pass
 
     def symmetrise(self):#called when pressed the botton
         adjust = processing.Symmetrise(self.figures['center'])
         adjust.run()
 
-    def subtract_BG(self):
-        self.figures['center'].subtract_BG()
-
     def normalise(self):
         pass
+
+    def integrate(self):
+        self.figures['right'].integrate()
+        self.figures['down'].integrate()
+        self.redraw()

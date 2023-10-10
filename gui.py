@@ -11,7 +11,6 @@ import os
 import figure_handeler, data_loader, constants, entities
 
 #to implement:
-#kz normalise
 #range plots
 #fitting?
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
@@ -21,13 +20,15 @@ import figure_handeler, data_loader, constants, entities
 #symmetrise based on a reference?
 #phi rotation in k convert?
 #the inital start cut position
-#compare 1D graphs
+#normalisation by division of gold
+#log teling what has been done
+#figure handlere state stack can saves each operation in memory
 
 #Bugs:
 #binding energy plots are transposed with respect to kinetic energy
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #cursor not showing at the beginnig
-#bg subtarct for fermi surface not applied on all energies
+#figure changes colour for new pop up -> send self instead of just self.ax
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -49,6 +50,7 @@ class GUI():#master Gui
 
         self.start_path = constants.start_path
         self.start_screen = Start_screen(self)
+        self.pop = []
 
     def design(self):
         self.style = tk.ttk.Style()
@@ -86,12 +88,40 @@ class GUI():#master Gui
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
         if not files: return
         for file in files:
-            tab = Data_tab(self,file)
+            self.tab = Data_tab(self,file)
         idx = file.rfind('/')+1
         self.start_path = file[:idx]#save the folder path so you start here next time
 
     def run(self):
         self.window.mainloop()
+
+    def pop_up(self,**kwarg):#called from figure right click or colour bar
+        if not self.pop:#if empty
+            size_string = kwarg['size']#depends on colur bar or figure
+            size = size_string.split(',')
+            sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
+
+            lim_string = self.tab.overview.operations.fig_lim_entry.get()#it returns a string
+            lim_string2 = lim_string.split(';')
+            lim_x = lim_string2[0].split(',')
+            lim_y = lim_string2[1].split(',')
+
+            for index, x in enumerate(lim_x):
+                if x == 'None':
+                    lim_x[index] = None
+                else:
+                    lim_x[index] = float(x)
+
+            for index, y in enumerate(lim_y):
+                if y == 'None':
+                    lim_y[index] = None
+                else:
+                    lim_y[index] = float(y)
+
+            label_string = self.tab.overview.operations.fig_label_entry.get()#it returns a string
+            label = label_string.split(',')
+
+            self.pop.append(Pop_up(self,sizes,[lim_x,lim_y],label))
 
 class Start_screen():#should add general information and such
     def __init__(self,gui):
@@ -121,7 +151,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
         self.save_botton()
         self.overview = Overview(self,data)#automatically open overview
         self.gui.notebook.select(self.tab)
-        self.pop = None
+        self.pop = []
 
     def define_data_loader(self, file):
         self.data_loader = getattr(data_loader, self.gui.start_screen.instrument.get())(self)#make an object based on string
@@ -161,7 +191,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
         botton.place(x = 1400, y = 750)
 
     def save(self):#things to save
-        path = tk.filedialog.asksaveasfile(initialdir = self.gui.start_path ,title='data')
+        path = tk.filedialog.asksaveasfile(initialdir = self.gui.start_path ,title='data',initialfile=self.name)
         os.remove(path.name)#tk inter automatically makes a file. So this should be deleted becasuse we wil lmake a file with pickle
         self.overview.figure_handeler.save()
 
@@ -174,7 +204,7 @@ class Data_tab():#holder for overview tabs. The data is stored here
 
         save_data.update(self.save_figure_specifics())#combine the dicts
         save_data.update(self.overview.data)#combine the dicts
-        with open(path.name+'.okf', "wb") as outfile:
+        with open(path.name + '.okf', "wb") as outfile:
             pickle.dump(save_data,outfile)
 
     def save_figure_specifics(self):
@@ -185,32 +215,31 @@ class Data_tab():#holder for overview tabs. The data is stored here
         return data
 
     def pop_up(self,**kwarg):#called from figure right click or colour bar
-        if self.pop == None:
-            size_string = kwarg['size']#depends on colur bar or figure
-            size = size_string.split(',')
-            sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
+        size_string = kwarg['size']#depends on colur bar or figure
+        size = size_string.split(',')
+        sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
 
-            lim_string = self.overview.operations.fig_lim_entry.get()#it returns a string
-            lim_string2 = lim_string.split(';')
-            lim_x = lim_string2[0].split(',')
-            lim_y = lim_string2[1].split(',')
+        lim_string = self.overview.operations.fig_lim_entry.get()#it returns a string
+        lim_string2 = lim_string.split(';')
+        lim_x = lim_string2[0].split(',')
+        lim_y = lim_string2[1].split(',')
 
-            for index, x in enumerate(lim_x):
-                if x == 'None':
-                    lim_x[index] = None
-                else:
-                    lim_x[index] = float(x)
+        for index, x in enumerate(lim_x):
+            if x == 'None':
+                lim_x[index] = None
+            else:
+                lim_x[index] = float(x)
 
-            for index, y in enumerate(lim_y):
-                if y == 'None':
-                    lim_y[index] = None
-                else:
-                    lim_y[index] = float(y)
+        for index, y in enumerate(lim_y):
+            if y == 'None':
+                lim_y[index] = None
+            else:
+                lim_y[index] = float(y)
 
-            label_string = self.overview.operations.fig_label_entry.get()#it returns a string
-            label = label_string.split(',')
+        label_string = self.overview.operations.fig_label_entry.get()#it returns a string
+        label = label_string.split(',')
 
-            self.pop = Pop_up(self,sizes,[lim_x,lim_y],label)
+        self.pop.append(Pop_up(self,sizes,[lim_x,lim_y],label))
 
 class Overview():
     def __init__(self, data_tab, data):
@@ -227,7 +256,7 @@ class Overview():
         self.define_combine_data()
         self.figure_handeler.redraw()
         self.data_tab.notebook.select(self.tab)
-        self.define_update_logbook()     
+        self.define_update_logbook()
 
     def add_tab(self,name):
         self.tab = tk.ttk.Frame(self.data_tab.notebook, style='My.TFrame')
@@ -240,22 +269,21 @@ class Overview():
             self.figure_handeler = figure_handeler.Threedimension(self)
 
     def logbook(self):
-        columns=[]
-        data=[]
+        columns, data = [], []
         for key in self.data['metadata']:
             columns.append(key)
             data.append(self.data['metadata'][key])
 
         self.tree = tk.ttk.Treeview(self.tab,columns=columns,show='headings',height=2)
-        verscrlbar = tk.ttk.Scrollbar(self.tab,orient ="horizontal",command = self.tree.xview)
-        self.tree.configure(xscrollcommand=verscrlbar.set)
+        #verscrlbar = tk.ttk.Scrollbar(self.tab,orient ="horizontal",command = self.tree.xview)
+        #self.tree.configure(xscrollcommand=verscrlbar.set)
 
         for texts in columns:
             self.tree.heading(texts,text=texts)
             self.tree.column(texts,width=100,stretch=False)
         self.tree.insert('',tk.END,values=data,iid = 'log')
         self.tree.place(x = 890, y = 0, width=610)
-        self.tree.bind("<Double-1>",self.update_logbook)
+        self.tree.bind("<Double-1>",self.update_logbook)#, lambda e, tr = self.tree: tr.tk.call(tr._w,'xview', 'scroll', 1, 'units')
 
     def define_update_logbook(self):
         self.log_entry = tk.ttk.Entry(self.tab, width= 3)#
@@ -341,6 +369,7 @@ class Operations():
         self.define_curvature()
         self.define_normalise()
         self.define_orientation_botton()
+        self.define_integrate()
 
         #figures
         self.define_fig_size()
@@ -468,6 +497,10 @@ class Operations():
     def define_symmetrise(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="symmetrise", command = self.overview.figure_handeler.symmetrise)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 160)
+
+    def define_integrate(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="integrate", command = self.overview.figure_handeler.integrate)#which figures shoudl have access to this?
+        button_calc.place(x = 0, y = 190)
 
     #not in use
     def define_normalise(self):
@@ -626,7 +659,7 @@ class Pop_up():#the pop up window
 
     def on_closing(self):
         self.popup.destroy()
-        self.data_tab.pop = None
+        self.data_tab.pop.remove(self)
 
 if __name__ == "__main__":
     gui = GUI()
