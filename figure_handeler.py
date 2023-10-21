@@ -1,4 +1,4 @@
-import figure, processing, constants
+import figure, processing, constants, data_handler
 import numpy as np
 
 class Figure_handeler():
@@ -6,18 +6,25 @@ class Figure_handeler():
         self.data_tab = data_tab#overview
         self.pos = constants.figure_position#posirion of the main figure
         self.size = constants.figure_grid#figure canvas size
+        self.int_range = self.data_tab.data_handler.data_stack[0].save_dict.get('int_range',0)#should be moved to operations?
+        self.cmap = self.data_tab.data_handler.data_stack[0].save_dict.get('cmap','RdYlBu_r')#should be moved to operations?
         self.make_figures()
+
         self.colour_bar = figure.Colour_bar(self)
 
+    def new_stack(self):#called when a new stack is attached
+        self.update_sort_data()
+        self.update_intensity()
+        self.draw()
+        self.update_mouse_range()
+
     def update_intensity(self):#called after k convert or fermi adjust
-        for key in self.figures.keys():
-            if key == 'center': continue
-            self.figures[key].intensity()
+        for figure in self.figures.values():
+            figure.intensity()
 
     def update_sort_data(self):#called after k convert or fermi adjust
-        for key in self.figures.keys():
-            if key == 'center': continue
-            self.figures[key].sort_data()
+        for figure in self.figures.values():
+            figure.sort_data()
 
     def update_mouse_range(self):#called after k convert or fermi adjust
         for figure in self.figures.values():
@@ -59,16 +66,8 @@ class Figure_handeler():
         adjust.run()
         self.draw()
 
-    def reset(self):#the reset bottom -> need to also set the original axes
-        self.figures['center'].int = self.figures['center'].original_int
-        self.figures['center'].update_colour_scale()
-        self.draw()
-
     def smooth(self):#the smooth botton
-        if self.data_tab.operations.orientation_botton.configure('text')[-1] == 'horizontal':
-            adjust = processing.Smooth_x(self.figures['center'])
-        else:
-            adjust = processing.Smooth_y(self.figures['center'])
+        adjust = processing.Smooth(self.figures['center'],self.data_tab.operations.orientation_botton.configure('text')[-1])
         adjust.run()
         self.draw()
 
@@ -97,7 +96,6 @@ class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,data_tab):
         super().__init__(data_tab)
         self.twoD = ['center','right','down']
-
         for fig in self.twoD:#update the 2D figures
             self.figures[fig].update_colour_scale()
 
@@ -116,14 +114,19 @@ class Threedimension(Figure_handeler):#fermi surface
         adjust = processing.Convert_kz(self.figures['center'])
         adjust.run()
 
-    def normalise(self):
+    def normalise(self):#normalise slice
         temp = np.transpose(self.figures['center'].data[3],(2, 0, 1))
+        temp2 = self.figures['center'].data[3].copy()
         for index, ary in enumerate(temp):#divide each angle with maximum
-            self.figures['center'].data[3][:,:,index] =  100000000*len(ary)*ary/np.sum(ary)#need to multiply woth large number to compensate for the fact that it becomes int, and not float
-        self.figures['center'].intensity()#updayte the intensoty
-        self.update_intensity()#updayte the intensoty
-        self.colour_bar.update()#update colour bar
-        self.draw()#update self.graph
+            temp2[:,:,index] =  100000000*len(ary)*ary/np.sum(ary)#need to multiply woth large number to compensate for the fact that it becomes int, and not float
+
+        dict = self.data_tab.data_handler.data.data[-1].copy()
+        dict['data'] = temp2
+        self.data_tab.data_handler.data.add_state(dict,'normalise')
+
+        self.data_tab.data_handler.append_state('normalise', len(self.data_tab.data_handler.data.states))
+        self.data_tab.data_handler.update_catalog()
+        self.new_stack()
 
     def integrate(self):
         pass
@@ -132,7 +135,6 @@ class Twodimension(Figure_handeler):#band
     def __init__(self,data_tab):
         super().__init__(data_tab)
         self.twoD = ['center']
-
         for fig in self.twoD:#update the 2D figures
             self.figures[fig].update_colour_scale()
 

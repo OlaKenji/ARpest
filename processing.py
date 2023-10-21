@@ -6,6 +6,7 @@ from scipy import ndimage
 from scipy.optimize import curve_fit
 from scipy import interpolate
 import data_loader
+import copy
 
 class Raw():
     def __init__(self,figure):
@@ -18,14 +19,14 @@ class Raw():
     def run(self):
         self.figure.int = self.original_int.copy()
 
-class Smooth_x(Raw):
-    def __init__(self,figure):
+class Smooth(Raw):
+    def __init__(self,figure,direction):
         super().__init__(figure)
-        self.direction = 'x'
+        self.direction = direction
 
-    def run(self,kernel_size = 40):
+    def run(self, kernel_size = 40):
         data = self.figure.int
-        direction={'x':-1,'y':0}[self.direction]
+        direction={'horizontal':-1,'vertical':0}[self.direction]
         kern = np.hanning(kernel_size)   # a Hanning window with width 50
         kern /= kern.sum()      # normalize the kernel weights to sum to 1
         smooth_data = ndimage.convolve1d(data, kern, axis = direction)#axis =0 is y, axis = -1 is x
@@ -34,23 +35,23 @@ class Smooth_x(Raw):
     def smooth2(self,data,kernel_size = 40):#not as good
         kernel = np.ones(kernel_size) / kernel_size
         smooth_data = data#place holrder
-        if self.direction == 'x':#smooth in x direction
+        if self.direction == 'horizontal':#smooth in x direction
             for index, row in enumerate(data):
                 smooth_data[index] = np.convolve(row, kernel, mode='same')
-        elif self.direction == 'y':#smooth in y direction
+        elif self.direction == 'vertical':#smooth in y direction
             for i in range(0,len(data[0])):
                 col=data[:,i]
                 smooth_data[:,i] = np.convolve(col, kernel, mode='same')
         return smooth_data
 
     def set_values(self,smooth):
-        self.figure.int = smooth
+        dict = copy.deepcopy(self.figure.sub_tab.data_handler.data.data[self.figure.sub_tab.data_handler.data.index])
+        dict['data'][:] = smooth.copy()
+        self.figure.sub_tab.data_handler.data.add_state(dict,'smooth' + self.direction)
+        self.figure.sub_tab.data_handler.append_state('smooth' + self.direction, len(self.figure.sub_tab.data_handler.data.states))
+        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.figure_handeler.new_stack()
         self.figure.update_colour_scale()
-
-class Smooth_y(Smooth_x):
-    def __init__(self,figure):
-        super().__init__(figure)
-        self.direction = 'y'
 
 class Derivative_x(Raw):
     def __init__(self,figure):
@@ -88,7 +89,7 @@ class Derivative_x(Raw):
             axis0 = 1
 
         #1st derivatives in both directions
-        data1_x = np.gradient(self.figure.int, axis=axis0+1)
+        data1_x = np.gradient(self.figure.int, axis=axis0 + 1)
         data1_y = np.gradient(self.figure.int, axis=axis0)
 
         # 2nd derivatives in both directions
@@ -98,16 +99,26 @@ class Derivative_x(Raw):
         self.set_values(data2_x,data2_y)
 
     def set_values(self,data2_x,data2_y):
-        self.figure.int = data2_x
-        self.figure.redraw()
+        dict = copy.deepcopy(self.figure.sub_tab.data_handler.data.data[self.figure.sub_tab.data_handler.data.index])
+        dict['data'][:] = data2_x.copy()
+        self.figure.sub_tab.data_handler.data.add_state(dict,'derivative_x')
+        self.figure.sub_tab.data_handler.append_state('derivative_x', len(self.figure.sub_tab.data_handler.data.states))
+        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.figure_handeler.new_stack()
+        self.figure.update_colour_scale()
 
 class Derivative_y(Derivative_x):
     def __init__(self,figure):
         super().__init__(figure)
 
     def set_values(self,data2_x,data2_y):
-        self.figure.int = -data2_y
-        self.figure.redraw()
+        dict = copy.deepcopy(self.figure.sub_tab.data_handler.data.data[self.figure.sub_tab.data_handler.data.index])
+        dict['data'][:] = -data2_y.copy()
+        self.figure.sub_tab.data_handler.data.add_state(dict,'derivative_y')
+        self.figure.sub_tab.data_handler.append_state('derivative_y', len(self.figure.sub_tab.data_handler.data.states))
+        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.figure_handeler.new_stack()
+        self.figure.update_colour_scale()
 
 class Curvature_x(Raw):
     def __init__(self,figure):
@@ -144,17 +155,13 @@ class Curvature_y(Curvature_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        self.hv = float(self.figure.sub_tab.data['metadata']['hv'])
+        self.hv = float(self.figure.sub_tab.data_handler.data.get_data('metadata')['hv'])
 
     def run(self):#called when pressing the botton
         self.convert2k()
-        self.update_figure()
-
-    def update_figure(self):
-        self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure
-        self.figure.figure_handeler.update_intensity()#update the cuts, but avoid for main figure
-        self.figure.figure_handeler.draw()
-        self.figure.figure_handeler.update_mouse_range()
+        self.figure.sub_tab.data_handler.append_state('k_convert', len(self.figure.sub_tab.data_handler.data.states))
+        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.figure_handeler.new_stack()
 
     def convert2k(self):
         work_func = 4#usually 4
@@ -192,7 +199,9 @@ class Convert_k(Raw):
                 KY[i] = cos_theta * np.sin(a[i])
 
         if KY.shape[1] == 1:#2D, band
-            self.figure.data[1] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))
+            dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+            dict['yscale'] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))#update
+            self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
         else:#3D, FS
             self.new_mesh_all(k0*KX,k0*KY)
 
@@ -231,10 +240,11 @@ class Convert_k(Raw):
                     inrange = True
                 intensity[row][col][:] = real_int
 
-        self.figure.data[3] = np.transpose(intensity,(2, 0, 1))
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-        self.figure.intensity()
+        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict['yscale'] = axis_y
+        dict['xscale'] = axis_x
+        dict['data'] = np.transpose(intensity,(2, 0, 1))
+        self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
 
 class Convert_kz(Raw):
     def __init__(self,figure):
@@ -242,13 +252,9 @@ class Convert_kz(Raw):
 
     def run(self):
         self.converthv()
-        self.update_figure()
-
-    def update_figure(self):
-        self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure
-        self.figure.figure_handeler.update_intensity()#update the cuts, but avoid for main figure
-        self.figure.figure_handeler.draw()
-        self.figure.figure_handeler.update_mouse_range()
+        self.figure.sub_tab.data_handler.append_state('k_convert', len(self.figure.sub_tab.data_handler.data.states))
+        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.figure_handeler.new_stack()
 
     def converthv(self):#convert to kz
         q = 1.60218*10**-19#charge
@@ -269,13 +275,14 @@ class Convert_kz(Raw):
         ky = np.transpose(np.array(ky))
 
         #to let ppcolormesh handle the interpolation
-        self.figure.data[0] = kz
-        self.figure.data[1] = ky
+        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict['xscale'] = kz
+        dict['yscale'] = ky
+        self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
         return
 
         #manually interpolate all layers so that cuts become easier
         self.new_mesh_interpolation(kz,ky)
-        #self.new_mesh_all(kz,ky)
 
     def new_mesh_interpolation(self,kx,ky):
         min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
@@ -300,16 +307,12 @@ class Convert_kz(Raw):
             Z[:,:,index] = interp(X,Y).T
             print(index/len(axis_z))
 
-        #X,Y,Z = np.meshgrid(axis_x,axis_y,axis_z, indexing='ij')
-        #points = [self.figure.data[2],self.figure.data[1],self.figure.data[0]]
-        #interp = interpolate.RegularGridInterpolator(points,self.figure.data[3],bounds_error=False,fill_value = None)
-        #Z = interp((X,Y,Z))
-
-        self.figure.data[0] = axis_x
-        self.figure.data[1] = axis_y
-        self.figure.data[2] = axis_z
-        self.figure.data[3] = np.transpose(Z,(2, 1, 0))
-        self.figure.intensity()
+        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict['xscale'] = axis_x
+        dict['yscale'] = axis_y
+        dict['zscale'] = axis_z
+        dict['data'] = np.transpose(Z,(2, 1, 0))
+        self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
 
     def new_mesh_all(self,kx,ky):#manually interpolate each layer at once -> doesn't look perfect
         min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
@@ -469,29 +472,26 @@ class Fermi_level_band(Raw):#only the main figure
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
         self.W = 4.38#work function [eV]
-        self.hv = self.figure.sub_tab.data['metadata']['hv']
+        self.hv = float(self.figure.sub_tab.data_handler.data.get_data('metadata')['hv'])
         self.e_0 = self.hv - self.W#initial guess of fermi level
         self.T = 10#K the temperature
 
     def run(self):
         self.fit()#kevins stuff
         self.pixel_shift()
-        self.normalise()
         self.update_figure()
+        self.normalise()
 
     def update_figure(self):
-        self.figure.figure_handeler.update_intensity()#update the cuts, but avoid for main figure
-        self.figure.figure_handeler.update_sort_data()#update the cuts, but avoid for main figure -> this is not wokring if you do k space first since the FS will be a 2D arrat, while band wants 1D
-        self.figure.figure_handeler.figures['center'].colour_limit()
-        self.figure.figure_handeler.figures['center'].update_colour_scale()
-
-        self.figure.figure_handeler.draw()
+        self.figure.sub_tab.data_handler.append_state('fermilevel', len(self.figure.sub_tab.data_handler.data.states))
+        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.figure_handeler.new_stack()
         self.figure.figure_handeler.update_mouse_range()
 
     def normalise(self):
-        difference_array = np.absolute(self.gold['xscale'] - self.EF.min())#subtract for each channel, works.
+        difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
         index1 = np.argmin(difference_array)
-        int = self.gold['data'][0][:,0:index1]/len(self.gold['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
+        int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
         total_MDC = np.nansum(int,axis=1)#of gold
         self.figure.int = (self.figure.int.T/total_MDC).T#works for 2D
 
@@ -536,13 +536,15 @@ class Fermi_level_band(Raw):#only the main figure
 
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:]))
 
-        self.figure.data[0] = new_axis
-        self.figure.int = new_intensity
+        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict['xscale'] = new_axis
+        dict['data'] = np.transpose(np.atleast_3d(new_intensity),(2,0,1))
+        self.figure.sub_tab.data_handler.data.add_state(dict,'fermilevel')
 
     def fit(self):
-        gold = self.gold['data'][0]
+        gold = self.gold[0]['data'][0]
         n_pixels, n_energies = gold.shape
-        energies = self.gold['xscale']
+        energies = self.gold[0]['xscale']
 
         params = []
         functions = []
@@ -676,13 +678,15 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
         new_intensity = np.array(new_intensity)
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:,0]))
 
-        self.figure.data[2] = new_axis
-        self.figure.data[3] = np.transpose(new_intensity, (1, 0, 2))
+        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict['zscale'] = new_axis
+        dict['data'] = np.transpose(new_intensity, (1, 0, 2))
+        self.figure.sub_tab.data_handler.data.add_state(dict,'fermilevel')
 
     def normalise(self):
-        difference_array = np.absolute(self.gold['xscale'] - self.EF.min())#subtract for each channel, works.
+        difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
         index1 = np.argmin(difference_array)
-        int = self.gold['data'][0][:,0:index1]/len(self.gold['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
+        int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
         total_MDC = np.nansum(int,axis=1)#of gold
         self.figure.data[3] = self.figure.data[3]/total_MDC[:,None]
 

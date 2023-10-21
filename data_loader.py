@@ -1,11 +1,9 @@
-
 import zipfile
 import h5py
 import numpy as np
 from igor import binarywave#implement reading igor file
 import pickle
 import sys
-from datetime import datetime
 from dateutil import parser
 
 def start_step_n(start, step, n) :
@@ -24,8 +22,8 @@ class Data_loader():
         with open(file,'rb') as fp:
             result = pickle.load(fp)
         #should these be here?
-        self.data_tab.gui.start_screen.instrument.set(result['instrument'])#update the instruent for this file
-        self.orientation =  getattr(sys.modules[__name__], result['instrument'])(None).orientation#set laso the orientation for this file
+        self.data_tab.gui.start_screen.instrument.set(result[0][0].save_dict['instrument'])#update the instruent for this file
+        self.orientation =  getattr(sys.modules[__name__], result[0][0].save_dict['instrument'])(None).orientation#set laso the orientation for this file
         return result
 
     @staticmethod
@@ -103,7 +101,7 @@ class Data_loader():
             result['yscale'] = xscale
             result['zscale'] = energies
             result['metadata'] = metadata
-        return result
+        return [result]
 
     @staticmethod
     def read_viewer(viewer) :
@@ -173,7 +171,7 @@ class Data_loader():
         #result['phi'] = 0
         #result['E_b'] = 0
         result['metadata'] = metadata
-        return result
+        return [result]
 
     def origanise_data(self,data,xscale,yscale,M2):#for max iv
         return data, xscale, yscale, None
@@ -364,7 +362,7 @@ class I05(Data_loader):
         result['yscale'] = yscale
         result['zscale'] = zscale
         result['metadata'] = metadata
-        return result
+        return [result]
 
 class URANOS(Data_loader):
     def __init__(self,data_tab):
@@ -516,9 +514,5 @@ class SIS(Data_loader):
         result['xscale'] = yscale
         result['yscale'] = xscale
         result['zscale'] = energies
-        result['angles'] = angles
-        result['theta'] = theta
-        result['phi'] = phi
-        result['E_b'] = E_b
         result['metadata'] = metadata
-        return result
+        return [result]

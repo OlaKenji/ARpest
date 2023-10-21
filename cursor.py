@@ -11,7 +11,7 @@ class Auto_cursor():
         self.ylimits = self.figure.ylimits
 
         self.center = [(self.xlimits[0]+self.xlimits[-1])*0.5,(self.ylimits[0]+self.ylimits[-1])*0.5]
-        self.pos = self.figure.sub_tab.data.get(type(self.figure).__name__ + 'cursor_pos', self.center.copy())
+        self.pos = self.figure.sub_tab.data_handler.data.get(type(self.figure).__name__ + 'cursor_pos', self.center.copy())
 
         self.dyn_horizontal_line = self.figure.ax.axhline(self.pos[1],color='k', lw=1, ls='--',zorder=3)
         self.dyn_vertical_line = self.figure.ax.axvline(self.pos[0],color='k', lw=1, ls='--',zorder=3)
@@ -46,8 +46,8 @@ class Auto_cursor():
         return [scalex*(self.xlimits[1]-self.xlimits[0])+self.xlimits[0],scaley*(self.ylimits[0]-self.ylimits[1])+self.ylimits[1]]
 
     def update_line_width(self):#254 seems to cover the whole plot. how to calculate exactly?
-        self.sta_horizontal_line.set_linewidth(254*(self.figure.sub_tab.int_range*2+1)/len(self.figure.data[1]))
-        self.sta_vertical_line.set_linewidth(254*(self.figure.sub_tab.int_range*2+1)/len(self.figure.data[0]))
+        self.sta_horizontal_line.set_linewidth(254*(self.figure.sub_tab.figure_handeler.int_range*2+1)/len(self.figure.data[1]))
+        self.sta_vertical_line.set_linewidth(254*(self.figure.sub_tab.figure_handeler.int_range*2+1)/len(self.figure.data[0]))
         self.redraw()
 
     def on_mouse_move(self, event):
