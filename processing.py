@@ -45,11 +45,11 @@ class Smooth(Raw):
         return smooth_data
 
     def set_values(self,smooth):
-        dict = copy.deepcopy(self.figure.sub_tab.data_handler.data.data[self.figure.sub_tab.data_handler.data.index])
+        dict = copy.deepcopy(self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index])
         dict['data'][:] = smooth.copy()
-        self.figure.sub_tab.data_handler.data.add_state(dict,'smooth' + self.direction)
-        self.figure.sub_tab.data_handler.append_state('smooth' + self.direction, len(self.figure.sub_tab.data_handler.data.states))
-        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.overview.data_handler.file.add_state(dict,'smooth' + self.direction)
+        self.figure.overview.data_handler.state_catalog.append_state('smooth' + self.direction, len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.update_catalog()
         self.figure.figure_handeler.new_stack()
         self.figure.update_colour_scale()
 
@@ -99,11 +99,11 @@ class Derivative_x(Raw):
         self.set_values(data2_x,data2_y)
 
     def set_values(self,data2_x,data2_y):
-        dict = copy.deepcopy(self.figure.sub_tab.data_handler.data.data[self.figure.sub_tab.data_handler.data.index])
+        dict = copy.deepcopy(self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index])
         dict['data'][:] = data2_x.copy()
-        self.figure.sub_tab.data_handler.data.add_state(dict,'derivative_x')
-        self.figure.sub_tab.data_handler.append_state('derivative_x', len(self.figure.sub_tab.data_handler.data.states))
-        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.overview.data_handler.file.add_state(dict,'derivative_x')
+        self.figure.overview.data_handler.state_catalog.append_state('derivative_x', len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.update_catalog()
         self.figure.figure_handeler.new_stack()
         self.figure.update_colour_scale()
 
@@ -112,11 +112,11 @@ class Derivative_y(Derivative_x):
         super().__init__(figure)
 
     def set_values(self,data2_x,data2_y):
-        dict = copy.deepcopy(self.figure.sub_tab.data_handler.data.data[self.figure.sub_tab.data_handler.data.index])
+        dict = copy.deepcopy(self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index])
         dict['data'][:] = -data2_y.copy()
-        self.figure.sub_tab.data_handler.data.add_state(dict,'derivative_y')
-        self.figure.sub_tab.data_handler.append_state('derivative_y', len(self.figure.sub_tab.data_handler.data.states))
-        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.overview.data_handler.file.add_state(dict,'derivative_y')
+        self.figure.overview.data_handler.state_catalog.append_state('derivative_y', len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.update_catalog()
         self.figure.figure_handeler.new_stack()
         self.figure.update_colour_scale()
 
@@ -155,12 +155,12 @@ class Curvature_y(Curvature_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        self.hv = float(self.figure.sub_tab.data_handler.data.get_data('metadata')['hv'])
+        self.hv = float(self.figure.overview.data_handler.file.get_data('metadata')['hv'])
 
     def run(self):#called when pressing the botton
         self.convert2k()
-        self.figure.sub_tab.data_handler.append_state('k_convert', len(self.figure.sub_tab.data_handler.data.states))
-        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.overview.data_handler.state_catalog.append_state('k_convert', len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.update_catalog()
         self.figure.figure_handeler.new_stack()
 
     def convert2k(self):
@@ -184,12 +184,12 @@ class Convert_k(Raw):
         KX = np.empty((nkx, nky))
         KY = np.empty((nkx, nky))
 
-        if self.figure.sub_tab.data_tab.data_loader.orientation == 'horizontal':
+        if self.figure.overview.data_tab.data_loader.orientation == 'horizontal':
             for i in range(nkx):
                 KX[i] = np.sin(b) * np.cos(a[i])
                 KY[i] = np.sin(a[i])
 
-        elif self.figure.sub_tab.data_tab.data_loader.orientation == 'vertical':
+        elif self.figure.overview.data_tab.data_loader.orientation == 'vertical':
             # Precalculate outside the loop
             theta_k = beta*np.pi/180
             cos_theta = np.cos(theta_k)
@@ -199,9 +199,9 @@ class Convert_k(Raw):
                 KY[i] = cos_theta * np.sin(a[i])
 
         if KY.shape[1] == 1:#2D, band
-            dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+            dict = self.figure.overview.data_handler.file.data[-1].copy()
             dict['yscale'] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))#update
-            self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
+            self.figure.overview.data_handler.file.add_state(dict,'k_convert')
         else:#3D, FS
             self.new_mesh_all(k0*KX,k0*KY)
 
@@ -240,11 +240,11 @@ class Convert_k(Raw):
                     inrange = True
                 intensity[row][col][:] = real_int
 
-        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[-1].copy()
         dict['yscale'] = axis_y
         dict['xscale'] = axis_x
         dict['data'] = np.transpose(intensity,(2, 0, 1))
-        self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
+        self.figure.overview.data_handler.file.add_state(dict,'k_convert')
 
 class Convert_kz(Raw):
     def __init__(self,figure):
@@ -252,8 +252,8 @@ class Convert_kz(Raw):
 
     def run(self):
         self.converthv()
-        self.figure.sub_tab.data_handler.append_state('k_convert', len(self.figure.sub_tab.data_handler.data.states))
-        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.overview.data_handler.state_catalog.append_state('k_convert', len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.update_catalog()
         self.figure.figure_handeler.new_stack()
 
     def converthv(self):#convert to kz
@@ -275,10 +275,10 @@ class Convert_kz(Raw):
         ky = np.transpose(np.array(ky))
 
         #to let ppcolormesh handle the interpolation
-        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[-1].copy()
         dict['xscale'] = kz
         dict['yscale'] = ky
-        self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
+        self.figure.overview.data_handler.file.add_state(dict,'k_convert')
         return
 
         #manually interpolate all layers so that cuts become easier
@@ -307,12 +307,12 @@ class Convert_kz(Raw):
             Z[:,:,index] = interp(X,Y).T
             print(index/len(axis_z))
 
-        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[-1].copy()
         dict['xscale'] = axis_x
         dict['yscale'] = axis_y
         dict['zscale'] = axis_z
         dict['data'] = np.transpose(Z,(2, 1, 0))
-        self.figure.sub_tab.data_handler.data.add_state(dict,'k_convert')
+        self.figure.overview.data_handler.file.add_state(dict,'k_convert')
 
     def new_mesh_all(self,kx,ky):#manually interpolate each layer at once -> doesn't look perfect
         min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
@@ -409,12 +409,12 @@ class Convert_kz(Raw):
         KX = np.empty((nkx, nky))
         KY = np.empty((nkx, nky))
 
-        if self.figure.sub_tab.data_tab.data_loader.orientation == 'horizontal':
+        if self.figure.overview.data_tab.data_loader.orientation == 'horizontal':
             for i in range(nkx):
                 KX[i] = np.sin(b) * np.cos(a[i])
                 KY[i] = np.sin(a[i])
 
-        if self.figure.sub_tab.data_tab.data_loader.orientation == 'vertical':
+        if self.figure.overview.data_tab.data_loader.orientation == 'vertical':
             # Precalculate outside the loop
             theta_k = beta*np.pi/180
             cos_theta = np.cos(theta_k)
@@ -446,12 +446,12 @@ class Convert_kz(Raw):
         KX = np.empty((nkx, nky))
         KY = np.empty((nkx, nky))
 
-        if self.figure.sub_tab.data_tab.data_loader.orientation == 'horizontal':
+        if self.figure.overview.data_tab.data_loader.orientation == 'horizontal':
             for i in range(nkx):
                 KX[i] = np.sin(b) * np.cos(a[i])
                 KY[i] = np.sin(a[i])
 
-        if self.figure.sub_tab.data_tab.data_loader.orientation == 'vertical':
+        if self.figure.overview.data_tab.data_loader.orientation == 'vertical':
             # Precalculate outside the loop
             theta_k = beta*np.pi/180
             cos_theta = np.cos(theta_k)
@@ -466,13 +466,13 @@ class Convert_kz(Raw):
 class Fermi_level_band(Raw):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
-        gold = tk.filedialog.askopenfilename(initialdir=self.figure.sub_tab.data_tab.gui.start_path ,title='gold please')
+        gold = tk.filedialog.askopenfilename(initialdir=self.figure.overview.data_tab.gui.start_path ,title='gold please')
         if not gold: return
-        self.gold = self.figure.sub_tab.data_tab.data_loader.load_data(gold)
+        self.gold = self.figure.overview.data_tab.data_loader.load_data(gold)
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
         self.W = 4.38#work function [eV]
-        self.hv = float(self.figure.sub_tab.data_handler.data.get_data('metadata')['hv'])
+        self.hv = float(self.figure.overview.data_handler.file.get_data('metadata')['hv'])
         self.e_0 = self.hv - self.W#initial guess of fermi level
         self.T = 10#K the temperature
 
@@ -483,8 +483,8 @@ class Fermi_level_band(Raw):#only the main figure
         self.normalise()
 
     def update_figure(self):
-        self.figure.sub_tab.data_handler.append_state('fermilevel', len(self.figure.sub_tab.data_handler.data.states))
-        self.figure.sub_tab.data_handler.update_catalog()
+        self.figure.overview.data_handler.state_catalog.append_state('fermilevel', len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.update_catalog()
         self.figure.figure_handeler.new_stack()
         self.figure.figure_handeler.update_mouse_range()
 
@@ -536,10 +536,10 @@ class Fermi_level_band(Raw):#only the main figure
 
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:]))
 
-        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[-1].copy()
         dict['xscale'] = new_axis
         dict['data'] = np.transpose(np.atleast_3d(new_intensity),(2,0,1))
-        self.figure.sub_tab.data_handler.data.add_state(dict,'fermilevel')
+        self.figure.overview.data_handler.file.add_state(dict,'fermilevel')
 
     def fit(self):
         gold = self.gold[0]['data'][0]
@@ -678,10 +678,10 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
         new_intensity = np.array(new_intensity)
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:,0]))
 
-        dict = self.figure.sub_tab.data_handler.data.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[-1].copy()
         dict['zscale'] = new_axis
         dict['data'] = np.transpose(new_intensity, (1, 0, 2))
-        self.figure.sub_tab.data_handler.data.add_state(dict,'fermilevel')
+        self.figure.overview.data_handler.file.add_state(dict,'fermilevel')
 
     def normalise(self):
         difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
@@ -697,15 +697,15 @@ class Range_plot(Raw):
         self.define_slide()
         self.define_entry()
         pos = [300,0]
-        self.fig = figure.DOS_down(self.figure.sub_tab,pos)
+        self.fig = figure.DOS_down(self.figure.overview,pos)
 
     def define_slide(self):
-        self.scale = tk.Scale(self.figure.sub_tab.tab,from_=self.slide_limits[0],to=self.slide_limits[1],orient=tk.HORIZONTAL,command=self.update_range,resolution=1)
+        self.scale = tk.Scale(self.figure.overview.tab,from_=self.slide_limits[0],to=self.slide_limits[1],orient=tk.HORIZONTAL,command=self.update_range,resolution=1)
         self.scale.pack()
 
     def update_range(self,value):
         range = (self.figure.ylimits[1]-self.figure.ylimits[0])*(1/self.slide_limits[1])*0.5
-        self.figure.sub_tab.range = int(value)*range
+        self.figure.overview.range = int(value)*range
         self.figure.cursor.draw_sta_line()
 
     def define_mouse(self):
@@ -714,7 +714,7 @@ class Range_plot(Raw):
         self.figure.canvas.get_tk_widget().bind( "<B1-Motion>", self.figure.cursor.drag)#left click
 
     def define_entry(self):
-        self.e1 = tk.Entry(self.figure.sub_tab.tab,width=5)#the step size
+        self.e1 = tk.Entry(self.figure.overview.tab,width=5)#the step size
         offset=[140,50]
         self.e1.place(x = self.figure.pos[0] + offset[0], y = self.figure.pos[1] + offset[1])
         self.e1.insert(0, 10)#default value 1

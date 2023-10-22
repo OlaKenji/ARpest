@@ -8,11 +8,10 @@ import numpy as np
 import pickle
 import os
 
-import figure_handeler, data_loader, constants, entities, data_catalog, logbook, operations, data_handler
+import figure_handeler, data_loader, constants, entities, logbook, operations, data_handler
 
 #to implement:
-#make all operations working in this new system
-#normalisation by division of gold
+#normalisation by division of gold -> chun_ not rellisable
 #range plots
 #fitting?
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
@@ -22,6 +21,7 @@ import figure_handeler, data_loader, constants, entities, data_catalog, logbook,
 #symmetrise based on a reference?
 #phi rotation in k convert?
 #the inital start cut position
+#merge catalog codes
 
 #Bugs:
 #binding energy plots are transposed with respect to kinetic energy
@@ -203,9 +203,9 @@ class Data_tab():#holder for overview tabs. The data is stored here
 
             save_data.update(self.save_figure_specifics(overview))#combine the dicts
             #save_data.update(overview.data_handler.data.save())#combine the dicts
-            overview.data_handler.data_stack[0].save(save_data)
-            #save_data['data_stack'] = overview.data_handler.data_stack#a list of File objects
-            all_data.append(overview.data_handler.data_stack)
+            overview.data_handler.files[0].save(save_data)
+            #save_data['data_stack'] = overview.data_handler.files#a list of File objects
+            all_data.append(overview.data_handler.files)
 
         with open(path.name + '.okf', "wb") as outfile:
             pickle.dump(all_data, outfile)
@@ -252,7 +252,6 @@ class Overview():
         self.make_figure()#figure_handler
         self.operations = operations.Operations(self)
         self.logbook = logbook.Logbook(self)
-        self.data_catalog = data_catalog.Data_catalog(self)
         self.figure_handeler.redraw()
         self.data_tab.notebook.select(self.tab)
         self.close_botton()
@@ -272,7 +271,7 @@ class Overview():
         self.data_tab.notebook.add(self.tab,text = name)
 
     def make_figure(self):
-        if self.data_handler.data.get_data('zscale') is None or len(self.data_handler.data.get_data('zscale')) == 1:#2D data
+        if self.data_handler.file.get_data('zscale') is None or len(self.data_handler.file.get_data('zscale')) == 1:#2D data
             self.figure_handeler = figure_handeler.Twodimension(self)
         else:#3D data
             self.figure_handeler = figure_handeler.Threedimension(self)

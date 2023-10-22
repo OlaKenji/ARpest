@@ -2,12 +2,12 @@ import figure, processing, constants, data_handler
 import numpy as np
 
 class Figure_handeler():
-    def __init__(self,data_tab):
-        self.data_tab = data_tab#overview
+    def __init__(self,overview):
+        self.overview = overview#overview
         self.pos = constants.figure_position#posirion of the main figure
         self.size = constants.figure_grid#figure canvas size
-        self.int_range = self.data_tab.data_handler.data_stack[0].save_dict.get('int_range',0)#should be moved to operations?
-        self.cmap = self.data_tab.data_handler.data_stack[0].save_dict.get('cmap','RdYlBu_r')#should be moved to operations?
+        self.int_range = self.overview.data_handler.files[0].save_dict.get('int_range',0)#should be moved to operations?
+        self.cmap = self.overview.data_handler.files[0].save_dict.get('cmap','RdYlBu_r')#should be moved to operations?
         self.make_figures()
 
         self.colour_bar = figure.Colour_bar(self)
@@ -51,7 +51,7 @@ class Figure_handeler():
         pass
 
     def derivative(self):#called when pushing the 2nd derivative botton
-        if self.data_tab.operations.orientation_botton.configure('text')[-1] == 'horizontal':
+        if self.overview.operations.orientation_botton.configure('text')[-1] == 'horizontal':
             adjust = processing.Derivative_x(self.figures['center'])
         else:#vertical
             adjust = processing.Derivative_y(self.figures['center'])
@@ -59,7 +59,7 @@ class Figure_handeler():
         self.draw()
 
     def curvature(self):#called when pushing the 2nd derivative botton
-        if self.data_tab.operations.orientation_botton.configure('text')[-1] == 'horizontal':
+        if self.overview.operations.orientation_botton.configure('text')[-1] == 'horizontal':
             adjust = processing.Curvature_x(self.figures['center'])
         else:#vertical
             adjust = processing.Curvature_y(self.figures['center'])
@@ -67,7 +67,7 @@ class Figure_handeler():
         self.draw()
 
     def smooth(self):#the smooth botton
-        adjust = processing.Smooth(self.figures['center'],self.data_tab.operations.orientation_botton.configure('text')[-1])
+        adjust = processing.Smooth(self.figures['center'],self.overview.operations.orientation_botton.configure('text')[-1])
         adjust.run()
         self.draw()
 
@@ -75,10 +75,10 @@ class Figure_handeler():
         self.figures['center'].save()
 
     def update_colour_scale(self,value = 0):#called from slider
-        value = self.data_tab.operations.color_scale.get()#value of the colour scale
+        value = self.overview.operations.color_scale.get()#value of the colour scale
         vmax = self.colour_bar.vlim[1]*float(value)/100
         self.colour_bar.vlim_set = [self.colour_bar.vlim[0],vmax]#for the pop up window -> should just be called once
-        self.data_tab.operations.label3.configure(text = (round(float(value),1)))#update the number next to int range slide -> should just be called once
+        self.overview.operations.label3.configure(text = (round(float(value),1)))#update the number next to int range slide -> should just be called once
 
         for figure in self.twoD:#update the 2D figures
             self.figures[figure].update_colour_scale()
@@ -93,8 +93,8 @@ class Figure_handeler():
         self.figures['center'].subtract_BG()
 
 class Threedimension(Figure_handeler):#fermi surface
-    def __init__(self,data_tab):
-        super().__init__(data_tab)
+    def __init__(self,overview):
+        super().__init__(overview)
         self.twoD = ['center','right','down']
         for fig in self.twoD:#update the 2D figures
             self.figures[fig].update_colour_scale()
@@ -120,20 +120,20 @@ class Threedimension(Figure_handeler):#fermi surface
         for index, ary in enumerate(temp):#divide each angle with maximum
             temp2[:,:,index] =  100000000*len(ary)*ary/np.sum(ary)#need to multiply woth large number to compensate for the fact that it becomes int, and not float
 
-        dict = self.data_tab.data_handler.data.data[-1].copy()
+        dict = self.overview.data_handler.file.data[-1].copy()
         dict['data'] = temp2
-        self.data_tab.data_handler.data.add_state(dict,'normalise')
+        self.overview.data_handler.file.add_state(dict,'normalise')
 
-        self.data_tab.data_handler.append_state('normalise', len(self.data_tab.data_handler.data.states))
-        self.data_tab.data_handler.update_catalog()
+        self.overview.data_handler.append_state('normalise', len(self.overview.data_handler.file.states))
+        self.overview.data_handler.update_catalog()
         self.new_stack()
 
     def integrate(self):
         pass
 
 class Twodimension(Figure_handeler):#band
-    def __init__(self,data_tab):
-        super().__init__(data_tab)
+    def __init__(self,overview):
+        super().__init__(overview)
         self.twoD = ['center']
         for fig in self.twoD:#update the 2D figures
             self.figures[fig].update_colour_scale()

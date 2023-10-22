@@ -68,11 +68,11 @@ class Operations():
         self.label.configure(text = str(1 + 2*int(float(value))))#update the number next to int range slide
 
     def define_colour_scale(self):
-        self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command = self.overview.figure_handeler.update_colour_scale,value = self.overview.data_handler.data.get('colour_scale',100))#
+        self.color_scale = tk.ttk.Scale(self.operation_tabs['General'],from_=0,to=100,orient='horizontal',command = self.overview.figure_handeler.update_colour_scale,value = self.overview.data_handler.file.get('colour_scale',100))#
         self.color_scale.place(x = 0, y = 100)
         label=ttk.Label(self.operation_tabs['General'],text='colour scale',background='white',foreground='black')
         label.place(x = 0, y = 80)
-        self.label3 = ttk.Label(self.operation_tabs['General'],text = self.overview.data_handler.data.get('colour_scale',100),background='white',foreground='black')#need to save it to updat the number next to the slide
+        self.label3 = ttk.Label(self.operation_tabs['General'],text = self.overview.data_handler.file.get('colour_scale',100),background='white',foreground='black')#need to save it to updat the number next to the slide
         self.label3.place(x = 100, y = 100)
 
     def define_dropdowns(self):
@@ -102,7 +102,7 @@ class Operations():
 
     def define_vlim(self):
         self.vlim_entry = tk.ttk.Entry(self.operation_tabs['General'], width= 10)#
-        default = self.overview.data_handler.data.get('vlim','None,None')
+        default = self.overview.data_handler.file.get('vlim','None,None')
         self.vlim_entry.insert(0, default)#default text
         self.vlim_entry.place(x = 150, y = 100)
         label = ttk.Label(self.operation_tabs['General'],text = 'colour limits',background='white',foreground='black')#need to save it to updat the number next to the slide
@@ -167,7 +167,7 @@ class Operations():
     #figure tab
     def define_fig_size(self):
         self.fig_size_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
-        default = self.overview.data_handler.data.get('fig_size_entry','3.3,3.3')
+        default = self.overview.data_handler.file.get('fig_size_entry','3.3,3.3')
         self.fig_size_entry.insert(0, default)#default text
         self.fig_size_entry.place(x = 0, y = 50)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'figure size',background='white',foreground='black')#need to save it to updat the number next to the slide
@@ -178,7 +178,7 @@ class Operations():
 
     def define_fig_lim(self):
         self.fig_lim_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 20)#
-        default = self.overview.data_handler.data.get('fig_lim_entry','None,None;None,None')
+        default = self.overview.data_handler.file.get('fig_lim_entry','None,None;None,None')
         self.fig_lim_entry.insert(0, default)#default text
         self.fig_lim_entry.place(x = 0, y = 80)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'figure limits',background='white',foreground='black')#need to save it to updat the number next to the slide
@@ -189,7 +189,7 @@ class Operations():
 
     def define_fig_label(self):
         self.fig_label_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
-        default = self.overview.data_handler.data.get('fig_label_entry','x,y')
+        default = self.overview.data_handler.file.get('fig_label_entry','x,y')
         self.fig_label_entry.insert(0, default)#default text
         self.fig_label_entry.place(x = 0, y = 110)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'figure label',background='white',foreground='black')#need to save it to updat the number next to the slide
@@ -200,7 +200,7 @@ class Operations():
 
     def define_colourbar_size(self):
         self.colourbar_size_entry = tk.ttk.Entry(self.operation_tabs['Figures'], width= 10)#
-        default = self.overview.data_handler.data.get('colorbar_size_entry','3.3,0.7')
+        default = self.overview.data_handler.file.get('colorbar_size_entry','3.3,0.7')
         self.colourbar_size_entry.insert(0, default)#default text
         self.colourbar_size_entry.place(x = 0, y = 200)
         label = ttk.Label(self.operation_tabs['Figures'],text = 'colourbar size',background='white',foreground='black')#need to save it to updat the number next to the slide
@@ -221,13 +221,13 @@ class Operations():
             self.fig_margines[margin] = tk.ttk.Entry(self.operation_tabs['Figures'], width= 3)#
             self.colourbar_margines[margin] = tk.ttk.Entry(self.operation_tabs['Figures'], width= 3)#
 
-            default = self.overview.data_handler.data.get('fig_margines',{'top':0.93,'left':0.18,'right':0.97,'bottom':0.13})
+            default = self.overview.data_handler.file.get('fig_margines',{'top':0.93,'left':0.18,'right':0.97,'bottom':0.13})
             self.fig_margines[margin].insert(0, default[margin])#default text
             self.fig_margines[margin].place(x = 50 + 50*index, y = 20)
             label = ttk.Label(self.operation_tabs['Figures'],text = margin,background='white',foreground='black')#need to save it to updat the number next to the slide
             label.place(x = 50 + 50*index, y = 0)
 
-            default = self.overview.data_handler.data.get('colourbar_margines',{'top':0.9,'left':0.03,'right':0.96,'bottom':0.7})
+            default = self.overview.data_handler.file.get('colourbar_margines',{'top':0.9,'left':0.03,'right':0.96,'bottom':0.7})
             self.colourbar_margines[margin].insert(0, default[margin])#default text
             self.colourbar_margines[margin].place(x = 50 + 50*index, y = 170)
             label = ttk.Label(self.operation_tabs['Figures'],text = margin,background='white',foreground='black')#need to save it to updat the number next to the slide
@@ -255,7 +255,7 @@ class Operations():
         self.arithmetic_botton = {'x':None,'y':None}
         for index, dir in enumerate(self.arithmetic.keys()):
             self.arithmetic[dir] = tk.ttk.Entry(self.operation_tabs['Arithmetic'], width= 10)#
-            default = self.overview.data_handler.data.get('arithmetic_' + dir,'1')
+            default = self.overview.data_handler.file.get('arithmetic_' + dir,'1')
             self.arithmetic[dir].insert(0, default)#default text
             self.arithmetic[dir].place(x = 0, y = 50 + index*20)
             label = ttk.Label(self.operation_tabs['Arithmetic'],text = dir + ' axis',background='white',foreground='black')#need to save it to updat the number next to the slide

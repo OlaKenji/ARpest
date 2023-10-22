@@ -23,11 +23,11 @@ class Functions():#figure functionality not being used
 class Figure(Functions):
     def __init__(self,figure_handeler,pos):
         self.figure_handeler = figure_handeler
-        self.sub_tab = figure_handeler.data_tab#overview
+        self.overview = figure_handeler.overview#overview
         self.pos = pos
         self.label = ['x','y']
         self.grid = False#plot with grid
-        self.cut_index = self.sub_tab.data_handler.data.get(type(self).__name__+'cut_index',0)
+        self.cut_index = self.overview.data_handler.files[0].save_dict.get(type(self).__name__+'cut_index',0)
         self.init_data()
 
         self.define_canvas(size = constants.figure_size['size'], top = constants.figure_size['top'], left = constants.figure_size['left'], right = constants.figure_size['right'], bottom = constants.figure_size['bottom'])
@@ -50,7 +50,7 @@ class Figure(Functions):
         self.ax.set_xticks([])
         self.ax.set_yticks([])
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master = self.sub_tab.tab)
+        self.canvas = FigureCanvasTkAgg(self.fig, master = self.overview.tab)
         self.canvas.draw()
 
         offset = [0,0]
@@ -59,9 +59,9 @@ class Figure(Functions):
         self.canvas.get_tk_widget().bind( "<Button-2>", self.right_click)#right click
         self.canvas.get_tk_widget().bind( "<Double-Button-1>", self.double_click)#double click
 
-        self.menue = tk.Menu(self.sub_tab.tab, tearoff = 0)
-        self.menue.add_command(label = "new", command = lambda: self.pop_up(self.sub_tab.data_tab))
-        self.menue.add_command(label = "add", command = lambda: self.pop_up(self.sub_tab.data_tab.gui))
+        self.menue = tk.Menu(self.overview.tab, tearoff = 0)
+        self.menue.add_command(label = "new", command = lambda: self.pop_up(self.overview.data_tab))
+        self.menue.add_command(label = "add", command = lambda: self.pop_up(self.overview.data_tab.gui))
 
     def mouse_range(self):#used for crusor
         self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]
@@ -76,13 +76,13 @@ class Figure(Functions):
         self.canvas.get_tk_widget().bind( "<B1-Motion>", self.cursor.on_mouse_click)#left click
 
     def define_export(self):
-        button_calc = tk.ttk.Button(self.sub_tab.tab, text="Export", command = self.export)
+        button_calc = tk.ttk.Button(self.overview.tab, text="Export", command = self.export)
         offset = [320,0]
         button_calc.place(x = self.pos[0]+offset[0], y = self.pos[1]+offset[1])
 
     def export(self):
         export_data = {'x':self.data[0].tolist(), 'y':self.data[1].tolist(), 'z':self.int.tolist()}
-        path = self.sub_tab.data_tab.gui.start_path + '/' + self.sub_tab.data_tab.name
+        path = self.overview.data_tab.gui.start_path + '/' + self.overview.data_tab.name
         with open(path+"_exported.json", "w") as outfile:
             json.dump(export_data, outfile)
 
@@ -99,7 +99,7 @@ class Figure(Functions):
             self.menue.grab_release()
 
     def pop_up(self,target):
-        target.pop_up(size = self.sub_tab.operations.fig_size_entry.get(),top = self.sub_tab.operations.fig_margines['top'].get(),left = self.sub_tab.operations.fig_margines['left'].get(),right = self.sub_tab.operations.fig_margines['right'].get(),bottom = self.sub_tab.operations.fig_margines['bottom'].get())#call gui to make a new window object
+        target.pop_up(size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get())#call gui to make a new window object
         self.plot(target.pop[-1].ax)#plot the fraph onto the popup ax
         self.make_grid(target.pop[-1].ax)
         target.pop[-1].graph = self.graph#corner doesn't have it
@@ -145,26 +145,26 @@ class FS(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
         self.figures = figure_handeler.figures
-        self.tilt = self.sub_tab.data_handler.data.get_data('metadata')['tilt']
+        self.tilt = self.overview.data_handler.file.get_data('metadata')['tilt']
 
     def subtract_BG(self):#move to processing? #the BG botton calls it from figure handlre
-        dict = self.sub_tab.data_handler.data.data[-1].copy()
-        if self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'vertical':#vertical bg subtract
+        dict = self.overview.data_handler.file.data[-1].copy()
+        if self.overview.operations.BG_orientation.configure('text')[-1] == 'vertical':#vertical bg subtract
             pass
-        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'horizontal':#horizontal bg subtract
+        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'horizontal':#horizontal bg subtract
             difference_array1 = np.absolute(self.figure_handeler.figures['right'].data[0] - self.figure_handeler.figures['right'].cursor.sta_vertical_line.get_data()[0])
             index1 = difference_array1.argmin()
             bg = np.nanmean(self.data[3][index1:-1:,:],axis=0)
             new_int = self.data[3] - bg
-        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
+        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
             pass
-        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'bg Matt':#EDC bg subtract
+        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'bg Matt':#EDC bg subtract
             pass
 
         dict['data'] = new_int
-        self.sub_tab.data_handler.data.add_state(dict,'bg_subtract')
-        self.sub_tab.data_handler.append_state('bg_subtract', len(self.sub_tab.data_handler.data.states))
-        self.sub_tab.data_handler.update_catalog()
+        self.overview.data_handler.file.add_state(dict,'bg_subtract')
+        self.overview.data_handler.append_state('bg_subtract', len(self.overview.data_handler.file.states))
+        self.overview.data_handler.update_catalog()
         self.figure_handeler.new_stack()
 
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
@@ -174,16 +174,16 @@ class FS(Figure):
         self.intensity()
 
     def save(self):#to save the stuff: called when pressing the save botton thorugh the figure handlere
-        self.sub_tab.data_handler.data.set_data('xscale',self.data[0])
-        self.sub_tab.data_handler.data.set_data('yscale',self.data[1])
-        self.sub_tab.data_handler.data.set_data('zscale',self.data[2])
-        self.sub_tab.data_handler.data.set_data('data',self.data[3])
+        self.overview.data_handler.file.set_data('xscale',self.data[0])
+        self.overview.data_handler.file.set_data('yscale',self.data[1])
+        self.overview.data_handler.file.set_data('zscale',self.data[2])
+        self.overview.data_handler.file.set_data('data',self.data[3])
 
     def plot(self,ax):#pcolorfast
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#FS
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#FS
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_handler.data.get_data('xscale'),self.sub_tab.data_handler.data.get_data('yscale'),self.sub_tab.data_handler.data.get_data('zscale'),self.sub_tab.data_handler.data.get_data('data')]
+        self.data = [self.overview.data_handler.file.get_data('xscale'),self.overview.data_handler.file.get_data('yscale'),self.overview.data_handler.file.get_data('zscale'),self.overview.data_handler.file.get_data('data')]
 
     def click(self,pos):
         super().click(pos)
@@ -220,11 +220,11 @@ class Band_right(Figure):
         super().__init__(figure_handeler,pos)
 
     def double_click(self,event):#called when doubleclicking
-        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.sub_tab.data_handler.data['metadata']}
-        self.sub_tab.data_tab.append_tab(new_data)
+        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.overview.data_handler.file['metadata']}
+        self.overview.data_tab.append_tab(new_data)
 
     def plot(self,ax):
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#band_right
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band_right
 
     def intensity(self):
         start,stop,step = self.int_range(self.cut_index)
@@ -256,11 +256,11 @@ class Band_down(Figure):
         self.draw()
 
     def double_click(self,event):#called when doubleclicking
-        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.sub_tab.data['metadata']}
-        self.sub_tab.data_tab.append_tab(new_data)
+        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.overview.data['metadata']}
+        self.overview.data_tab.append_tab(new_data)
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#band down
+        self.graph = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band down
 
     def intensity(self):
         start,stop,step=self.int_range(self.cut_index)
@@ -339,7 +339,7 @@ class DOS_right_down(Figure):
 class Band(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
-        self.tilt = self.sub_tab.data_handler.data.get_data('metadata')['tilt']
+        self.tilt = self.overview.data_handler.file.get_data('metadata')['tilt']
         self.figures = figure_handeler.figures
 
     def init_data(self):#called in init
@@ -347,54 +347,54 @@ class Band(Figure):
         self.intensity()
 
     def plot(self,ax):#2D plot
-        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.sub_tab.vlim_set[0], vmax = self.sub_tab.vlim_set[1]))#band
+        self.graph = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band
 
     def subtract_BG(self):#move to processing? #the BG botton calls it from figure handlre
-        dict = self.sub_tab.data_handler.data.data[-1].copy()
-        if self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'vertical':#vertical bg subtract
+        dict = self.overview.data_handler.file.data[-1].copy()
+        if self.overview.operations.BG_orientation.configure('text')[-1] == 'vertical':#vertical bg subtract
             difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
             index1 = difference_array1.argmin()
             bg = np.nanmean(self.int[index1:-1,:],axis=0)#axis = 0is vertical, axis =1 is horizontal means
             new_int = self.int - bg
-        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'horizontal':#horizontal bg subtract
+        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'horizontal':#horizontal bg subtract
             difference_array1 = np.absolute(self.data[0] - self.cursor.sta_vertical_line.get_data()[0])
             index1 = difference_array1.argmin()
             bg = np.nanmean(self.int[:,index1:-1],axis=1)#axis = 0is vertical, axis =1 is horizontal means
             int = np.transpose(self.int) - bg
             new_int = np.transpose(int)
-        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
+        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
             new_int = self.int - self.figures['down'].int[None,:]#subtract the EDC from each row in data
-        elif self.sub_tab.operations.BG_orientation.configure('text')[-1] == 'bg Matt':#EDC bg subtract
+        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'bg Matt':#EDC bg subtract
             new_int = self.int.copy()
             for index, ary in enumerate(np.transpose(self.int[200:600,:])):#MDCs -> deifine the area...
                 new_int[:,index] -= np.nanmin(ary)
                 #plt.plot(ary)
                 #plt.show()
         dict['data'] = np.transpose(np.atleast_3d(new_int),(2,0,1))
-        self.sub_tab.data_handler.data.add_state(dict,'bg_subtract')
-        self.sub_tab.data_handler.append_state('bg_subtract', len(self.sub_tab.data_handler.data.states))
-        self.sub_tab.data_handler.update_catalog()
+        self.overview.data_handler.file.add_state(dict,'bg_subtract')
+        self.overview.data_handler.append_state('bg_subtract', len(self.overview.data_handler.file.states))
+        self.overview.data_handler.update_catalog()
         self.figure_handeler.new_stack()
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 
     def save(self):#to save the stuff: called when pressing the save botton thorugh the figure handlere
-        self.sub_tab.data_handler.data.set_data('xscale',self.data[0])
-        self.sub_tab.data_handler.data.set_data('yscale',self.data[1])
-        self.sub_tab.data_handler.data.set_data('data',np.transpose(np.atleast_3d(self.int),(2, 0, 1)))
+        self.overview.data_handler.file.set_data('xscale',self.data[0])
+        self.overview.data_handler.file.set_data('yscale',self.data[1])
+        self.overview.data_handler.file.set_data('data',np.transpose(np.atleast_3d(self.int),(2, 0, 1)))
 
     def sort_data(self):
-        self.data = [self.sub_tab.data_handler.data.get_data('xscale'), self.sub_tab.data_handler.data.get_data('yscale'), self.sub_tab.data_handler.data.get_data('data')]
+        self.data = [self.overview.data_handler.file.get_data('xscale'), self.overview.data_handler.file.get_data('yscale'), self.overview.data_handler.file.get_data('data')]
 
     def click(self,pos):
         super().click(pos)
         difference_array = np.absolute(self.data[0] - pos[0])#subtract for each channel, works.
-        index1 = np.argmin(difference_array)
-        self.figures['right'].intensity(index1)
+        self.figures['right'].cut_index = np.argmin(difference_array)
+        self.figures['right'].intensity()
         self.figures['right'].redraw()
 
         difference_array = np.absolute(self.data[1] - pos[1])
-        index2 = np.argmin(difference_array)
-        self.figures['down'].intensity(index2)
+        self.figures['down'].cut_index = np.argmin(difference_array)
+        self.figures['down'].intensity()
         self.figures['down'].redraw()
 
     def intensity(self,y = 0):
@@ -413,8 +413,8 @@ class DOS_right(Figure):
     def integrate(self):#EDC: called from figure hadnlre
         self.int = np.sum(self.figure_handeler.figures['center'].int,axis=1)/len(self.figure_handeler.figures['center'].int[0,:])
 
-    def intensity(self, x = 0):
-        start,stop,step = self.int_range(x)
+    def intensity(self):
+        start,stop,step = self.int_range(self.cut_index)
         temp = np.transpose(self.figure_handeler.figures['center'].int)
         self.int = np.sum(temp[start:stop:1],axis=0)/step
         self.sort_data()
@@ -453,8 +453,8 @@ class DOS_down(Figure):
     def sort_data(self):
         self.data = [self.figure_handeler.figures['center'].data[0],self.int]
 
-    def intensity(self,y = 0):
-        start,stop,step=self.int_range(y)
+    def intensity(self):
+        start,stop,step=self.int_range(self.cut_index)
         self.int = sum(self.figure_handeler.figures['center'].int[start:stop:1])/step
         self.sort_data()
 
@@ -485,7 +485,7 @@ class DOS_down(Figure):
 class Colour_bar(Figure):
     def __init__(self,figure_handler):
         self.figure_handler = figure_handler
-        self.sub_tab = figure_handler.data_tab#overview
+        self.overview = figure_handler.overview#overview
         self.pos = constants.colourbar_position
         self.define_canvas(size = constants.colourbar_size['size'], top = constants.colourbar_size['top'], left = constants.colourbar_size['left'], right = constants.colourbar_size['right'], bottom = constants.colourbar_size['bottom'])
         self.bar = self.fig.colorbar(self.figure_handler.figures['center'].graph,cax = self.ax,orientation='horizontal',label = 'Intensity')
@@ -499,15 +499,15 @@ class Colour_bar(Figure):
         self.canvas.draw()
 
     def pop_up(self,target):#the popup window
-        self.sub_tab.data_tab.gui.pop_up(size = self.sub_tab.operations.colourbar_size_entry.get(),top = self.sub_tab.operations.colourbar_margines['top'].get(),left = self.sub_tab.operations.colourbar_margines['left'].get(),right = self.sub_tab.operations.colourbar_margines['right'].get(),bottom = self.sub_tab.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
-        orientation = self.sub_tab.operations.colourbar_orientation.configure('text')[-1]
-        self.sub_tab.data_tab.gui.pop[0].fig.colorbar(self.figure_handler.figures['center'].graph,cax = self.sub_tab.data_tab.gui.pop[0].ax,orientation=orientation,label = 'Intensity')
-        #self.sub_tab.data_tab.gui.pop.fig.subplots_adjust(top = kwarg['top'],left = kwarg['left'],right = kwarg['right'], bottom = kwarg['bottom'])
-        self.sub_tab.data_tab.gui.pop[0].set_lim()
-        self.sub_tab.data_tab.gui.pop[0].canvas.draw()#draw it after plot
+        self.overview.data_tab.gui.pop_up(size = self.overview.operations.colourbar_size_entry.get(),top = self.overview.operations.colourbar_margines['top'].get(),left = self.overview.operations.colourbar_margines['left'].get(),right = self.overview.operations.colourbar_margines['right'].get(),bottom = self.overview.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
+        orientation = self.overview.operations.colourbar_orientation.configure('text')[-1]
+        self.overview.data_tab.gui.pop[0].fig.colorbar(self.figure_handler.figures['center'].graph,cax = self.overview.data_tab.gui.pop[0].ax,orientation=orientation,label = 'Intensity')
+        #self.overview.data_tab.gui.pop.fig.subplots_adjust(top = kwarg['top'],left = kwarg['left'],right = kwarg['right'], bottom = kwarg['bottom'])
+        self.overview.data_tab.gui.pop[0].set_lim()
+        self.overview.data_tab.gui.pop[0].canvas.draw()#draw it after plot
 
     def set_vlim(self):#called from botton
-        values = self.sub_tab.operations.vlim_entry.get()
+        values = self.overview.operations.vlim_entry.get()
         value = values.split(',')
 
         if value[0] != 'None':

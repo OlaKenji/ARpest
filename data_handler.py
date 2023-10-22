@@ -1,93 +1,58 @@
 import tkinter as tk
 from tkinter import ttk
 
-import data_loader
+import file_catalog, state_catalog
 
 class Data_handler():#contains the stack of data as a list
     def __init__(self, overivew, data):
-        self.sub_tab = overivew
+        self.overview = overivew
 
         if isinstance(data,list):#if okf file -> old file: contains meta and x,y,z,data
-            #self.data_stack = [File(data['data_stack'])]
-            self.index = data[0].save_dict.get('data_stack_index',[0,0])#[0] points to state, [1] points to file
-
-            self.data_stack = data.copy()#a list of file objects
-            self.data = self.data_stack[0]#data.copy()#copy all dict to self.data
-            #self.data.pop('data_stack')#remove the x,y,z,data stuff (File object should have these)
+            self.index = data[0].save_dict.get('data_stack_index',0)#[0] points to state, [1] points to file
+            self.files = data.copy()#a list of file objects
+            self.file = self.files[0]#data.copy()#copy all dict to self.file
             self.organise_data()
         else:#if normal file -> first time
-            self.data_stack = [File(data, self.sub_tab.data_tab.name)]
-            self.data = self.data_stack[0]#a file object
-            self.index = [0,0]
+            self.files = [File(data, self.overview.data_tab.name)]
+            self.file = self.files[0]#a file object
+            self.index = 0
 
-        self.define_bottons()
-        self.state_catalog()
-
-    def state_catalog(self):#state holders
-        self.catalog = tk.ttk.Treeview(self.sub_tab.tab,columns='States',show='headings',height=2)
-        verscrlbar = tk.ttk.Scrollbar(self.sub_tab.tab,orient ="vertical",command = self.catalog.yview)
-        self.catalog.heading('States')
-        self.catalog.configure(yscrollcommand = verscrlbar.set)
-        self.catalog.place(x = 890, y = 520, width=300,height=100)
-        self.update_catalog()
-        self.catalog.bind('<Button-1>', self.select_state)#should only be activated when the files have neen loaded?
-
-    def update_catalog(self):
-        for item in self.catalog.get_children():
-              self.catalog.delete(item)
-        for index, state in enumerate(self.data.states):
-            self.append_state(state,index+1)
-
-        child_id = self.catalog.get_children()[self.data.index]#set the focus on the new item
-        self.catalog.focus(child_id)
-        self.catalog.selection_set(child_id)
-
-    def append_state(self,name, index = 1):
-        self.catalog.insert('',tk.END,values=name, iid = index)
+        self.file_catalog = file_catalog.File_catalog(self)
+        self.state_catalog = state_catalog.State_catalog(self)
 
     def select_state(self,event):#called when pressing an item in the catalog
-        column = self.catalog.identify_row(event.y)#where did you click?
+        column = self.state_catalog.catalog.identify_row(event.y)#where did you click?
         index = int(column[-1]) - 1
-        self.data_stack[self.index[1]].set_state(index)
+        self.files[self.index].set_state(index)
         self.organise_data()
-        self.sub_tab.figure_handeler.new_stack()
+        self.overview.figure_handeler.new_stack()
 
     def select_file(self,event):#called when pressing an item in the catalog
-        column = self.sub_tab.data_catalog.catalog.identify_row(event.y)#where did you click?
+        column = self.file_catalog.catalog.identify_row(event.y)#where did you click?
         index = int(column[-1]) - 1
-        self.index[1] = index
+        self.index = index
         self.organise_data()
-        self.sub_tab.figure_handeler.new_stack()
+        self.overview.figure_handeler.new_stack()
         self.update_catalog()
 
     def add_file(self,data, file):#called from load data bottom in data_catalog: it adds new files
         idx = file.rfind('/') + 1
         name = file[idx:]
-        self.data_stack.append(File(data[0], name))
-        self.index[1] += 1
+        self.files.append(File(data[0], name))
+        self.index += 1
         self.organise_data()
-        self.sub_tab.figure_handeler.new_stack()
-        self.update_catalog()
-        self.sub_tab.logbook.add_log(self.data_stack[-1])
-
-    def add_stack(self,data):#new states, should be called after new operations
-        self.data_stack[self.index[1]].append(data)
-        self.index[0] += 1
-        self.organise_data()
-        self.sub_tab.figure_handeler.new_stack()
+        self.overview.figure_handeler.new_stack()
+        self.file_catalog.update_catalog()
+        self.overview.logbook.add_log(self.files[-1])
 
     def organise_data(self):
-        self.data = self.data_stack[self.index[1]]#a file object
+        self.file = self.files[self.index]#a file object
 
-    def define_bottons(self):
-        button_calc = tk.ttk.Button(self.sub_tab.tab, text = "delete stack", command = self.delete_stack)#which figures shoudl have access to this?
-        button_calc.place(x = 1200, y = 540)
-
-    def delete_stack(self):
-        self.data.remove_state()
-        self.update_catalog()
+    def delete_state(self):
+        self.file.remove_state()
+        self.state_catalog.update_catalog()
         self.organise_data()
-        self.sub_tab.figure_handeler.new_stack()
+        self.overview.figure_handeler.new_stack()
 
 class File():#the data onject, contains the list of data and the rellavant poitners
     def __init__(self, data, name):

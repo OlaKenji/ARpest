@@ -2,24 +2,24 @@ import tkinter as tk
 from tkinter import ttk
 
 class Logbook():
-    def __init__(self, sub_tab):
-        self.sub_tab = sub_tab
+    def __init__(self, overview):
+        self.overview = overview
         self.logbook()
         self.define_update_logbook()
 
     def logbook(self):
         columns, data = [], []
-        for key in self.sub_tab.data_handler.data.get_data('metadata'):
+        for key in self.overview.data_handler.file.get_data('metadata'):
             columns.append(key)
-            data.append(self.sub_tab.data_handler.data.get_data('metadata')[key])
+            data.append(self.overview.data_handler.file.get_data('metadata')[key])
 
-        self.tree = tk.ttk.Treeview(self.sub_tab.tab, columns = columns, show = 'headings', height = 2)
+        self.tree = tk.ttk.Treeview(self.overview.tab, columns = columns, show = 'headings', height = 2)
 
         for texts in columns:
             self.tree.heading(texts,text=texts)
             self.tree.column(texts,width=100,stretch=False)
 
-        for data in self.sub_tab.data_handler.data_stack:
+        for data in self.overview.data_handler.files:
             self.add_log(data)
 
         self.tree.place(x = 890, y = 0, width=610)
@@ -42,7 +42,7 @@ class Logbook():
 
     #the douilble cliking part
     def define_update_logbook(self):
-        self.log_entry = tk.ttk.Entry(self.sub_tab.tab, width= 3)#
+        self.log_entry = tk.ttk.Entry(self.overview.tab, width= 3)#
         self.log_entry.place(x = 1460, y = 60)
 
     def update_logbook(self,event):
@@ -50,4 +50,4 @@ class Logbook():
         value = self.log_entry.get()
         if value == '': return#if nothing there, do nothing
         self.tree.set('log', column = column, value = value)
-        #self.sub_tab.data_handler.data.get_data('metadata') = self.tree.set('log')
+        #self.overview.data_handler.file.get_data('metadata') = self.tree.set('log')

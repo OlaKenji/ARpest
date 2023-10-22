@@ -3,7 +3,7 @@ from tkinter import ttk
 
 class Button():
     def __init__(self, operations, tab, type, iterations = ['horizontal','vertical'], width = 10, command = None, style = 'toggle.TButton'):
-        default = operations.overview.data_handler.data.get(type, iterations[0])
+        default = operations.overview.data_handler.file.get(type, iterations[0])
         self.iterations = iterations
         self.box = tk.ttk.Button(tab, text = default, command = self.press, width = width, style = style)#which figures shoudl have access to this?
         self.index = 0
