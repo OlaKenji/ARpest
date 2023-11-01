@@ -60,8 +60,8 @@ class Figure(Functions):
         self.canvas.get_tk_widget().bind( "<Double-Button-1>", self.double_click)#double click
 
         self.menue = tk.Menu(self.overview.tab, tearoff = 0)
-        self.menue.add_command(label = "new", command = lambda: self.pop_up(self.overview.data_tab))
-        self.menue.add_command(label = "add", command = lambda: self.pop_up(self.overview.data_tab.gui))
+        self.menue.add_command(label = "new", command = lambda: self.pop_up(-1))
+        self.menue.add_command(label = "add", command = lambda: self.pop_up(0))
 
     def mouse_range(self):#used for crusor
         self.xlimits = [np.nanmin(self.data[0]), np.nanmax(self.data[0])]
@@ -98,13 +98,16 @@ class Figure(Functions):
         finally:#called when selecting
             self.menue.grab_release()
 
-    def pop_up(self,target):
-        target.pop_up(size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get())#call gui to make a new window object
-        self.plot(target.pop[-1].ax)#plot the fraph onto the popup ax
-        self.make_grid(target.pop[-1].ax)
-        target.pop[-1].graph = self.graph#corner doesn't have it
-        target.pop[-1].set_lim()
-        target.pop[-1].canvas.draw()#draw it after plot
+    def pop_up(self,index):
+        if index == -1:#enter many times
+            self.overview.data_tab.pop_up(index = index, size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get())#call gui to make a new window object
+        elif len(self.overview.data_tab.pop) == 0:#enter only once
+            self.overview.data_tab.pop_up(index = index, size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get())#call gui to make a new window object
+        self.plot(self.overview.data_tab.pop[index].ax)#plot the fraph onto the popup ax
+        self.make_grid(self.overview.data_tab.pop[index].ax)
+        self.overview.data_tab.pop[index].graph = self.graph#corner doesn't have it
+        self.overview.data_tab.pop[index].set_lim()
+        self.overview.data_tab.pop[index].canvas.draw()#draw it after plot
         self.plot(self.ax)#this is to re-updathe self.graph to the proper figure
 
     def draw(self):
@@ -163,8 +166,8 @@ class FS(Figure):
 
         dict['data'] = new_int
         self.overview.data_handler.file.add_state(dict,'bg_subtract')
-        self.overview.data_handler.append_state('bg_subtract', len(self.overview.data_handler.file.states))
-        self.overview.data_handler.update_catalog()
+        self.overview.data_handler.state_catalog.append_state('bg_subtract', len(self.overview.data_handler.file.states))
+        self.overview.data_handler.state_catalog.update_catalog()
         self.figure_handeler.new_stack()
 
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
@@ -215,12 +218,18 @@ class FS(Figure):
         super().pop_up(target)
         target.pop.set_vlim(self.figure_handeler.colour_bar.vlim_set[0],self.figure_handeler.colour_bar.vlim_set[1])#2D doens't have vlim
 
+    def make_circle(self):
+        radius = self.overview.operations.c_clip_entry.get()
+        self.circle = plt.Circle((0,0), float(radius),fill = False)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#FS
+        self.ax.add_artist(self.circle)
+        self.canvas.draw()
+
 class Band_right(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
 
     def double_click(self,event):#called when doubleclicking
-        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.overview.data_handler.file['metadata']}
+        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.overview.data_handler.file.get_data('metadata')}
         self.overview.data_tab.append_tab(new_data)
 
     def plot(self,ax):
@@ -372,8 +381,8 @@ class Band(Figure):
                 #plt.show()
         dict['data'] = np.transpose(np.atleast_3d(new_int),(2,0,1))
         self.overview.data_handler.file.add_state(dict,'bg_subtract')
-        self.overview.data_handler.append_state('bg_subtract', len(self.overview.data_handler.file.states))
-        self.overview.data_handler.update_catalog()
+        self.overview.data_handler.state_catalog.append_state('bg_subtract', len(self.overview.data_handler.file.states))
+        self.overview.data_handler.state_catalog.update_catalog()
         self.figure_handeler.new_stack()
         self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
 

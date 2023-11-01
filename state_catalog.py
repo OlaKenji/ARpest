@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-class State_catalog():#contains the stack of data as a list
+class State_catalog():
     def __init__(self, data_handler):
         self.data_handler = data_handler
         self.define_bottons()

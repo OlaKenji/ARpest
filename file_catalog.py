@@ -8,8 +8,8 @@ class File_catalog():
         self.data_handler = data_handler
         self.file_catalog()
         for index, data in enumerate(self.data_handler.files):
-            self.append_files(data.name,index+1)
-        self.update()
+            self.append_files(data.name,index + 1)
+        self.update(self.data_handler.index)
         self.file_handler = file_handler.File_handler(self)
         self.define_bottons()
 
@@ -21,23 +21,26 @@ class File_catalog():
         self.catalog.place(x = 890, y = 695, width=300,height=150)
         self.catalog.bind('<Button-1>', self.data_handler.select_file)#should only be activated when the files have neen loaded?
 
-    def update(self):
-        child_id = self.catalog.get_children()[self.data_handler.index]#set the focus on the new item
+    def update(self, index):
+        child_id = self.catalog.get_children()[index]#set the focus on the new item
         self.catalog.focus(child_id)
         self.catalog.selection_set(child_id)
 
-    def update_catalog(self):
+    def clean(self):
         for item in self.catalog.get_children():
-              self.catalog.delete(item)
+              self.catalog.delete(item)        
+
+    def update_catalog(self):
+        self.clean()
         for index, data in enumerate(self.data_handler.files):#file objects
             self.catalog.insert('',tk.END,values=data.name, iid = index+1)
-        self.update()
+        self.update(self.data_handler.index)
 
     def append_files(self,file,index):#insert the name into the catalog
         idx = file.rfind('/') + 1
         name = file[idx:]
         self.catalog.insert('',tk.END,values=name,iid = index)
-        self.update()
+        self.update(0)#should it be 0 or self.data_handler.index?
 
     def define_bottons(self):#called frin init
         button_calc = tk.ttk.Button(self.data_handler.overview.tab, text="Add data", command = self.file_handler.add_data)#the botton to add data (e.g. several measurement but divided into several files)

@@ -11,17 +11,21 @@ import os
 import figure_handeler, data_loader, constants, entities, logbook, operations, data_handler
 
 #to implement:
-#normalisation by division of gold -> chun_ not rellisable
+#normalise EDC/MDC by max
+#optional normalisation when fermi_level by gold
 #range plots
 #fitting?
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
+#normalisation by division of gold -> chun_ not rellisable
 #log scale -> not supported by pcolorfast
 #select area:
     #normalise based on some selected area?
 #symmetrise based on a reference?
 #phi rotation in k convert?
 #the inital start cut position
-#merge catalog codes
+#clipping data
+
+#the cutting of okf file seems fatser than raw file. why? :D
 
 #Bugs:
 #binding energy plots are transposed with respect to kinetic energy
@@ -93,34 +97,6 @@ class GUI():#master Gui
 
     def run(self):
         self.window.mainloop()
-
-    def pop_up(self,**kwarg):#called from figure right click or colour bar: combine with the datatab one
-        if not self.pop:#if empty
-            size_string = kwarg['size']#depends on colur bar or figure
-            size = size_string.split(',')
-            sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
-
-            lim_string = self.tab.overviews[0].operations.fig_lim_entry.get()#it returns a string
-            lim_string2 = lim_string.split(';')
-            lim_x = lim_string2[0].split(',')
-            lim_y = lim_string2[1].split(',')
-
-            for index, x in enumerate(lim_x):
-                if x == 'None':
-                    lim_x[index] = None
-                else:
-                    lim_x[index] = float(x)
-
-            for index, y in enumerate(lim_y):
-                if y == 'None':
-                    lim_y[index] = None
-                else:
-                    lim_y[index] = float(y)
-
-            label_string = self.tab.overviews[0].operations.fig_label_entry.get()#it returns a string
-            label = label_string.split(',')
-
-            self.pop.append(Pop_up(self,sizes,[lim_x,lim_y],label))
 
 class Start_screen():#should add general information and such
     def __init__(self,gui):
@@ -252,9 +228,9 @@ class Overview():
         self.make_figure()#figure_handler
         self.operations = operations.Operations(self)
         self.logbook = logbook.Logbook(self)
-        self.figure_handeler.redraw()
         self.data_tab.notebook.select(self.tab)
         self.close_botton()
+        self.figure_handeler.update_colour_scale()
 
     def close_botton(self):#to close the datatab
         botton = tk.ttk.Button(self.tab,text='close',command = self.close)
@@ -304,7 +280,6 @@ class Pop_up():#the pop up window
     def on_closing(self):
         self.popup.destroy()
         self.data_tab.pop.remove(self)
-
 
 if __name__ == "__main__":
     gui = GUI()

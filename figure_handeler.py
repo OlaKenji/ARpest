@@ -9,7 +9,6 @@ class Figure_handeler():
         self.int_range = self.overview.data_handler.files[0].save_dict.get('int_range',0)#should be moved to operations?
         self.cmap = self.overview.data_handler.files[0].save_dict.get('cmap','RdYlBu_r')#should be moved to operations?
         self.make_figures()
-
         self.colour_bar = figure.Colour_bar(self)
 
     def new_stack(self):#called when a new stack is attached
@@ -96,8 +95,6 @@ class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,overview):
         super().__init__(overview)
         self.twoD = ['center','right','down']
-        for fig in self.twoD:#update the 2D figures
-            self.figures[fig].update_colour_scale()
 
     def make_figures(self):
         figures = {'center':figure.FS,'right':figure.Band_right,'down':figure.Band_down,'corner':figure.DOS_right_down}
@@ -131,12 +128,17 @@ class Threedimension(Figure_handeler):#fermi surface
     def integrate(self):
         pass
 
+    def EF_corr(self):
+        adjust = processing.EF_corr_3D(self.figures['center'])
+        adjust.run()
+
+    def make_circle(self):
+        self.figures['center'].make_circle()
+
 class Twodimension(Figure_handeler):#band
     def __init__(self,overview):
         super().__init__(overview)
         self.twoD = ['center']
-        for fig in self.twoD:#update the 2D figures
-            self.figures[fig].update_colour_scale()
 
     def make_figures(self):
         figures = {'center':figure.Band,'right':figure.DOS_right,'down':figure.DOS_down}
@@ -163,3 +165,11 @@ class Twodimension(Figure_handeler):#band
         self.figures['right'].integrate()
         self.figures['down'].integrate()
         self.redraw()
+
+    def EF_corr(self):
+        return
+        adjust = processing.EF_corr(self.figures['center'])
+        adjust.run()
+
+    def make_circle(self):
+        pass        

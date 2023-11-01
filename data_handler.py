@@ -29,16 +29,22 @@ class Data_handler():#contains the stack of data as a list
 
     def select_file(self,event):#called when pressing an item in the catalog
         column = self.file_catalog.catalog.identify_row(event.y)#where did you click?
-        index = int(column[-1]) - 1
-        self.index = index
+        self.file_catalog.update(int(column[-1]) - 1)
+        self.index = int(self.file_catalog.catalog.focus()) - 1
         self.organise_data()
         self.overview.figure_handeler.new_stack()
-        self.update_catalog()
+        self.file_catalog.update(self.index)
+        self.state_catalog.update_catalog()
 
     def add_file(self,data, file):#called from load data bottom in data_catalog: it adds new files
         idx = file.rfind('/') + 1
         name = file[idx:]
-        self.files.append(File(data[0], name))
+        if any(isinstance(i, list) for i in data):#if okf file: it checks if it is a nested list
+            overview, file = 0, 0
+            data[overview][file].name = name
+            self.files.append(data[overview][file])
+        else:#normal file
+            self.files.append(File(data[0], name))
         self.index += 1
         self.organise_data()
         self.overview.figure_handeler.new_stack()

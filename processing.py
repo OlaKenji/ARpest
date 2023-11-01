@@ -1,5 +1,6 @@
 import numpy as np
 import tkinter as tk
+import matplotlib.pyplot as plt
 
 import figure, cursor#for range plot
 from scipy import ndimage
@@ -549,14 +550,15 @@ class Fermi_level_band(Raw):#only the main figure
         params = []
         functions = []
         for i,edc in enumerate(gold):
-            p, res_func = self.fit_fermi_dirac(energies, edc, self.e_0, T=self.T)
+            lenght = int(len(edc)*0.75)
+            p, res_func = self.fit_fermi_dirac(energies[lenght:-1], edc[lenght:-1], self.e_0, T=self.T)
             params.append(p)
             self.e_0 = p[0]#update teh guess
             functions.append(res_func)
 
         # Prepare the results
         params = np.array(params)
-        fermi_levels = params[:,0]
+        fermi_levels = np.clip(params[:,0],90.37,90.45)
         sigmas = params[:,1]
         slopes = params[:,2]
         offsets = params[:,3]
@@ -689,6 +691,203 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
         int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
         total_MDC = np.nansum(int,axis=1)#of gold
         self.figure.data[3] = self.figure.data[3]/total_MDC[:,None]
+
+class EF_corr_3D(Raw):#only the main figure
+    def __init__(self,parent_figure):
+        super().__init__(parent_figure)
+        self.kB = 1.38064852e-23 #[J/K]
+        self.eV = 1.6021766208e-19#[J]
+        self.W = 4.38#work function [eV]
+        self.hv = float(self.figure.overview.data_handler.file.get_data('metadata')['hv'])
+        self.e_0 = self.hv - self.W#initial guess of fermi level
+        self.T = 10#K the temperature
+
+    def run(self):
+        self.fit()#kevins stuff
+        self.update_figure()
+
+    def update_figure(self):
+        self.figure.overview.data_handler.state_catalog.append_state('fermilevel', len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.update_catalog()
+        self.figure.figure_handeler.new_stack()
+        self.figure.figure_handeler.update_mouse_range()
+
+    def pixel_shift(self,cut):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
+        print('lets shift')
+        energies = self.figure.data[2]
+
+        fermi_levels = self.EF
+        fermi_index = np.array([np.argmin(np.abs(energies - f)) for f in fermi_levels],dtype=int)#look for 0
+        max_shift = max(fermi_index)-min(fermi_index)
+        new_data = np.array([energies - level for level in fermi_levels])#shifted data#s
+        target_index = max(fermi_index)
+
+        dE = energies[1] - energies[0]
+
+        new_array = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
+        new_intensity = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
+        new_intensity[:] =  np.nan
+        intensity = cut
+
+        for row, array in enumerate(new_data):
+            shift = target_index - fermi_index[row]
+            if shift != 0:#insert at the begnning
+                empty_1 = np.empty(shift)
+                empty_1[:] = array[0]
+                array = np.insert(array,0,empty_1)
+                empty_1[:] = np.nan
+                temp = np.insert(intensity[row],0,empty_1)
+            else:
+                temp = intensity[row]
+
+            #insert at the end
+            more_shift = max_shift - shift
+            empty_1 = np.empty(more_shift)
+            empty_1[:] = array[-1]
+            array = np.append(array,empty_1)
+            empty_1[:] = np.nan
+            temp = np.append(temp,empty_1)
+
+            new_array[row] = array
+            new_intensity[row] = temp
+
+        new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:]))
+        return new_intensity, new_axis
+
+    def fit(self):
+        data = self.figure.data[-1]
+        energies = self.figure.data[2]
+
+        new_intensity=[]
+        temp = np.transpose(self.figure.data[3])
+        clip_radius = float(self.figure.overview.operations.c_clip_entry.get())
+
+        for i in range(0,len(self.figure.data[0])):
+            params = []
+            self.pos = []
+            cut = temp[i,:,:]
+            self.e_0 = self.hv - self.W#initial guess of fermi level
+            int_range = 0
+
+            #look for index within the defined circle
+            x = self.figure.data[0][i]
+            y = (clip_radius**2 - x**2)**0.5
+
+            self.start_index = np.argmin(np.abs(self.figure.data[1] + y))
+            self.end_index = np.argmin(np.abs(self.figure.data[1] - y))
+
+            for i in range(self.start_index, self.end_index, 20):
+                start,stop=i-int_range,i+1+int_range
+                step = stop- start
+                edc = sum(cut[start:stop:1])/step
+                self.pos.append(self.figure.data[1][start])
+                lenght = int(len(cut)*0.14)
+                p, res_func = self.fit_fermi_dirac(energies[lenght:-1], edc[lenght:-1], self.e_0, T = self.T)
+                params.append(p)
+                self.e_0 = p[0]#update the guess
+
+            # Prepare the results
+            params = np.array(params)
+            fermi_levels = params[:,0]
+            sigmas = params[:,1]
+            slopes = params[:,2]
+            offsets = params[:,3]
+
+            self.EF = fermi_levels#need to fit a polynomal to make a continuis Efs
+            self.fit_polynomal()
+            #plt.pcolormesh(self.figure.data[2],self.figure.data[1],cut)
+            #plt.plot(self.EF,self.figure.data[1])
+            #plt.show()
+            intensity, axis = self.pixel_shift(cut)
+            new_intensity.append(np.transpose(intensity))
+
+        corr_intensity = self.correct_intensity(new_intensity)
+        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict['zscale'] = np.linspace(axis.min(),axis.max(),len(corr_intensity))
+        dict['data'] = corr_intensity
+        self.figure.overview.data_handler.file.add_state(dict,'fermi corr')
+
+    def correct_intensity(self,new_intensity):
+        maxList = max(new_intensity, key = len)
+        maxLength = len(maxList)
+        placeholder = np.zeros((maxLength,len(self.figure.data[1]),len(self.figure.data[0])))
+        placeholder[:] = np.nan
+        for index, intensity in enumerate(new_intensity):
+            start_index = 0
+            placeholder[start_index:len(intensity),start_index:len(np.transpose(intensity)),index] = intensity
+        return placeholder
+
+    def fit_polynomal(self):
+        polynomal = np.polyfit(self.pos, self.EF,4)
+        xp = self.figure.data[1]
+        p = np.poly1d(polynomal)
+        self.EF = p(xp)
+
+        self.EF[0:self.start_index] = self.EF[self.start_index]
+        self.EF[self.end_index:-1] = self.EF[self.end_index]
+
+    def fit_fermi_dirac(self,energies,edc,e_0,T=10, sigma0=1, a0=0, b0=-0.1):
+        # Normalize the EDC to interval [0, 1]
+        edcmin = edc.min()
+        edcmax = edc.max()
+        edc = (edc-edcmin)/max((edcmax-edcmin),1)
+
+        # Initial guess and bounds for parameters
+        p0 = [e_0, sigma0, a0, b0]
+        de = 1
+        lower = [e_0-de, 0, -10, -1]
+        upper = [e_0+de, 100, 10, 1]
+
+        # Carry out the fit
+        p, cov = curve_fit(self.FD_function, energies, edc, p0=p0, bounds=(lower, upper))
+
+        res_func = lambda x : self.FD_function(x, *p)
+        return p, res_func
+
+    def FD_function(self,E, E_F, sigma, a, b, T=10):
+        # Basic Fermi Dirac distribution at given T
+        sigma =0
+        kT = self.kB * self.T / self.eV
+        y = 1 / (np.exp((E-E_F)/kT) + 1)
+
+        # Add a linear contribution to the 'below-E_F' part
+        y += (a*(E-E_F)+b) * self.step_function(E, E_F, flip=True)
+
+        # Convolve with instrument resolution
+        if sigma > 0 :
+            y = ndimage.gaussian_filter(y, sigma)
+        return y
+
+    def step_function(self,x, step_x, flip) :
+        res = \
+        np.frompyfunc(lambda x : self.step_function_core(x, step_x, flip), 1, 1)(x)
+        return res.astype(float)
+
+    def step_function_core(self,x, step_x, flip) :
+        """ Implement a perfect step function f(x) with step at `step_x`::
+
+                    / 0   if x < step_x
+                    |
+            f(x) = {  0.5 if x = step_x
+                    |
+                    \ 1   if x > step_x
+
+        **Parameters**
+
+        ======  ====================================================================
+        x       array; x domain of function
+        step_x  float; position of the step
+        flip    boolean; Flip the > and < signs in the definition
+        ======  ====================================================================
+        """
+        sign = -1 if flip else 1
+        if sign*x < sign*step_x :
+            result = 0
+        elif x == step_x :
+            result = 0.5
+        elif sign*x > sign*step_x :
+            result = 1
+        return result
 
 class Range_plot(Raw):
     def __init__(self,parent_figure):
