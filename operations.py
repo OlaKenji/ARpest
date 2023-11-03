@@ -28,10 +28,13 @@ class Operations():
         self.define_derivative()
         self.define_smooth()
         self.define_curvature()
-        self.define_normalise()
+        self.define_normalise_slices()
         self.define_orientation_botton()
         self.define_integrate()
         self.define_EF_correction()
+        self.define_normalise_by()
+        self.divide_by()
+        self.define_normalise_cuts()
 
         #figures
         self.define_fig_size()
@@ -46,6 +49,8 @@ class Operations():
 
         #clip
         self.define_c_clip()
+        self.define_hori_clip()
+        self.define_remove_line()
 
     def make_box(self):#make a box with operations options on the figures
         self.notebook = tk.ttk.Notebook(master=self.overview.tab,width=610, height=300)#to make tabs
@@ -146,6 +151,8 @@ class Operations():
     def define_fermilevel(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Fermi level", command = self.overview.figure_handeler.fermi_level)
         button_calc.place(x = 0, y = 70)
+        self.fermi_normalisation = entities.Button(self, self.operation_tabs['Operations'],'Fermi_level',['on','off'])
+        self.fermi_normalisation.place(x = 120, y = 70)
 
     def define_kz(self):
         button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="kz", command = self.overview.figure_handeler.kz_convert)#which figures shoudl have access to this?
@@ -167,9 +174,23 @@ class Operations():
         botton = tk.ttk.Button(self.operation_tabs['Operations'], text="EF corr", command = self.overview.figure_handeler.EF_corr)#which figures shoudl have access to this?
         botton.place(x = 0, y = 250)
 
-    def define_normalise(self):
-        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Normalise slice", command = self.overview.figure_handeler.normalise)#which figures shoudl have access to this?
+    def define_normalise_slices(self):#for e.g. kz
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Normalise slices", command = self.overview.figure_handeler.normalise_slices)#which figures shoudl have access to this?
         button_calc.place(x = 0, y = 220)
+
+    def define_normalise_by(self):#for e.g. kz
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Normalise by", command = self.overview.figure_handeler.normalise_by)#which figures shoudl have access to this?
+        button_calc.place(x = 200, y = 220)
+        self.normalise_by = entities.Button(self, self.operation_tabs['Operations'],'Normalise_by',['EDC','MDC'])
+        self.normalise_by.place(x = 300, y = 220)
+
+    def divide_by(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Divide by", command = self.overview.figure_handeler.divide_by)#which figures shoudl have access to this?
+        button_calc.place(x = 200, y = 250)
+
+    def define_normalise_cuts(self):
+        button_calc = tk.ttk.Button(self.operation_tabs['Operations'], text="Normalise cuts", command = self.overview.figure_handeler.normalise_cuts)#which figures shoudl have access to this?
+        button_calc.place(x = 100, y = 220)
 
     #figure tab
     def define_fig_size(self):
@@ -296,7 +317,7 @@ class Operations():
             self.overview.figure_handeler.figures['center'].data[index] /= (value/scale)
         self.overview.figure_handeler.draw()
 
-    #clipbo
+    #clip
     def define_c_clip(self):
         mult_calc = tk.ttk.Button(self.operation_tabs['Clip'], text="circle clip", command = self.overview.figure_handeler.make_circle)
         mult_calc.place(x = 0, y = 10)
@@ -305,3 +326,17 @@ class Operations():
         default = self.overview.data_handler.file.save_dict.get('c_clip_entry','17')
         self.c_clip_entry.insert(0, default)#default text
         self.c_clip_entry.place(x = 110, y = 10)
+
+    def define_hori_clip(self):
+        mult_calc = tk.ttk.Button(self.operation_tabs['Clip'], text="hori clip", command = self.overview.figure_handeler.make_hori_clip)
+        mult_calc.place(x = 0, y = 40)
+        self.hori_clip_enties = []
+        default_values = [-15,15]
+        for i in range(0,2):
+            self.hori_clip_enties.append(tk.ttk.Entry(self.operation_tabs['Clip'], width= 3))
+            default = self.overview.data_handler.file.save_dict.get('hori_clip_enties',str(default_values[i]))
+            self.hori_clip_enties[i].insert(0, default)#default text
+            self.hori_clip_enties[i].place(x = 110 + 40*i, y = 40)
+
+    def define_remove_line(self):
+        pass

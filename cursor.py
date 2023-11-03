@@ -24,6 +24,13 @@ class Auto_cursor():
         self.sta_horizontal_line.set_ydata(self.pos[1])#this is needed to be set once. This is so that .get_data() return the same form (for some reason)
         self.sta_vertical_line.set_xdata(self.pos[0])#this is needed to be set once. This is so that .get_data() return the same form (for some reason)
 
+        #self.figure.artists['text'] = self.text
+        #self.figure.artists['dyn_horizontal_line'] = self.dyn_horizontal_line
+        #self.figure.artists['dyn_vertical_line'] = self.dyn_vertical_line
+        #self.figure.artists['angle_line'] = self.angle_line
+        #self.figure.artists['sta_horizontal_line'] = self.sta_horizontal_line
+        #self.figure.artists['sta_vertical_line'] = self.sta_vertical_line
+
     def reset_position(self):
         self.dyn_horizontal_line.set_ydata(self.center[1])
         self.dyn_vertical_line.set_xdata(self.center[0])
@@ -72,10 +79,9 @@ class Auto_cursor():
         self.figure.ax.draw_artist(self.angle_line)
         self.figure.ax.draw_artist(self.sta_horizontal_line)
         self.figure.ax.draw_artist(self.sta_vertical_line)
-        #self.figure.range_cursor.redraw()
         self.figure.canvas.blit(self.figure.ax.bbox)
 
-class Range_cursor():#not in use
+class Horizontal_cursor():#not in use
     def __init__(self, figure):
         self.figure = figure
 
@@ -87,10 +93,9 @@ class Range_cursor():#not in use
 
         self.pos = self.figure.cursor.pos[1]
 
-        self.width=self.figure.overview.range
-        thickness = self.figure.overview.int_range + 0.8
-        self.up_line = self.figure.ax.axhline(self.pos+self.width,color='y', lw=thickness)
-        self.down_line = self.figure.ax.axhline(self.pos-self.width,color='y', lw=thickness)
+        thickness = 1
+        self.up_line = self.figure.ax.axhline(self.pos+1,color='y', lw=thickness)
+        self.down_line = self.figure.ax.axhline(self.pos-1,color='y', lw=thickness)
 
     def draw_sta_line(self):
         self.width=self.figure.overview.range
@@ -124,7 +129,7 @@ class Range_cursor():#not in use
     def get_position(self):
         return [self.pos-self.width,self.pos+self.width]
 
-class Verti_cursor():#not in use
+class Vertical_cursor():#not in use
     def __init__(self, figure):
         self.figure = figure
         self.ax = self.figure.ax

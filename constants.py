@@ -1,6 +1,6 @@
 #gui
 window_size = [1920,1080]
-start_path = '/Users/olakenjiforslund/Library/CloudStorage/OneDrive-Chalmers/Work/Research/Experiment/Data/Photons'
+start_path = '/Users/olakenjiforslund/OKF/Work/Research/Experiment/Data/Photons'
 
 #figure
 figure_position = [-4,0]

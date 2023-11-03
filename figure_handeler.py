@@ -1,5 +1,7 @@
 import figure, processing, constants, data_handler
 import numpy as np
+import copy
+import matplotlib.pyplot as plt
 
 class Figure_handeler():
     def __init__(self,overview):
@@ -46,9 +48,6 @@ class Figure_handeler():
         adjust = processing.Convert_k(self.figures['center'])
         adjust.run()
 
-    def symmetrise(self):#called when pressed the botton
-        pass
-
     def derivative(self):#called when pushing the 2nd derivative botton
         if self.overview.operations.orientation_botton.configure('text')[-1] == 'horizontal':
             adjust = processing.Derivative_x(self.figures['center'])
@@ -91,6 +90,22 @@ class Figure_handeler():
     def subtract_BG(self):
         self.figures['center'].subtract_BG()
 
+    def make_hori_clip(self):#clips the data based on 2 horizontal lines
+        values = []
+        dict = copy.deepcopy(self.overview.data_handler.file.data[self.overview.data_handler.file.index])
+        for entry in self.overview.operations.hori_clip_enties:
+            values.append(float(entry.get()))
+        min_index = np.argmin(np.abs(self.figures['center'].data[1]-min(values)))
+        max_index = np.argmin(np.abs(self.figures['center'].data[1]-max(values)))
+
+        dict['data'] = dict['data'][:,min_index:max_index,:]
+        dict['yscale'] = dict['yscale'][min_index:max_index]
+
+        self.overview.data_handler.file.add_state(dict,'clipped'+str(min(values))+','+str(min(values)))
+        self.overview.data_handler.state_catalog.append_state('clipped'+str(min(values))+','+str(min(values)), len(self.overview.data_handler.file.states))
+        self.overview.data_handler.state_catalog.update_catalog()
+        self.new_stack()
+
 class Threedimension(Figure_handeler):#fermi surface
     def __init__(self,overview):
         super().__init__(overview)
@@ -103,7 +118,7 @@ class Threedimension(Figure_handeler):#fermi surface
         for key in figures.keys():
             self.figures[key] = figures[key](self,positions[key])#figures are initated here
 
-    def fermi_level(self):#called when pressed the botton
+    def fermi_level(self):#corrects the fermi level based on a referecnce (gold) cut
         adjust = processing.Fermi_level_FS(self.figures['center'])
         adjust.run()
 
@@ -111,7 +126,7 @@ class Threedimension(Figure_handeler):#fermi surface
         adjust = processing.Convert_kz(self.figures['center'])
         adjust.run()
 
-    def normalise(self):#normalise slice
+    def normalise_slices(self):#normalise each slice in a 3D data. useful for e.g. for kz
         temp = np.transpose(self.figures['center'].data[3],(2, 0, 1))
         temp2 = self.figures['center'].data[3].copy()
         for index, ary in enumerate(temp):#divide each angle with maximum
@@ -125,15 +140,34 @@ class Threedimension(Figure_handeler):#fermi surface
         self.overview.data_handler.update_catalog()
         self.new_stack()
 
-    def integrate(self):
-        pass
+    def integrate(self):#sums up the EDC
+        self.figures['corner'].int_right = np.nansum(self.figures['right'].int,axis=0)/len(self.figures['right'].int)
+        self.figures['corner'].int_down = np.nansum(self.figures['down'].int,axis=1)/len(self.figures['down'].int[0,:])
 
-    def EF_corr(self):
+        self.figures['corner'].artists['graph2'].set_ydata(self.figures['corner'].int_down)
+        self.figures['corner'].artists['graph1'].set_ydata(self.figures['corner'].int_right)
+        self.redraw()
+
+    def EF_corr(self):#corrects EF based on oneself
         adjust = processing.EF_corr_3D(self.figures['center'])
         adjust.run()
 
-    def make_circle(self):
+    def make_circle(self):#makes a circle that defines the region of inetres. Works for EF corr now
         self.figures['center'].make_circle()
+
+    def normalise_by(self):#-2D data: it normalises the center figure by what is plotted in teh EDC or MDC
+        pass
+
+    def normalise_cuts(self):#notmalises the cuts to 1
+        self.figures['corner'].int_down =  self.figures['corner'].int_down/np.nanmax(self.figures['corner'].int_down)
+        self.figures['corner'].int_right =  self.figures['corner'].int_right/np.nanmax(self.figures['corner'].int_right)
+        self.redraw()
+
+    def divide_by(self):#2D data: reads in a ile and divide the center figure with this file
+        pass
+
+    def symmetrise(self):#called when pressed the botton
+        pass
 
 class Twodimension(Figure_handeler):#band
     def __init__(self,overview):
@@ -147,7 +181,7 @@ class Twodimension(Figure_handeler):#band
         for key in figures.keys():
             self.figures[key] = figures[key](self,positions[key])#figures are initated here
 
-    def fermi_level(self):#called when pressed the botton
+    def fermi_level(self):#called when pressed the botton. corrects the fermi level based on a Au cut
         adjust = processing.Fermi_level_band(self.figures['center'])
         adjust.run()
 
@@ -158,18 +192,52 @@ class Twodimension(Figure_handeler):#band
         adjust = processing.Symmetrise(self.figures['center'])
         adjust.run()
 
-    def normalise(self):
+    def normalise_slices(self):#only 3D data -> disable if it is 2D?
         pass
 
-    def integrate(self):
-        self.figures['right'].integrate()
-        self.figures['down'].integrate()
+    def integrate(self):#it summs up the right and down figures
+        self.figures['right'].int = np.sum(self.figures['center'].int,axis=1)/len(self.figures['center'].int[0,:])
+        self.figures['down'].int = np.nansum(self.figures['center'].int,axis=0)/len(self.figures['center'].int)
         self.redraw()
 
-    def EF_corr(self):
-        return
+    def EF_corr(self):#fermi level on one self
+        return#need to make the cirly part geenral
         adjust = processing.EF_corr(self.figures['center'])
         adjust.run()
 
-    def make_circle(self):
-        pass        
+    def make_circle(self):#only 3D data -> disable if it is 2D?
+        pass
+
+    def normalise_by(self):#-2D data: it normalises the center figure by what is plotted in teh EDC or MDC
+        dict = copy.deepcopy(self.overview.data_handler.file.data[self.overview.data_handler.file.index])
+        if self.overview.operations.normalise_by.configure('text')[-1] == 'MDC':
+            dict['data'] = self.figures['center'].data[-1] / self.figures['right'].int[:, np.newaxis]
+        else:#MDC
+            dict['data'] = self.figures['center'].data[-1] / self.figures['down'].int
+
+        dict['data'] = np.nan_to_num(dict['data'],nan = 0.0)
+
+        self.overview.data_handler.file.add_state(dict,'normalise_by'+self.overview.operations.normalise_by.configure('text')[-1])
+        self.overview.data_handler.state_catalog.append_state('normalise_by'+self.overview.operations.normalise_by.configure('text')[-1], len(self.overview.data_handler.file.states))
+        self.overview.data_handler.state_catalog.update_catalog()
+        self.new_stack()
+
+    def divide_by(self):#reads in a ile and divide the center figure with this file
+        ref_data, gold = self.overview.data_tab.data_loader.gold_please()
+        if not ref_data: return
+        dict = copy.deepcopy(self.overview.data_handler.file.data[self.overview.data_handler.file.index])
+        result = self.figures['center'].data[-1][0] / ref_data[0]['data'][0]
+
+        dict['data'] = np.transpose(np.atleast_3d(result),(2,0,1))
+        dict['data'] = np.nan_to_num(dict['data'],nan = 0.0,posinf=0, neginf=0)
+
+        name = gold[gold.rfind('/')+1:]#used in overview
+        self.overview.data_handler.file.add_state(dict,'divided_by:_'+name)
+        self.overview.data_handler.state_catalog.append_state('divided_by:_'+ name, len(self.overview.data_handler.file.states))
+        self.overview.data_handler.state_catalog.update_catalog()
+        self.new_stack()
+
+    def normalise_cuts(self):#normalise the cuts to 1
+        self.figures['right'].int =  self.figures['right'].int/np.nanmax(self.figures['right'].int)
+        self.figures['down'].int =  self.figures['down'].int/np.nanmax(self.figures['down'].int)
+        self.redraw()

@@ -5,6 +5,7 @@ from igor import binarywave#implement reading igor file
 import pickle
 import sys
 from dateutil import parser
+import tkinter as tk
 
 def start_step_n(start, step, n) :
     """
@@ -25,6 +26,18 @@ class Data_loader():
         self.data_tab.gui.start_screen.instrument.set(result[0][0].save_dict['instrument'])#update the instruent for this file
         self.orientation =  getattr(sys.modules[__name__], result[0][0].save_dict['instrument'])(None).orientation#set laso the orientation for this file
         return result
+
+    def gold_please(self):
+        gold = tk.filedialog.askopenfilename(initialdir=self.data_tab.gui.start_path ,title='gold please')#usually gold
+        if not gold: return None, None
+        gold_data = self.load_data(gold)
+        if gold.endswith('okf'):#sometimes, some operations has been done on gold. And we would like to use this gold, maybe
+            overveiw_index, file_index = 0, 0
+            state_index = gold_data[overveiw_index][file_index].index
+            ref_data = [gold_data[overveiw_index][file_index].data[state_index]]#take the first data file and the state index it was saved on
+        else:
+            ref_data = gold_data
+        return ref_data, gold
 
     @staticmethod
     def read_metadata(keys, metadata_file):

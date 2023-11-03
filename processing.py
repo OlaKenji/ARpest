@@ -200,7 +200,7 @@ class Convert_k(Raw):
                 KY[i] = cos_theta * np.sin(a[i])
 
         if KY.shape[1] == 1:#2D, band
-            dict = self.figure.overview.data_handler.file.data[-1].copy()
+            dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
             dict['yscale'] = np.linspace(k0*KY.min(), k0*KY.max(),len(KY.ravel()))#update
             self.figure.overview.data_handler.file.add_state(dict,'k_convert')
         else:#3D, FS
@@ -241,7 +241,7 @@ class Convert_k(Raw):
                     inrange = True
                 intensity[row][col][:] = real_int
 
-        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
         dict['yscale'] = axis_y
         dict['xscale'] = axis_x
         dict['data'] = np.transpose(intensity,(2, 0, 1))
@@ -276,7 +276,7 @@ class Convert_kz(Raw):
         ky = np.transpose(np.array(ky))
 
         #to let ppcolormesh handle the interpolation
-        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
         dict['xscale'] = kz
         dict['yscale'] = ky
         self.figure.overview.data_handler.file.add_state(dict,'k_convert')
@@ -308,7 +308,7 @@ class Convert_kz(Raw):
             Z[:,:,index] = interp(X,Y).T
             print(index/len(axis_z))
 
-        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
         dict['xscale'] = axis_x
         dict['yscale'] = axis_y
         dict['zscale'] = axis_z
@@ -467,9 +467,8 @@ class Convert_kz(Raw):
 class Fermi_level_band(Raw):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
-        gold = tk.filedialog.askopenfilename(initialdir=self.figure.overview.data_tab.gui.start_path ,title='gold please')
-        if not gold: return
-        self.gold = self.figure.overview.data_tab.data_loader.load_data(gold)
+        ref_data, gold = self.figure.overview.data_tab.data_loader.gold_please()
+        self.gold = ref_data
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
         self.W = 4.38#work function [eV]
@@ -481,20 +480,12 @@ class Fermi_level_band(Raw):#only the main figure
         self.fit()#kevins stuff
         self.pixel_shift()
         self.update_figure()
-        self.normalise()
 
     def update_figure(self):
-        self.figure.overview.data_handler.state_catalog.append_state('fermilevel', len(self.figure.overview.data_handler.file.states))
+        self.figure.overview.data_handler.state_catalog.append_state('fermilevel'+self.figure.overview.operations.fermi_normalisation.configure('text')[-1], len(self.figure.overview.data_handler.file.states))
         self.figure.overview.data_handler.state_catalog.update_catalog()
         self.figure.figure_handeler.new_stack()
         self.figure.figure_handeler.update_mouse_range()
-
-    def normalise(self):
-        difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
-        index1 = np.argmin(difference_array)
-        int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
-        total_MDC = np.nansum(int,axis=1)#of gold
-        self.figure.int = (self.figure.int.T/total_MDC).T#works for 2D
 
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
         print('lets shift')
@@ -537,10 +528,19 @@ class Fermi_level_band(Raw):#only the main figure
 
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:]))
 
-        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict = copy.deepcopy(self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index])
         dict['xscale'] = new_axis
+        if self.figure.overview.operations.fermi_normalisation.configure('text')[-1] == 'on':
+            new_intensity = self.normalise(new_intensity)
         dict['data'] = np.transpose(np.atleast_3d(new_intensity),(2,0,1))
-        self.figure.overview.data_handler.file.add_state(dict,'fermilevel')
+        self.figure.overview.data_handler.file.add_state(dict,'fermilevel_'+self.figure.overview.operations.fermi_normalisation.configure('text')[-1])
+
+    def normalise(self,new_intensity):
+        difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
+        index1 = np.argmin(difference_array)
+        int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
+        total_MDC = np.nansum(int,axis=1)#of gold
+        return (new_intensity.T/total_MDC).T#works for 2D
 
     def fit(self):
         gold = self.gold[0]['data'][0]
@@ -550,7 +550,7 @@ class Fermi_level_band(Raw):#only the main figure
         params = []
         functions = []
         for i,edc in enumerate(gold):
-            lenght = int(len(edc)*0.75)
+            lenght = int(len(edc)*0.1)
             p, res_func = self.fit_fermi_dirac(energies[lenght:-1], edc[lenght:-1], self.e_0, T=self.T)
             params.append(p)
             self.e_0 = p[0]#update teh guess
@@ -558,7 +558,7 @@ class Fermi_level_band(Raw):#only the main figure
 
         # Prepare the results
         params = np.array(params)
-        fermi_levels = np.clip(params[:,0],90.37,90.45)
+        fermi_levels = params[:,0]
         sigmas = params[:,1]
         slopes = params[:,2]
         offsets = params[:,3]
@@ -680,17 +680,20 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
         new_intensity = np.array(new_intensity)
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:,0]))
 
-        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
         dict['zscale'] = new_axis
-        dict['data'] = np.transpose(new_intensity, (1, 0, 2))
+        if self.figure.overview.operations.fermi_normalisation.configure('text')[-1] == 'on':
+            new_intensity = self.normalise(new_intensity)
+        dict['data'] = new_intensity#np.transpose(new_intensity, (1, 0, 2))
         self.figure.overview.data_handler.file.add_state(dict,'fermilevel')
 
-    def normalise(self):
+    def normalise(self,new_intensity):
         difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
         index1 = np.argmin(difference_array)
         int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
         total_MDC = np.nansum(int,axis=1)#of gold
-        self.figure.data[3] = self.figure.data[3]/total_MDC[:,None]
+        result = np.transpose(new_intensity,(1,0,2))/total_MDC[:,np.newaxis]
+        return result
 
 class EF_corr_3D(Raw):#only the main figure
     def __init__(self,parent_figure):
@@ -802,7 +805,7 @@ class EF_corr_3D(Raw):#only the main figure
             new_intensity.append(np.transpose(intensity))
 
         corr_intensity = self.correct_intensity(new_intensity)
-        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
         dict['zscale'] = np.linspace(axis.min(),axis.max(),len(corr_intensity))
         dict['data'] = corr_intensity
         self.figure.overview.data_handler.file.add_state(dict,'fermi corr')

@@ -11,19 +11,16 @@ import os
 import figure_handeler, data_loader, constants, entities, logbook, operations, data_handler
 
 #to implement:
-#normalise EDC/MDC by max
-#optional normalisation when fermi_level by gold
 #range plots
 #fitting?
 #fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
-#normalisation by division of gold -> chun_ not rellisable
 #log scale -> not supported by pcolorfast
 #select area:
     #normalise based on some selected area?
 #symmetrise based on a reference?
 #phi rotation in k convert?
 #the inital start cut position
-#clipping data
+#make the fermi level botton detect if it is a 2D gold or 3D, and from there do the prope stuff
 
 #the cutting of okf file seems fatser than raw file. why? :D
 
@@ -73,7 +70,7 @@ class GUI():#master Gui
         self.style.map('TNotebook.Tab', background= [("selected", "white")])#makes the selected tab white
         self.style.configure("TNotebook", background= 'white')#makes ther notebook bg white
 
-        self.style.configure("TScale", background="white")#makes ther notebook bg white
+        #self.style.configure("TScale", background="white")#makes ther notebook bg white
 
         #self.style.configure('TCheckbutton',indicatorbackground="black", indicatorforeground="white",background="white", foreground="white")
         #self.style.map('TCheckbutton', foreground=[('disabled', 'blue'),('selected', 'blue'),('!selected', 'grey')],background=[("active", "white")])
@@ -116,7 +113,7 @@ class Start_screen():#should add general information and such
         drop.config(bg = "white")
         drop.place(x = 100, y = 300)
 
-class Data_tab():#holder for overview tabs. The data is stored here
+class Data_tab():#holder for overview tabs.
     def __init__(self, gui, file):
         self.gui = gui
         self.define_tab(file)
