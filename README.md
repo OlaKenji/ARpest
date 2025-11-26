@@ -33,7 +33,6 @@ A modern, interactive Python application for analysing ARPES (Angle-Resolved Pho
 - Python 3.9 or higher
 - PyQt5
 - NumPy
-- Matplotlib
 - SciPy
 - h5py
 - igor (optional, for `.ibw` files)
@@ -80,20 +79,7 @@ python run.py
 ### Supported Beamlines
 
 #### Diamond Light Source - I05
-- **File format**: `.nxs`, `.h5` (HDF5)
-- **Data types**: 
-  - 2D single cuts
-  - 3D deflector angle scans
-  - 3D photon energy scans
-- **Metadata**: Automatically extracts photon energy, tilt angles, temperature
-
 #### MAX IV - Bloch
-- **File formats**: `.zip`, `.ibw`
-- **Data types**:
-  - 2D single cuts (`.ibw`, `.zip`)
-  - 3D photon energy scans (`.ibw`)
-  - 3D Fermi surface maps (`.zip`)
-- **Metadata**: Extracts scan parameters from viewer.ini and IBW headers
 
 ## Data Model
 ARpest uses a unified data structure for all beamlines:
@@ -117,37 +103,6 @@ This design allows:
 - Type-safe operations with proper validation
 
 ---
-
-## Key Features in Detail
-
-### State Management
-Every operation creates a new state that can be restored:
-
-```python
-file_stack = FileStack(
-    filename="my_data.nxs",
-    raw_data=dataset,  # Original data (never modified)
-)
-
-# After processing
-file_stack.add_state(processed_dataset, "normalized")
-file_stack.add_state(further_processed, "fermi_aligned")
-
-```
-
-### Extensible Loader System
-Adding a new beamline is straightforward:
-
-```python
-class MyBeamlineLoader(BaseLoader):
-    def can_load(self, filepath: Path) -> bool:
-        # Check if file is from this beamline
-        return filepath.suffix == ".xyz" and self._check_format(filepath)
-    
-    def load(self, filepath: Path) -> Dataset:
-        # Load and return unified Dataset
-        return Dataset(x_axis=..., y_axis=..., intensity=...)
-```
 
 ## Roadmap
 
@@ -188,12 +143,7 @@ If you use ARpest in your research, please cite:
 ```
 
 ---
-## Contact
 
-- **Issues**: [GitHub Issues](https://github.com/OlaKenji/arpest/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/OlaKenji/arpest/discussions)
-
----
 ## Screenshots
 
 ### 2D Single Cut Analysis
