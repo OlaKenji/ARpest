@@ -1,6 +1,12 @@
-import numpy as np 
-from ..constants import * 
+"""Helpers for fitting and aligning Fermi-Dirac distributions."""
+
+from __future__ import annotations
+
+import numpy as np
+from scipy import ndimage
 from scipy.optimize import curve_fit
+
+from ..constants import kB, elementary_charge
 from scipy import ndimage
 
 def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=1, a0=0, b0=-0.1):
@@ -23,8 +29,8 @@ def fit_fermi_dirac(energies, edc, e_0, T=10, sigma0=1, a0=0, b0=-0.1):
 
 def FD_function(E, E_F, sigma, a, b, T=10):
     # Basic Fermi Dirac distribution at given T
-    sigma =0
-    kT = kB * T / eV
+    sigma = 0
+    kT = kB * T / elementary_charge
     y = 1 / (np.exp((E-E_F)/kT) + 1)
 
     # Add a linear contribution to the 'below-E_F' part

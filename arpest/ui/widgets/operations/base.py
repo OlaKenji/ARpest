@@ -1,4 +1,4 @@
-"""Base classes for processing operations."""
+"""Base classes for processing operation widgets."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from typing import Any, Callable, Optional
 
 from PyQt5.QtWidgets import QGroupBox, QMessageBox
 
-from ..models import Dataset, FileStack
+from ....models import Dataset, FileStack
+
 
 class OperationWidget(QGroupBox):
     """Abstract widget representing a single operation."""
