@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arpest"
+version = "2.0.0"
+description = "ARPES data analysis and visualization tool"
+authors = [{name = "Ola Kenjiforslund"}]
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+dependencies = [
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+    "scipy>=1.11.0",
+    "h5py>=3.0.0",
+]
+
+# Note: Install either PyQt6 (requires macOS 13+) or PyQt5 manually
+# pip install PyQt6  # For macOS 13+ or Linux
+# pip install PyQt5  # For macOS 12 or older systems
+#
+# Optional: For IBW file support (Bloch beamline)
+# pip install igor
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-qt>=4.2.0",
+    "black>=23.0.0",
+    "mypy>=1.5.0",
+    "ruff>=0.0.290",
+]
+
+[project.scripts]
+arpest = "arpest.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["arpest*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
