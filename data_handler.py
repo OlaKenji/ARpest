@@ -7,15 +7,17 @@ class Data_handler():#contains the stack of data as a list
     def __init__(self, overivew, data):
         self.overview = overivew
 
-        if isinstance(data,list):#if okf file -> old file: contains meta and x,y,z,data
-            self.index = data[0].save_dict.get('data_stack_index',0)#[0] points to state, [1] points to file
-            self.files = data.copy()#a list of file objects
-            self.file = self.files[0]#data.copy()#copy all dict to self.file
+        if len(data.keys()) <= 2:#if okf file -> old file: contains meta and x,y,z,data
+            self.index = data['global'].get('data_stack_index',0)
+            self.files = data['files'].copy()#a list of file objects
+            self.file = self.files[0]
             self.organise_data()
+            self.save_dict = data['global']
         else:#if normal file -> first time
             self.files = [File(data, self.overview.data_tab.name)]
             self.file = self.files[0]#a file object
             self.index = 0
+            self.save_dict = {}
 
         self.file_catalog = file_catalog.File_catalog(self)
         self.state_catalog = state_catalog.State_catalog(self)
@@ -29,8 +31,10 @@ class Data_handler():#contains the stack of data as a list
 
     def select_file(self,event):#called when pressing an item in the catalog
         column = self.file_catalog.catalog.identify_row(event.y)#where did you click?
-        self.file_catalog.update(int(column[-1]) - 1)
-        self.index = int(self.file_catalog.catalog.focus()) - 1
+        self.file_catalog.update(int(column) -1)#update the tree
+
+        curItem = self.file_catalog.catalog.focus()#get the focus item
+        self.index = int(curItem) - 1
         self.organise_data()
         self.overview.figure_handeler.new_stack()
         self.file_catalog.update(self.index)
@@ -45,7 +49,8 @@ class Data_handler():#contains the stack of data as a list
             self.files.append(data[overview][file])
         else:#normal file
             self.files.append(File(data[0], name))
-        self.index += 1
+
+        self.index = len(self.files)-1
         self.organise_data()
         self.overview.figure_handeler.new_stack()
         self.file_catalog.update_catalog()
@@ -65,7 +70,6 @@ class File():#the data onject, contains the list of data and the rellavant poitn
         self.data = [data]
         self.index = 0
         self.states = ['raw']
-        self.save_dict = {}
         self.name = name
 
     def remove_state(self):
@@ -96,6 +100,3 @@ class File():#the data onject, contains the list of data and the rellavant poitn
 
     def set_state(self,index):
         self.index = index
-
-    def save(self,dict):#
-        self.save_dict.update(dict)

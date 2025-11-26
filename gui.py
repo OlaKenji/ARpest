@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+#from tkinter import ttk
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -19,16 +19,12 @@ import figure_handeler, data_loader, constants, entities, logbook, operations, d
     #normalise based on some selected area?
 #symmetrise based on a reference?
 #phi rotation in k convert?
-#the inital start cut position
-#make the fermi level botton detect if it is a 2D gold or 3D, and from there do the prope stuff
-
-#the cutting of okf file seems fatser than raw file. why? :D
+#make the fermi level botton detect if it is a 2D gold or 3D, and from there do the proper stuff
 
 #Bugs:
 #binding energy plots are transposed with respect to kinetic energy
 #multiple file photon energy scan only seem to wor for evenly spaced energy scans
 #cursor not showing at the beginnig
-#figure changes colour for new pop up -> send self instead of just self.ax
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
@@ -50,6 +46,7 @@ class GUI():#master Gui
 
         self.start_path = constants.start_path
         self.start_screen = Start_screen(self)
+        self.data_tabs = []
         self.pop = []
 
     def design(self):
@@ -66,15 +63,14 @@ class GUI():#master Gui
         self.style.map('toggle.TButton', background=[('active','powderblue')])#when hovering
         self.style.configure('toggle.TButton', background = 'powderblue', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
 
+        self.style.map('soft.TButton', background=[('active','light goldenrod')])#when hovering
+        self.style.configure('soft.TButton', background = 'light goldenrod', foreground = 'black', borderwidth=1, focusthickness=3, focuscolor='none')
+
         self.style.configure('TFrame', background='white')#makes th frame where plots are white
         self.style.map('TNotebook.Tab', background= [("selected", "white")])#makes the selected tab white
         self.style.configure("TNotebook", background= 'white')#makes ther notebook bg white
 
-        #self.style.configure("TScale", background="white")#makes ther notebook bg white
-
-        #self.style.configure('TCheckbutton',indicatorbackground="black", indicatorforeground="white",background="white", foreground="white")
-        #self.style.map('TCheckbutton', foreground=[('disabled', 'blue'),('selected', 'blue'),('!selected', 'grey')],background=[("active", "white")])
-        #self.style.configure("TMenubutton", background="white")
+        self.style.configure("TScale", background="white")#makes the scale bg white
 
     def notebook(self):
         self.notebook = tk.ttk.Notebook(master = self.window,width=self.size[0],height=self.size[1])#to make tabs
@@ -88,12 +84,39 @@ class GUI():#master Gui
         files = tk.filedialog.askopenfilenames(initialdir = self.start_path ,title='data')
         if not files: return
         for file in files:
-            self.tab = Data_tab(self,file)
+            self.data_tabs.append(Data_tab(self,file))
         idx = file.rfind('/')+1
         self.start_path = file[:idx]#save the folder path so you start here next time
 
     def run(self):
         self.window.mainloop()
+
+    def pop_up(self,**kwarg):#called from figure right click or colour bar
+        size_string = kwarg['size']#depends on colur bar or figure
+        size = size_string.split(',')
+        label_size = kwarg['label_size'].split(',')
+        sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
+        
+        lim_string = self.data_tabs[kwarg['data_tab']].overviews[0].operations.fig_lim_entry.get()#it returns a string
+        lim_string2 = lim_string.split(';')
+        lim_x = lim_string2[0].split(',')
+        lim_y = lim_string2[1].split(',')
+
+        for index, x in enumerate(lim_x):
+            if x == 'None':
+                lim_x[index] = None
+            else:
+                lim_x[index] = float(x)
+
+        for index, y in enumerate(lim_y):
+            if y == 'None':
+                lim_y[index] = None
+            else:
+                lim_y[index] = float(y)
+
+        label_string = self.data_tabs[kwarg['data_tab']].overviews[0].operations.fig_label_entry.get()#it returns a string
+        label = label_string.split(',')
+        self.pop.append(Pop_up(self,sizes,[lim_x,lim_y],label, label_size))        
 
 class Start_screen():#should add general information and such
     def __init__(self,gui):
@@ -122,7 +145,6 @@ class Data_tab():#holder for overview tabs.
         data = self.define_data_loader(file)
         self.load_overviews(data)
         self.gui.notebook.select(self.tab)
-        self.pop = []
 
     def load_overviews(self, loaded_data):
         self.overviews = []
@@ -132,7 +154,9 @@ class Data_tab():#holder for overview tabs.
     def define_data_loader(self, file):#loading data
         self.data_loader = getattr(data_loader, self.gui.start_screen.instrument.get())(self)#make an object based on string
         data = self.data_loader.load_data(file)
-        if data != None: return data#it means it succeeds. else, try another one
+        if data != None:#it means it succeeds. else, try another one
+            self.data_loader = getattr(data_loader, self.gui.start_screen.instrument.get())(self)#if okf file, reupdate the data_loader is needed
+            return data
 
         for instrument in self.gui.start_screen.instruments:
             if instrument == self.gui.start_screen.instrument.get(): continue#skip the one already tried
@@ -160,28 +184,32 @@ class Data_tab():#holder for overview tabs.
         botton.place(x = 1400, y = 750)
 
     def save(self):#things to save
-        path = tk.filedialog.asksaveasfile(initialdir = self.gui.start_path ,title='data',initialfile=self.name)
+        idx = self.name.rfind('.')
+        default_name = self.name[:idx]#remove the .
+        path = tk.filedialog.asksaveasfile(initialdir = self.gui.start_path ,title='data',initialfile=default_name)
+        if not path: return#if pressing cancel
         os.remove(path.name)#tk inter automatically makes a file. So this should be deleted becasuse we wil lmake a file with pickle
-        all_data = []
-        save_data = {}
+
+        save_data = []
         for index, overview in enumerate(self.overviews):
+            all_data = {'global':{},'files':None}#make a new one each loop to avoid memory overlap
             overview.figure_handeler.save()
 
-            save_data = {'int_range':overview.figure_handeler.int_range,'cmap':overview.figure_handeler.cmap,'instrument':self.gui.start_screen.instrument.get(),
+            all_data['global'] = {'int_range':overview.figure_handeler.int_range,'cmap':overview.figure_handeler.cmap,'instrument':self.gui.start_screen.instrument.get(),
             'colour_scale':overview.operations.color_scale.get(),'fig_lim_entry':overview.operations.fig_lim_entry.get(),'fig_size_entry':overview.operations.fig_size_entry.get(),
             'fig_label_entry':overview.operations.fig_label_entry.get(),'colourbar_size_entry':overview.operations.colourbar_size_entry.get(),'colourbar_orientation':overview.operations.colourbar_orientation.configure('text')[-1],
             'vlim':overview.operations.vlim_entry.get(),'colourbar_margines':{margin:overview.operations.colourbar_margines[margin].get() for margin in overview.operations.colourbar_margines.keys()},
             'fig_margines':{margin:overview.operations.fig_margines[margin].get() for margin in overview.operations.fig_margines.keys()},'arithmetic_x':overview.operations.arithmetic['x'].get(),
-            'arithmetic_y':overview.operations.arithmetic['y'].get(),'data_stack_index':overview.data_handler.index}
+            'arithmetic_y':overview.operations.arithmetic['y'].get(),'data_stack_index':overview.data_handler.index,
+            'fig_label_size_entry': overview.operations.fig_label_size_entry.get()}
 
-            save_data.update(self.save_figure_specifics(overview))#combine the dicts
-            #save_data.update(overview.data_handler.data.save())#combine the dicts
-            overview.data_handler.files[0].save(save_data)
-            #save_data['data_stack'] = overview.data_handler.files#a list of File objects
-            all_data.append(overview.data_handler.files)
+            all_data['global'].update(self.save_figure_specifics(overview))#combine the dicts
+            all_data['files'] = overview.data_handler.files
+
+            save_data.append(all_data)
 
         with open(path.name + '.okf', "wb") as outfile:
-            pickle.dump(all_data, outfile)
+            pickle.dump(save_data , outfile)
 
     def save_figure_specifics(self, overview):
         data ={}
@@ -190,43 +218,17 @@ class Data_tab():#holder for overview tabs.
             data[type(overview.figure_handeler.figures[key]).__name__ + 'cursor_pos'] = overview.figure_handeler.figures[key].cursor.pos
         return data
 
-    def pop_up(self,**kwarg):#called from figure right click or colour bar
-        size_string = kwarg['size']#depends on colur bar or figure
-        size = size_string.split(',')
-        sizes = {'size':[float(size[0]),float(size[1])],'top':kwarg['top'],'left':kwarg['left'],'right':kwarg['right'],'bottom':kwarg['bottom']}
-
-        lim_string = self.overviews[0].operations.fig_lim_entry.get()#it returns a string
-        lim_string2 = lim_string.split(';')
-        lim_x = lim_string2[0].split(',')
-        lim_y = lim_string2[1].split(',')
-
-        for index, x in enumerate(lim_x):
-            if x == 'None':
-                lim_x[index] = None
-            else:
-                lim_x[index] = float(x)
-
-        for index, y in enumerate(lim_y):
-            if y == 'None':
-                lim_y[index] = None
-            else:
-                lim_y[index] = float(y)
-
-        label_string = self.overviews[0].operations.fig_label_entry.get()#it returns a string
-        label = label_string.split(',')
-
-        self.pop.append(Pop_up(self,sizes,[lim_x,lim_y],label))
-
 class Overview():
     def __init__(self, data_tab, data):
         self.data_tab = data_tab
         self.add_tab(type(self).__name__)
+        self.close_botton()
         self.data_handler = data_handler.Data_handler(self, data)#will have the data
         self.make_figure()#figure_handler
         self.operations = operations.Operations(self)
         self.logbook = logbook.Logbook(self)
         self.data_tab.notebook.select(self.tab)
-        self.close_botton()
+        self.figure_handeler.colour_bar.set_vlim()
         self.figure_handeler.update_colour_scale()
 
     def close_botton(self):#to close the datatab
@@ -250,13 +252,22 @@ class Overview():
             self.figure_handeler = figure_handeler.Threedimension(self)
 
 class Pop_up():#the pop up window
-    def __init__(self, data_tab, sizes, lim, label):
+    def __init__(self, data_tab, sizes, lim, label, label_size):
         self.data_tab = data_tab
         self.fig = plt.Figure(figsize = sizes['size'])
         self.ax = self.fig.add_subplot(111)
         self.lim = lim#will  be updated from figure right clicj
-        self.ax.set_xlabel(label[0])
-        self.ax.set_ylabel(label[1])
+        self.ax.set_xlabel(label[0], fontsize = int(label_size[0]))
+        self.ax.set_ylabel(label[1], fontsize = int(label_size[1]))
+        self.ax.tick_params(axis='x', labelsize=int(label_size[0]))
+        self.ax.tick_params(axis='y', labelsize=int(label_size[1]))
+
+        # Hide tick labels on both axes
+        #elf.ax.set_xticklabels([])  # Remove x-axis labels
+        #self.ax.set_yticklabels([])  # Remove y-axis labels            
+        #self.ax.xaxis.label.set_visible(False)
+        #self.ax.yaxis.label.set_visible(False)
+
         self.fig.subplots_adjust(top = float(sizes['top']),left = float(sizes['left']),right = float(sizes['right']), bottom = float(sizes['bottom']))
         self.popup = tk.Toplevel()
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.popup)
@@ -266,15 +277,23 @@ class Pop_up():#the pop up window
 
         self.popup.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.popup.focus_set()
+        self.artists = {}
 
     def set_lim(self):#called from figure ricj click
         self.ax.set_xbound(self.lim[0])
         self.ax.set_ybound(self.lim[1])
 
     def set_vlim(self,vmin,vmax):
-        self.graph.set_clim(vmin = vmin, vmax = vmax)#all graphs have common have comon vmax and vmin
+        self.artists['graph'].set_clim(vmin = vmin, vmax = vmax)#all graphs have common have comon vmax and vmin
 
     def on_closing(self):
+        #self.ax.set_xticks([])  # Remove x-axis ticks
+        #self.ax.set_yticks([])  # Remove y-axis ticks
+        #self.ax.set_xlabel('')  # Remove x-axis label
+        #self.ax.set_ylabel('')         
+        #self.ax.figure.savefig('FS.png', format="png", bbox_inches="tight")
+        self.ax.figure.savefig("foo.png", format="png", dpi=600, bbox_inches="tight", transparent=True)
+
         self.popup.destroy()
         self.data_tab.pop.remove(self)
 

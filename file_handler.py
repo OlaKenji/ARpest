@@ -29,17 +29,13 @@ class File_handler():
 
     def add_data(self):
         indices = self.file_catalog.catalog.selection()
-        dict = self.file_catalog.data_handler.file.data[-1].copy()
+        dict = self.file_catalog.data_handler.file.data[0].copy()#the raw
+        dict['data'] = dict['data'] - dict['data']#0 them
         for num, index in enumerate(indices):
-            if num == 0: continue
-            dict['data'] = dict['data'] + self.file_catalog.data_handler.files[num].data[0]['data']
+            dict['data'] = dict['data'] + self.file_catalog.data_handler.files[num].data[0]['data']#the raw
 
         dict['data'] = dict['data']/(num+1)
-        self.file_catalog.data_handler.file.add_state(dict,'added')
-        self.file_catalog.data_handler.state_catalog.append_state('added', len(self.file_catalog.data_handler.file.states))
-        self.file_catalog.data_handler.state_catalog.update_catalog()
-        self.file_catalog.data_handler.overview.figure_handeler.new_stack()
-        #self.file_catalog.data_handler.add_file([dict], 'test')#if to make a new file
+        self.file_catalog.data_handler.add_file([dict], '/added')#add a new file
 
     def combine_data(self):#combining and putting the data in the data catalog: photon energy as x, angle as  y, kintex energy as z, intensity as data (3D)
         indices = self.file_catalog.catalog.selection()
@@ -48,13 +44,13 @@ class File_handler():
         for num, index in enumerate(indices):
             scan_data = self.file_catalog.data_handler.files[num]#file object
 
-            #hv.append(scan_data['metadata']['hv'])#the photon energy
-            hv.append(64+2*num)
+            hv.append(scan_data.data[0]['metadata']['hv'])#the photon energy
+            #hv.append(64+2*num)
             if num == 0:
                 int = np.atleast_3d(np.transpose(scan_data.data[0]['data']))
             else:
                 int = np.append(int,np.atleast_3d(np.transpose(scan_data.data[0]['data'])),axis=2)
 
-        scan_data.data[0]['metadata']['hv'] = hv
+        #scan_data.data[0]['metadata']['hv'] = hv
         new_data = {'xscale':np.array(hv), 'yscale':scan_data.data[0]['yscale'],'zscale':scan_data.data[0]['xscale'],'data':int,'metadata':scan_data.data[0]['metadata']}
         tab = self.file_catalog.data_handler.overview.data_tab.append_tab(new_data)

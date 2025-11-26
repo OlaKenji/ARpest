@@ -32,3 +32,10 @@ class State_catalog():
     def define_bottons(self):
         button_calc = tk.ttk.Button(self.data_handler.overview.tab, text = "delete stack", command = self.data_handler.delete_state)#which figures shoudl have access to this?
         button_calc.place(x = 1200, y = 540)
+
+    def add_state(self,dict,name):#add a new state
+        index = len(self.data_handler.file.states)+1
+        self.data_handler.file.add_state(dict,name)
+        self.append_state(name,index)
+        self.update_catalog()
+        self.data_handler.overview.figure_handeler.new_stack()

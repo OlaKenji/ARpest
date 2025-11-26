@@ -8,7 +8,7 @@ import json#for the export
 
 import processing, cursor, data_loader, constants
 
-class Functions():#figure functionality not being used
+class Functions():
     def __init__(self):
         pass
 
@@ -16,9 +16,36 @@ class Functions():#figure functionality not being used
         pass
 
     def make_grid(self,ax):#called when pressing the botton, from figure handlere
-        ax.grid(self.grid)#self.grid toggles when pressing the botton
-        self.canvas.draw()#would like to blit it instead somehow
-        self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        x_ticks = ax.get_xticks()
+        y_ticks = ax.get_yticks()
+
+        for index, vertical in enumerate(x_ticks):
+            if index == 0 or index == len(x_ticks)-1: continue#skip the first and last
+            if not self.artists.get('vertical_' + str(index),False):#if there are no grid
+                self.artists['vertical_' + str(index)] = ax.axvline(vertical, color='grey', lw=1, zorder = 2)
+            else:#if thre is grid
+                self.artists.pop('vertical_' + str(index))
+        for index, horizontal in enumerate(y_ticks):
+            if index == 0 or index == len(y_ticks)-1: continue#skip the first and last
+            if not self.artists.get('horizontal_' + str(index),False):#if there are no grid
+                self.artists['horizontal_' + str(index)] = ax.axhline(horizontal, color='grey', lw=1, zorder = 2)
+            else:
+                self.artists.pop('horizontal_' + str(index))
+        self.redraw()
+
+    def make_grid_pop(self,object):#called when drawing pop up
+        x_ticks = object.ax.get_xticks()
+        y_ticks = object.ax.get_yticks()
+
+        for index, vertical in enumerate(x_ticks):
+            if index == 0 or index == len(x_ticks)-1: continue#skip the first and last
+            if self.artists.get('vertical_' + str(index),False):#if there is a grid
+                object.artists['vertical_' + str(index)] = object.ax.axvline(vertical, color='grey', lw=1, zorder = 2)
+        for index, horizontal in enumerate(y_ticks):
+            if index == 0 or index == len(y_ticks)-1: continue#skip the first and last
+            if self.artists.get('horizontal_' + str(index),False):#if there is agrid
+                object.artists['horizontal_' + str(index)] = object.ax.axhline(horizontal, color='grey', lw=1, zorder = 2)
+        self.redraw()
 
 class Figure(Functions):
     def __init__(self,figure_handeler,pos):
@@ -26,8 +53,7 @@ class Figure(Functions):
         self.overview = figure_handeler.overview#overview
         self.pos = pos
         self.label = ['x','y']
-        self.grid = False#plot with grid
-        self.cut_index = self.overview.data_handler.files[0].save_dict.get(type(self).__name__+'cut_index',0)
+        self.inital_index()
         self.init_data()
         self.artists = {}#things to blit -> first one is dedicated to graph
 
@@ -39,6 +65,9 @@ class Figure(Functions):
     def init_data(self):
         self.intensity()
         self.sort_data()
+
+    def inital_index(self):
+        self.cut_index = self.overview.data_handler.save_dict.get(type(self).__name__+'cut_index',0)
 
     def define_canvas(self, **kwarg):
         self.fig = plt.Figure(figsize = kwarg['size'])
@@ -99,21 +128,24 @@ class Figure(Functions):
         finally:#called when selecting
             self.menue.grab_release()
 
-    def pop_up(self,index):
-        if index == -1:#enter many times
-            self.overview.data_tab.pop_up(index = index, size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get())#call gui to make a new window object
-        elif len(self.overview.data_tab.pop) == 0:#enter only once
-            self.overview.data_tab.pop_up(index = index, size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get())#call gui to make a new window object
-        self.plot(self.overview.data_tab.pop[index].ax)#plot the fraph onto the popup ax
-        self.make_grid(self.overview.data_tab.pop[index].ax)
-        self.overview.data_tab.pop[index].graph = self.artists['graph']#corner doesn't have it
-        self.overview.data_tab.pop[index].set_lim()
-        self.overview.data_tab.pop[index].canvas.draw()#draw it after plot
-        self.plot(self.ax)#this is to re-updathe self.graph to the proper figure
+    def pop_up(self,index):#index = 0 is adding, index = -1 is new
+        tab = self.overview.data_tab.gui.data_tabs.index(self.overview.data_tab)        
+        if index == -1:#enter many times                 
+            self.overview.data_tab.gui.pop_up(index = index, data_tab = tab, size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get(), label_size =  self.overview.operations.fig_label_size_entry.get())#call gui to make a new window object)#call gui to make a new window object
+        elif len(self.overview.data_tab.gui.pop) == 0:#enter only once
+            self.overview.data_tab.gui.pop_up(index = index, data_tab = tab, size = self.overview.operations.fig_size_entry.get(),top = self.overview.operations.fig_margines['top'].get(),left = self.overview.operations.fig_margines['left'].get(),right = self.overview.operations.fig_margines['right'].get(),bottom = self.overview.operations.fig_margines['bottom'].get(), label_size =  self.overview.operations.fig_label_size_entry.get())#call gui to make a new window object
+        self.plot(self.overview.data_tab.gui.pop[index])#plot the fraph onto the popup ax
+        self.make_grid_pop(self.overview.data_tab.gui.pop[index])#make a grid if there is a grid
+        self.overview.data_tab.gui.pop[index].set_lim()
+        self.set_vlim_pop(index)
+        self.overview.data_tab.gui.pop[index].canvas.draw()#draw it after plot
+
+    def set_vlim_pop(self,index):
+        self.overview.data_tab.gui.pop[index].set_vlim(self.figure_handeler.colour_bar.vlim_set[0], self.figure_handeler.colour_bar.vlim_set[1])
 
     def draw(self):
         self.ax.cla()
-        self.plot(self.ax)
+        self.plot(self)
         self.set_label()#shuoldn't be here perhaps?
         self.canvas.draw()
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
@@ -123,7 +155,6 @@ class Figure(Functions):
         self.canvas.restore_region(self.blank_background)
         for artist in self.artists.values():
             self.ax.draw_artist(artist)
-        #self.make_grid(self.ax) -> a little slow
         self.canvas.blit(self.ax.bbox)
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
@@ -152,28 +183,6 @@ class FS(Figure):
         self.figures = figure_handeler.figures
         self.tilt = self.overview.data_handler.file.get_data('metadata')['tilt']
 
-    def subtract_BG(self):#move to processing? #the BG botton calls it from figure handlre
-        dict = self.overview.data_handler.file.data[-1].copy()
-        if self.overview.operations.BG_orientation.configure('text')[-1] == 'vertical':#vertical bg subtract
-            pass
-        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'horizontal':#horizontal bg subtract
-            difference_array1 = np.absolute(self.figure_handeler.figures['right'].data[0] - self.figure_handeler.figures['right'].cursor.sta_vertical_line.get_data()[0])
-            index1 = difference_array1.argmin()
-            bg = np.nanmean(self.data[3][index1:-1:,:],axis=0)
-            new_int = self.data[3] - bg
-        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
-            pass
-        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'bg Matt':#EDC bg subtract
-            pass
-
-        dict['data'] = new_int
-        self.overview.data_handler.file.add_state(dict,'bg_subtract')
-        self.overview.data_handler.state_catalog.append_state('bg_subtract', len(self.overview.data_handler.file.states))
-        self.overview.data_handler.state_catalog.update_catalog()
-        self.figure_handeler.new_stack()
-
-        self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
-
     def init_data(self):#called in init
         self.sort_data()
         self.intensity()
@@ -184,8 +193,9 @@ class FS(Figure):
         self.overview.data_handler.file.set_data('zscale',self.data[2])
         self.overview.data_handler.file.set_data('data',self.data[3])
 
-    def plot(self,ax):#pcolorfast
-        self.artists['graph'] = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#FS
+    def plot(self,object):#pcolorfast
+        #print(self.data[0].shape, self.data[1].shape, self.int.shape)
+        object.artists['graph'] = object.ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#FS
 
     def sort_data(self):
         self.data = [self.overview.data_handler.file.get_data('xscale'),self.overview.data_handler.file.get_data('yscale'),self.overview.data_handler.file.get_data('zscale'),self.overview.data_handler.file.get_data('data')]
@@ -233,11 +243,19 @@ class Band_right(Figure):
         super().__init__(figure_handeler,pos)
 
     def double_click(self,event):#called when doubleclicking
-        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.overview.data_handler.file.get_data('metadata')}
+        meta_data = self.overview.data_handler.file.get_data('metadata').copy()
+        hv_data = meta_data['hv']
+        if isinstance(hv_data, np.ndarray):#if it is a numpy array and not a number
+            if len(hv_data) == 1:                
+                meta_data['hv'] = hv_data[0]
+            else:#if it is kz scan
+                meta_data['hv'] = self.overview.data_tab.overviews[0].figure_handeler.figures['center'].cursor.sta_vertical_line.get_data()[0]                               
+
+        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':meta_data}
         self.overview.data_tab.append_tab(new_data)
 
-    def plot(self,ax):
-        self.artists['graph'] = ax.pcolormesh(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band_right
+    def plot(self,object):
+        object.artists['graph'] = object.ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band_right
 
     def intensity(self):
         start,stop,step = self.int_range(self.cut_index)
@@ -261,19 +279,12 @@ class Band_down(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
 
-    def subtract_BG(self):#not in use
-        difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
-        index1 = difference_array1.argmin()
-        bg = np.mean(self.int[index1:len(self.data[1]),:],axis=0)#axis = 0is vertical, axis =1 is horizontal means
-        self.int -=  bg
-        self.draw()
-
     def double_click(self,event):#called when doubleclicking
-        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.overview.data['metadata']}
+        new_data = {'xscale':self.data[0],'yscale':self.data[1],'zscale': None,'data':np.transpose(np.atleast_3d(self.int),axes=(2, 0, 1)),'metadata':self.overview.data_handler.file.get_data('metadata')}
         self.overview.data_tab.append_tab(new_data)
 
-    def plot(self,ax):#2D plot
-        self.artists['graph'] = ax.pcolormesh(self.data[0], self.data[1], self.int,zorder=1,cmap=self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band down
+    def plot(self,object):#2D plot
+        object.artists['graph'] = object.ax.pcolorfast(self.data[0], self.data[1], self.int,zorder=1,cmap=self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band down
 
     def intensity(self):
         start,stop,step=self.int_range(self.cut_index)
@@ -314,9 +325,9 @@ class DOS_right_down(Figure):
             int_down.append(sum(ary[start:stop:1])/step)
         self.int_down = np.array(int_down)
 
-    def plot(self,ax):#2D plot
-        self.artists['graph1'] = ax.plot(self.data[0], self.int_right, 'b-',zorder=3)[0]
-        self.artists['graph2'] = ax.plot(self.data[0], self.int_down, 'r-',zorder=3)[0]
+    def plot(self,object):#2D plot
+        object.artists['graph1'] = object.ax.plot(self.data[0], self.int_right, 'b-',zorder=3)[0]
+        object.artists['graph2'] = object.ax.plot(self.data[0], self.int_down, 'r-',zorder=3)[0]
 
     def click(self,pos):
         super().click(pos)
@@ -329,11 +340,19 @@ class DOS_right_down(Figure):
     def update_colour_scale(self):
         pass
 
+    def set_vlim_pop(self,index):
+        pass
+
     def redraw(self):
         ymin=min(np.nanmin(self.int_right),np.nanmin(self.int_down))
         ymax=max(np.nanmax(self.int_right),np.nanmax(self.int_down))
         xmin=min(self.data[0])
         xmax=max(self.data[0])
+
+        if np.isnan(ymin):
+            ymin = 0
+        if np.isnan(ymax):
+            ymax = 1
 
         self.ax.set_xbound([xmin,xmax])
         self.ax.set_ybound([ymin,ymax])
@@ -359,36 +378,9 @@ class Band(Figure):
         self.sort_data()
         self.intensity()
 
-    def plot(self,ax):#2D plot
-        #print('plt',self.data[0].shape,self.data[1].shape,self.data[2].shape)
-        self.artists['graph'] = ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band
-
-    def subtract_BG(self):#move to processing? #the BG botton calls it from figure handlre
-        dict = self.overview.data_handler.file.data[-1].copy()
-        if self.overview.operations.BG_orientation.configure('text')[-1] == 'vertical':#vertical bg subtract
-            difference_array1 = np.absolute(self.data[1] - self.cursor.sta_horizontal_line.get_data()[1])
-            index1 = difference_array1.argmin()
-            bg = np.nanmean(self.int[index1:-1,:],axis=0)#axis = 0is vertical, axis =1 is horizontal means
-            new_int = self.int - bg
-        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'horizontal':#horizontal bg subtract
-            difference_array1 = np.absolute(self.data[0] - self.cursor.sta_vertical_line.get_data()[0])
-            index1 = difference_array1.argmin()
-            bg = np.nanmean(self.int[:,index1:-1],axis=1)#axis = 0is vertical, axis =1 is horizontal means
-            int = np.transpose(self.int) - bg
-            new_int = np.transpose(int)
-        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'EDC':#EDC bg subtract
-            new_int = self.int - self.figures['down'].int[None,:]#subtract the EDC from each row in data
-        elif self.overview.operations.BG_orientation.configure('text')[-1] == 'bg Matt':#EDC bg subtract
-            new_int = self.int.copy()
-            for index, ary in enumerate(np.transpose(self.int[0:-1,:])):#MDCs -> deifine the area...
-                new_int[:,index] -= np.nanmin(ary)
-
-        dict['data'] = np.transpose(np.atleast_3d(new_int),(2,0,1))
-        self.overview.data_handler.file.add_state(dict,'bg_subtract')
-        self.overview.data_handler.state_catalog.append_state('bg_subtract', len(self.overview.data_handler.file.states))
-        self.overview.data_handler.state_catalog.update_catalog()
-        self.figure_handeler.new_stack()
-        self.click([self.cursor.sta_vertical_line.get_data()[0],self.cursor.sta_horizontal_line.get_data()[1]])#update the right and down figures
+    def plot(self,object):#2D plot
+        #print('plt',self.data[0].shape,self.data[1].shape,self.data[2].shape)      
+        object.artists['graph'] = object.ax.pcolorfast(self.data[0], self.data[1], self.int, zorder=1, cmap = self.figure_handeler.cmap)#, norm = colors.Normalize(vmin = self.overview.vlim_set[0], vmax = self.overview.vlim_set[1]))#band
 
     def save(self):#to save the stuff: called when pressing the save botton thorugh the figure handlere
         self.overview.data_handler.file.set_data('xscale',self.data[0])
@@ -420,6 +412,13 @@ class DOS_right(Figure):
     def __init__(self,figure_handeler,pos):
         super().__init__(figure_handeler,pos)
 
+    def set_vlim_pop(self,index):
+        pass
+
+    def inital_index(self):
+        default = round(len(self.figure_handeler.figures['center'].data[0])*0.5)
+        self.cut_index = self.overview.data_handler.save_dict.get(type(self).__name__+'cut_index',default)
+
     def sort_data(self):
         self.data = [self.int,self.figure_handeler.figures['center'].data[1]]
 
@@ -429,8 +428,8 @@ class DOS_right(Figure):
         self.int = np.sum(temp[start:stop:1],axis=0)/step
         self.sort_data()
 
-    def plot(self,ax):#2D plot
-        self.artists['graph'] = ax.plot(self.int,self.figure_handeler.figures['center'].data[1])[0]#DOS right
+    def plot(self,object):#2D plot
+        object.artists['graph'] = object.ax.plot(self.int,self.figure_handeler.figures['center'].data[1])[0]#DOS right
 
     def redraw(self):
         self.artists['graph'].set_xdata(self.int)
@@ -439,6 +438,11 @@ class DOS_right(Figure):
         ymin=min(self.data[1])
         ymax=max(self.data[1])
 
+        if np.isnan(ymin):
+            ymin = 0
+        if np.isnan(ymax):
+            ymax = 1
+
         self.ax.set_xbound([xmin,xmax])
         self.ax.set_ybound([ymin,ymax])
 
@@ -446,12 +450,13 @@ class DOS_right(Figure):
         self.ax.draw_artist(self.ax.get_yaxis())
         self.ax.draw_artist(self.ax.get_xaxis())
 
-        self.ax.draw_artist(self.artists['graph'])
+        for artist in self.artists.values():
+            self.ax.draw_artist(artist)
 
         self.canvas.blit(self.ax.clipbox)
-
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
+        self.mouse_range()
 
 class DOS_down(Figure):
     def __init__(self,figure_handeler,pos):
@@ -465,16 +470,25 @@ class DOS_down(Figure):
         self.int = sum(self.figure_handeler.figures['center'].int[start:stop:1])/step
         self.sort_data()
 
-    def plot(self,ax):#2D plot
-        self.artists['graph'] = ax.plot(self.figure_handeler.figures['center'].data[0], self.int)[0]#DOS down
+    def inital_index(self):
+        default = round(len(self.figure_handeler.figures['center'].data[1])*0.5)
+        self.cut_index = self.overview.data_handler.save_dict.get(type(self).__name__+'cut_index',default)
+
+    def plot(self,object):#2D plot
+        object.artists['graph'] = object.ax.plot(self.figure_handeler.figures['center'].data[0], self.int)[0]#DOS down
 
     def redraw(self):
         self.artists['graph'].set_ydata(self.int)
-        ymin=np.nanmin(self.int)
-        ymax=np.nanmax(self.int)
-        xmin=min(self.data[0])
-        xmax=max(self.data[0])
+        ymin = np.nanmin(self.int)
+        ymax = np.nanmax(self.int)
+        xmin = min(self.data[0])
+        xmax = max(self.data[0])
 
+        if np.isnan(ymin):
+            ymin = 0
+        if np.isnan(ymax):
+            ymax = 1
+        
         self.ax.set_xbound([xmin,xmax])
         self.ax.set_ybound([ymin,ymax])
 
@@ -482,12 +496,16 @@ class DOS_down(Figure):
         self.ax.draw_artist(self.ax.get_yaxis())
         self.ax.draw_artist(self.ax.get_xaxis())
 
-        self.ax.draw_artist(self.artists['graph'])
+        for artist in self.artists.values():
+            self.ax.draw_artist(artist)
 
         self.canvas.blit(self.ax.clipbox)
-
         self.curr_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
         self.cursor.redraw()
+        self.mouse_range()
+
+    def set_vlim_pop(self,index):
+        pass
 
 class Colour_bar(Figure):
     def __init__(self,figure_handler):
@@ -506,12 +524,12 @@ class Colour_bar(Figure):
         self.canvas.draw()
 
     def pop_up(self,target):#the popup window
-        self.overview.data_tab.gui.pop_up(size = self.overview.operations.colourbar_size_entry.get(),top = self.overview.operations.colourbar_margines['top'].get(),left = self.overview.operations.colourbar_margines['left'].get(),right = self.overview.operations.colourbar_margines['right'].get(),bottom = self.overview.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
+        self.overview.data_tab.pop_up(size = self.overview.operations.colourbar_size_entry.get(),top = self.overview.operations.colourbar_margines['top'].get(),left = self.overview.operations.colourbar_margines['left'].get(),right = self.overview.operations.colourbar_margines['right'].get(),bottom = self.overview.operations.colourbar_margines['bottom'].get())#call gui to make a new window object
         orientation = self.overview.operations.colourbar_orientation.configure('text')[-1]
-        self.overview.data_tab.gui.pop[0].fig.colorbar(self.figure_handler.figures['center'].artists['graph'],cax = self.overview.data_tab.gui.pop[0].ax,orientation=orientation,label = 'Intensity')
+        self.overview.data_tab.pop[0].fig.colorbar(self.figure_handler.figures['center'].artists['graph'],cax = self.overview.data_tab.pop[0].ax,orientation=orientation,label = 'Intensity')
         #self.overview.data_tab.gui.pop.fig.subplots_adjust(top = kwarg['top'],left = kwarg['left'],right = kwarg['right'], bottom = kwarg['bottom'])
-        self.overview.data_tab.gui.pop[0].set_lim()
-        self.overview.data_tab.gui.pop[0].canvas.draw()#draw it after plot
+        self.overview.data_tab.pop[0].set_lim()
+        self.overview.data_tab.pop[0].canvas.draw()#draw it after plot
 
     def set_vlim(self):#called from botton
         values = self.overview.operations.vlim_entry.get()

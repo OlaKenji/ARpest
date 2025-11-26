@@ -147,12 +147,7 @@ class Curvature_y(Curvature_x):
 class Convert_k(Raw):
     def __init__(self,figure):
         super().__init__(figure)
-        
-        hv_data =  self.figure.overview.data_handler.file.get_data('metadata')['hv']
-        if isinstance(hv_data, list):            
-            self.hv = float(hv_data[0])            
-        else:
-            self.hv = float(self.figure.overview.data_handler.file.get_data('metadata')['hv']) 
+        self.hv = float(self.figure.overview.data_handler.file.get_data('metadata')['hv'])
 
     def run(self):#called when pressing the botton
         self.convert2k()
@@ -172,7 +167,6 @@ class Convert_k(Raw):
         alpha,beta = self.figure.define_angle2k()#depends on the figure
         a = (alpha + dalpha)*np.pi/180
         b = (beta + dbeta)*np.pi/180
-        print(alpha,beta)
 
         # place hodlers
         nkx = len(alpha)
@@ -258,26 +252,157 @@ class Convert_kz(Raw):
         Eb = 0#eV binding energy
         kz = []
         ky = []
+
+
+
+
+
+
+
+
         for hv in self.figure.data[0]:#do it for each photon energy
             ky.append(self.convert2k(hv)[:,0])
-
             Ek = (hv-W-Eb)*q#J -> can be extract the value from the figure?
+
             theta = self.figure.data[1]
             kz.append(10**-10*np.sqrt(2*m*(Ek*np.cos(np.pi*theta/180)**2+V))/hbar)
+
+
 
         kz = np.transpose(np.array(kz))
         ky = np.transpose(np.array(ky))
 
+        # approximatly the number of division of each original cell, 2 approx 4 times more pixel
+        division = 4
+
+        self.create_rectangular_mesh(kz,ky, division ,m,hbar,V)
+
+
 
         #to let ppcolormesh handle the interpolation
-        dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
-        dict['xscale'] = kz
-        dict['yscale'] = ky
-        self.figure.overview.data_handler.state_catalog.add_state(dict,'k_convert')
+        # dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
+        # dict['xscale'] = kz
+        # dict['yscale'] = ky
+        # self.figure.overview.data_handler.state_catalog.add_state(dict,'k_convert')
         return
 
         #manually interpolate all layers so that cuts become easier
-        self.new_mesh_interpolation(kz,ky)
+        #self.new_mesh_interpolation(kz,ky)
+
+
+
+
+    def create_rectangular_mesh(self,kx,ky,division,m,hbar,V):
+        kx = np.array(kx)
+        ky = np.array(ky)
+
+
+
+
+        axis_x =np.linspace(kx.min(),kx.max(),num = min(round(len(kx[0])*division),800))#make a 1D array from the 2D kx with a lince spacing defined by the minimum distance
+        axis_y = np.linspace(ky.min(),ky.max(),num = min(round(len(kx)*division),800))#make a 1D array from the 2D ky with a lince spacing defined by the minimum distance
+        axis_z = np.linspace(self.figure.data[2].min(),self.figure.data[2].max(),num = len(self.figure.data[3]))
+
+
+
+        value_position = np.full((axis_x.size,axis_y.size),-2)
+        #check = np.full((len(kx),len(kx[0])),False)
+
+
+
+
+
+        #we calculate the average theta of each ray of the data set
+        theta = np.arctan(kx/ky)
+        theta_line = np.array([])
+
+        radius = np.sqrt(kx[:,0]**2+ky[:,0]**2)
+        min_radius = np.average(radius)
+        radius_end = np.sqrt(kx[:,-1]**2+ky[:,-1]**2)
+        max_radius = np.average(radius_end)
+
+        for i in range(len(kx)):
+            theta_line = np.append(theta_line,np.average(theta[i]))
+
+
+
+        array_length = len(kx[0])
+
+#We check that the the new pixel is between the two exteral theta angle to know if it is on the data set, if yes we just search the minimum distance in the ray with the nearest angle of the pixel. This allow to pass from a complexity O(n**4) for a brut search to O(n**3) for this loop
+        for i in range(len(axis_x)):
+            for j in range(len(axis_y)):
+                angle = np.arctan(axis_x[i]/axis_y[j])
+                r = np.sqrt(axis_x[i]**2 + axis_y[j]**2)
+                if abs(angle)>abs(theta_line[-1]) and abs(angle)>abs(theta_line[0]) and r>=min_radius and r<=max_radius:
+                    ik = np.argmin(np.absolute(theta_line-angle))
+                    distance = np.sqrt((kx[ik]-axis_x[i])**2+(ky[ik]-axis_y[j])**2)
+                    jk = np.argmin(distance)
+                    value_position[i,j] = ik*array_length+jk
+                    #check[ik,jk] = True
+
+        #to check if there is any data point that is not transmitted to the new grid
+        # lost_count = 0
+        # for i in range(len(kx)):
+        #     for j in range(len(kx[0])):
+        #         if not check[ik,jk]:
+        #             lost_count = lost_count+1
+        #
+        # print(lost_count)
+
+        Z = np.zeros((len(axis_x),len(axis_y),len(axis_z)))
+        #points = np.column_stack((kx.flatten(),ky.flatten()))
+        # for i in range(len(axis_x)):
+        #     for j in range(len(axis_y)):
+        #         #Ek = ((axis_x[i]**2+axis_y[j]**2)*hbar**2)/(2*m)*10**20-V
+        #         #if
+        #         d = (points-np.array([axis_x[i],axis_y[j]]))**2
+        #         distance = np.sqrt(d[:,0]+d[:,1])
+        #
+        #         #print(distance[np.argmin(distance)])
+        #
+        #         if distance[np.argmin(distance)]<0.1:
+        #             value_position[i,j] = np.argmin(distance)
+
+
+
+
+        array_length = len(kx[0])
+
+        for k in range(len(axis_z)):
+            for i in range(len(axis_x)):
+                for j in range(len(axis_y)):
+                    if value_position[i,j]>-2:
+                        ik,jk = value_position[i,j]//array_length,value_position[i,j]%array_length
+
+                        Z[i,j,k] = self.figure.data[3][k,ik,jk]
+
+
+        dict = self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index].copy()
+        dict['xscale'] = axis_x
+        dict['yscale'] = axis_y
+        dict['zscale'] = axis_z
+        dict['data'] = np.transpose(Z,(2, 1, 0))
+        self.figure.overview.data_handler.state_catalog.add_state(dict,'k_convert')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def new_mesh_interpolation(self,kx,ky):
         min_index = [np.argmin(kx[:].max(axis=0)-kx[:].min(axis=0)),np.argmin(ky[:].max(axis=0)-ky[:].min(axis=0))]#the index in whihc there is the minimum distance between the intensity mesh
@@ -467,9 +592,9 @@ class Convert_kz(Raw):
 class Fermi_level_band(Raw):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
-        gold = tk.filedialog.askopenfilename(initialdir=self.figure.overview.data_tab.gui.start_path ,title='gold please')
-        if not gold: return
-        self.gold = self.figure.overview.data_tab.data_loader.load_data(gold)
+        ref_data, gold = self.figure.overview.data_tab.data_loader.gold_please()
+        self.gold_file = gold
+        self.gold = ref_data
         self.kB = 1.38064852e-23 #[J/K]
         self.eV = 1.6021766208e-19#[J]
         self.W = 4.38#work function [eV]
@@ -479,28 +604,28 @@ class Fermi_level_band(Raw):#only the main figure
 
     def run(self):
         self.fit()#kevins stuff
-        self.pixel_shift()
+        self.fit_polynomal()#make EF smooth with poly fit
+        self.pixel_shift()#shift the data so that we get a rectangle data grid
         self.update_figure()
-        self.normalise()
 
     def update_figure(self):
-        self.figure.overview.data_handler.state_catalog.append_state('fermilevel', len(self.figure.overview.data_handler.file.states))
-        self.figure.overview.data_handler.state_catalog.update_catalog()
-        self.figure.figure_handeler.new_stack()
         self.figure.figure_handeler.update_mouse_range()
 
-    def normalise(self):
-        difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
-        index1 = np.argmin(difference_array)
-        int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
-        total_MDC = np.nansum(int,axis=1)#of gold
-        self.figure.int = (self.figure.int.T/total_MDC).T#works for 2D
+    def fit_polynomal(self):
+        polynomal = np.polyfit(self.pos, self.EF,4)
+        xp = self.figure.data[1]
+        p = np.poly1d(polynomal)
+        self.EF = p(xp)
+
+        #start_index = 0
+        #end_index = len(self.gold[0]['data'][0])
+        #self.EF[0:start_index] = self.EF[start_index]
+        #self.EF[end_index:-1] = self.EF[end_index]
 
     def pixel_shift(self):#pixel ashift and add NaN such that the index of the fermilevel allign along x in the data
         print('lets shift')
         energies = self.figure.data[0]
         fermi_levels = self.EF
-        print(fermi_levels)
         fermi_index = np.array([np.argmin(np.abs(energies - f)) for f in fermi_levels],dtype=int)
 
         max_shift = max(fermi_index)-min(fermi_index)
@@ -511,7 +636,7 @@ class Fermi_level_band(Raw):#only the main figure
 
         new_array = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
         new_intensity = np.zeros((len(fermi_levels),len(new_data[0])+max_shift))#place holder
-        new_intensity[:] =  np.nan
+        new_intensity[:] =  0
         intensity = self.figure.int
 
         for row, array in enumerate(new_data):
@@ -520,7 +645,7 @@ class Fermi_level_band(Raw):#only the main figure
                 empty_1 = np.empty(shift)
                 empty_1[:] = array[0]
                 array = np.insert(array,0,empty_1)
-                empty_1[:] = np.nan
+                empty_1[:] = 0
                 temp = np.insert(intensity[row],0,empty_1)
             else:
                 temp = intensity[row]
@@ -530,7 +655,7 @@ class Fermi_level_band(Raw):#only the main figure
             empty_1 = np.empty(more_shift)
             empty_1[:] = array[-1]
             array = np.append(array,empty_1)
-            empty_1[:] = np.nan
+            empty_1[:] = 0
             temp = np.append(temp,empty_1)
 
             new_array[row] = array
@@ -538,10 +663,21 @@ class Fermi_level_band(Raw):#only the main figure
 
         new_axis = np.linspace(new_array.min(), new_array.max(),len(new_intensity[0,:]))
 
-        dict = self.figure.overview.data_handler.file.data[-1].copy()
+        dict = copy.deepcopy(self.figure.overview.data_handler.file.data[self.figure.overview.data_handler.file.index])
         dict['xscale'] = new_axis
+        if self.figure.overview.operations.fermi_normalisation.configure('text')[-1] == 'on':
+            new_intensity = self.normalise(new_intensity)
         dict['data'] = np.transpose(np.atleast_3d(new_intensity),(2,0,1))
-        self.figure.overview.data_handler.file.add_state(dict,'fermilevel')
+        idx = self.gold_file.rfind('/') + 1
+        name = self.gold_file[idx:]
+        self.figure.overview.data_handler.state_catalog.add_state(dict,'fermilevel_'+self.figure.overview.operations.fermi_normalisation.configure('text')[-1] + ':_' + name)
+
+    def normalise(self,new_intensity):
+        difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
+        index1 = np.argmin(difference_array)
+        int = self.gold[0]['data'][0][:,0:index1]/len(self.gold[0]['xscale'][0:index1])#shod it star tfrom 0? should we corect the EF for this as well? probablu slow tohugh
+        total_MDC = np.nansum(int,axis=1)#of gold
+        return (new_intensity.T/total_MDC).T#works for 2D
 
     def fit(self):
         gold = self.gold[0]['data'][0]
@@ -550,16 +686,33 @@ class Fermi_level_band(Raw):#only the main figure
 
         params = []
         functions = []
-        for i,edc in enumerate(gold):
-            lenght = int(len(edc)*0.75)
-            p, res_func = self.fit_fermi_dirac(energies[lenght:-1], edc[lenght:-1], self.e_0, T=self.T)
-            params.append(p)
-            self.e_0 = p[0]#update teh guess
-            functions.append(res_func)
+        int_range = 0
+        self.pos = []#y position of the EDCs
+
+        for i in range(0, len(gold), 20):
+            #edc = gold[i]
+            start,stop=max(i-int_range,0),i+1+int_range
+            step = stop - start
+            edc = sum(gold[start:stop:1])/step
+
+
+        #for i, edc in enumerate(gold):
+            if i >= 0:#temp fix, for FS fits in PrAlGe.
+                self.pos.append(self.figure.data[1][start])
+                lenght = int(len(edc)*0)
+                p, res_func = self.fit_fermi_dirac(energies[lenght:-1], edc[lenght:-1], self.e_0, T=self.T)
+                params.append(p)
+                self.e_0 = p[0]#update teh guess
+                functions.append(res_func)
+            else:
+                p = [23.6,0,0,0]
+                res_func = None
+                params.append(p)
+                self.e_0 = p[0]#update teh guess
 
         # Prepare the results
         params = np.array(params)
-        fermi_levels = params[:,0]#np.clip(params[:,0],90.37,90.45)
+        fermi_levels = params[:,0]
         sigmas = params[:,1]
         slopes = params[:,2]
         offsets = params[:,3]
@@ -630,7 +783,6 @@ class Fermi_level_band(Raw):#only the main figure
             result = 1
         return result
 
-
 class Fermi_level_FS(Fermi_level_band):#only the main figure
     def __init__(self,parent_figure):
         super().__init__(parent_figure)
@@ -687,12 +839,7 @@ class Fermi_level_FS(Fermi_level_band):#only the main figure
         if self.figure.overview.operations.fermi_normalisation.configure('text')[-1] == 'on':
             new_intensity = self.normalise(new_intensity)
         dict['data'] = new_intensity#np.transpose(new_intensity, (1, 0, 2))
-
-        idx = self.gold_file.rfind('/') + 1
-        name = self.gold_file[idx:]
-
-        self.figure.overview.data_handler.state_catalog.add_state(dict,'fermilevel_'+self.figure.overview.operations.fermi_normalisation.configure('text')[-1] + ':_' + name)
-
+        self.figure.overview.data_handler.state_catalog.add_state(dict,'fermilevel')
 
     def normalise(self,new_intensity):
         difference_array = np.absolute(self.gold[0]['xscale'] - self.EF.min())#subtract for each channel, works.
@@ -893,7 +1040,6 @@ class EF_corr_3D(Raw):#only the main figure
         elif sign*x > sign*step_x :
             result = 1
         return result
-
 
 class Range_plot(Raw):
     def __init__(self,parent_figure):

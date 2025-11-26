@@ -15,6 +15,11 @@ def start_step_n(start, step, n) :
     end = start + n*step
     return np.linspace(start, end, n)
 
+def get_instrument(self,file):
+    with open(file,'rb') as fp:
+        result = pickle.load(fp)
+    return result[0]['global']['instrument']
+
 class Data_loader():
     def __init__(self,data_tab):
         self.data_tab = data_tab
@@ -23,18 +28,19 @@ class Data_loader():
         with open(file,'rb') as fp:
             result = pickle.load(fp)
         #should these be here?
-        self.data_tab.gui.start_screen.instrument.set(result[0][0].save_dict['instrument'])#update the instruent for this file
-        self.orientation =  getattr(sys.modules[__name__], result[0][0].save_dict['instrument'])(None).orientation#set laso the orientation for this file
+        self.data_tab.gui.start_screen.instrument.set(result[0]['global']['instrument'])#update the instruent for this file
+        self.orientation =  getattr(sys.modules[__name__], result[0]['global']['instrument'])(None).orientation#set laso the orientation for this file
         return result
 
     def gold_please(self):
         gold = tk.filedialog.askopenfilename(initialdir=self.data_tab.gui.start_path ,title='gold please')#usually gold
         if not gold: return None, None
         gold_data = self.load_data(gold)
-        if gold.endswith('okf'):#sometimes, some operations has been done on gold. And we would like to use this gold, maybe
+
+        if gold.endswith('okf'):#sometimes, some operations has been done on gold. And we would like to use this gold
             overveiw_index, file_index = 0, 0
-            state_index = gold_data[overveiw_index][file_index].index
-            ref_data = [gold_data[overveiw_index][file_index].data[state_index]]#take the first data file and the state index it was saved on
+            state_index = gold_data[overveiw_index]['files'][file_index].index
+            ref_data = [gold_data[overveiw_index]['files'][file_index].data[state_index]]#take the first data file and the state index it was saved on
         else:
             ref_data = gold_data
         return ref_data, gold
@@ -259,6 +265,7 @@ class I05(Data_loader):
                         ('kinetic_energy_start', 'Low Energy', float),
                         ('kinetic_energy_end', 'High Energy', float),
                         ('kinetic_energy_step', 'Energy Step', float),
+                        ('slit size', 'slit size', float),
                         ('Time', 'Time', str)
                         ]
 
@@ -355,6 +362,8 @@ class I05(Data_loader):
         M2['Excitation Energy'] = np.array(infile['/entry1/instrument/monochromator/energy'])#it is a list
         M2['polarisation'] = np.array(infile['/entry1/instrument/insertion_device/beam/final_polarisation_label'])
         M2['time'] = total_time
+        M2['slit size'] = np.array(infile['/entry1/instrument/monochromator/exit_slit_size/'])
+
         for position in np.array(infile['/entry1/instrument/manipulator']):
             M2[position] = np.array(infile['/entry1/instrument/manipulator/'+position])[0]
         for ana in np.array(infile['/entry1/instrument/analyser']):

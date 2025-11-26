@@ -28,7 +28,7 @@ class File_catalog():
 
     def clean(self):
         for item in self.catalog.get_children():
-              self.catalog.delete(item)        
+              self.catalog.delete(item)
 
     def update_catalog(self):
         self.clean()
@@ -43,10 +43,10 @@ class File_catalog():
         self.update(0)#should it be 0 or self.data_handler.index?
 
     def define_bottons(self):#called frin init
-        button_calc = tk.ttk.Button(self.data_handler.overview.tab, text="Add data", command = self.file_handler.add_data)#the botton to add data (e.g. several measurement but divided into several files)
+        button_calc = tk.ttk.Button(self.data_handler.overview.tab, text="Load data", command = self.file_handler.load_data)#the botton to add data (e.g. several measurement but divided into several files)
         button_calc.place(x = 1200, y = 710)
 
-        button_calc = tk.ttk.Button(self.data_handler.overview.tab, text="Load data", command = self.file_handler.load_data)#the botton to add data (e.g. several measurement but divided into several files)
+        button_calc = tk.ttk.Button(self.data_handler.overview.tab, text="Add data", command = self.file_handler.add_data)#the botton to add data (e.g. several measurement but divided into several files)
         button_calc.place(x = 1200, y = 740)
 
         button = tk.ttk.Button(self.data_handler.overview.tab, text="combine data", command = self.file_handler.combine_data)#kz
