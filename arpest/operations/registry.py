@@ -6,6 +6,7 @@ from typing import List, Type
 
 from .base import OperationWidget
 from .basic import NormalizeOperationWidget, ScaleOperationWidget
+from .fermi import FermiLevelCorrectionWidget
 from .k_space import KSpaceOperationWidget
 
 def get_registered_operations() -> List[Type[OperationWidget]]:
@@ -13,5 +14,6 @@ def get_registered_operations() -> List[Type[OperationWidget]]:
     return [
         NormalizeOperationWidget,
         ScaleOperationWidget,
+        FermiLevelCorrectionWidget,
         KSpaceOperationWidget,
     ]

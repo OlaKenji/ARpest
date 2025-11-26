@@ -82,22 +82,8 @@ python run.py
 #### MAX IV - Bloch
 
 ## Data Model
-ARpest uses a unified data structure for all beamlines:
+ARpest uses a unified data structure for all beamlines to allow for:
 
-```python
-@dataclass
-class Dataset:
-    """Unified ARPES dataset representation"""
-    x_axis: Axis          # Typically angle or energy
-    y_axis: Axis          # Typically energy or angle
-    intensity: np.ndarray # 2D, 3D, or 4D intensity data
-    z_axis: Optional[Axis] = None  # For 3D data (photon energy, etc.)
-    w_axis: Optional[Axis] = None  # For 4D data
-    measurement: Measurement = field(default_factory=Measurement)
-    filename: str = ""
-```
-
-This design allows:
 - Consistent processing across different beamlines
 - Easy addition of new data loaders
 - Type-safe operations with proper validation

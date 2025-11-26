@@ -311,6 +311,8 @@ class DatasetTab(QWidget):
             context_providers={
                 "cut_state": self._current_cut_state,
                 "photon_energy_cursor": self._current_photon_energy_value,
+                "available_loaders": self._available_loaders,
+                "start_path": self._current_start_path,
             },
         )
         operations_layout.addWidget(self.operations_panel)
@@ -389,6 +391,16 @@ class DatasetTab(QWidget):
 
     def _current_file_stack(self) -> FileStack:
         return self.file_stacks[self.current_index]
+
+    def _available_loaders(self) -> list:
+        """Expose loader list to operation widgets."""
+        return list(self.loaders or [])
+
+    def _current_start_path(self) -> str:
+        """Return the preferred directory for file dialogs."""
+        if self.config is not None and getattr(self.config, "start_path", None):
+            return str(self.config.start_path)
+        return str(Path.home())
 
     def _current_cut_state(self):
         """Return the static cut position from the active figure, if available."""

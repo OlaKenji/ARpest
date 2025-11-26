@@ -9,7 +9,6 @@ from PyQt5.QtWidgets import QGroupBox, QMessageBox
 
 from ..models import Dataset, FileStack
 
-
 class OperationWidget(QGroupBox):
     """Abstract widget representing a single operation."""
 
