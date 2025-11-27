@@ -16,8 +16,9 @@ from PyQt5.QtWidgets import (
 
 from ....core.loaders import BaseLoader
 from ....models import Dataset
-from .base import OperationWidget
 from ....operations.fermi import correct_fermi_level_2d, correct_fermi_level_3d_same, correct_fermi_level_3d
+from ....utils.session import SESSION_FILE_EXTENSION, load_session
+from .base import OperationWidget
 
 class FermiLevelCorrectionWidget(OperationWidget):
     """Align the dataset Fermi level using a gold reference measurement."""
@@ -90,7 +91,9 @@ class FermiLevelCorrectionWidget(OperationWidget):
             filter_entries.append(f"{loader.name} ({exts})")
             all_exts.extend(loader.extensions)
 
+        all_exts.append(SESSION_FILE_EXTENSION)
         filter_entries.insert(0, f"All supported ({' '.join(f'*{ext}' for ext in set(all_exts))})")
+        filter_entries.insert(1, f"Saved datasets (*{SESSION_FILE_EXTENSION})")
         filter_entries.append("All files (*.*)")
         filename, _ = QFileDialog.getOpenFileName(
             self,
@@ -129,6 +132,9 @@ class FermiLevelCorrectionWidget(OperationWidget):
         return str(Path.home())
 
     def _load_reference_dataset(self, path: Path, loaders: Iterable[BaseLoader]) -> Dataset:
+        if path.suffix == SESSION_FILE_EXTENSION:
+            return self._load_session_reference(path)
+
         for loader in loaders:
             try:
                 if loader.can_load(path):
@@ -136,6 +142,30 @@ class FermiLevelCorrectionWidget(OperationWidget):
             except Exception as exc:  # pragma: no cover - defensive
                 raise ValueError(f"Failed to load {path.name} with {loader.name}: {exc}") from exc
         raise ValueError(f"No loader available for {path.name}")
+
+    def _load_session_reference(self, path: Path) -> Dataset:
+        """Return the active dataset stored inside a saved session file."""
+        try:
+            session = load_session(path)
+        except Exception as exc:
+            raise ValueError(f"Could not read {path.name}: {exc}") from exc
+
+        if not session.tabs:
+            raise ValueError("Session does not contain any datasets.")
+
+        tab_state = session.tabs[0]
+        if not tab_state.file_stacks:
+            raise ValueError("Session does not contain any file stacks.")
+
+        stack_index = max(0, min(tab_state.current_index, len(tab_state.file_stacks) - 1))
+        file_stack = tab_state.file_stacks[stack_index]
+        if not file_stack.states:
+            dataset = file_stack.raw_data
+        else:
+            state_index = max(0, min(file_stack.current_index, len(file_stack.states) - 1))
+            dataset = file_stack.states[state_index]
+
+        return dataset
 
     # ------------------------------------------------------------------ Operation logic
     def _apply_operation(self, dataset: Dataset) -> tuple[Dataset, str]:
@@ -156,7 +186,6 @@ class FermiLevelCorrectionWidget(OperationWidget):
                 'fit each scan angle and correct'
                 corrected_dataset, _ = correct_fermi_level_3d(dataset, self._reference_dataset)
                 return corrected_dataset, "Fermi level corrected"
-
 
 
 

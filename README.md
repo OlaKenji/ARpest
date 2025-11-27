@@ -30,7 +30,7 @@ A modern, interactive Python application for analysing ARPES (Angle-Resolved Pho
 ## Installation
 
 ### Requirements
-- Python 3.9 or higher
+- Python 3.7 or higher
 - PyQt5
 - NumPy
 - SciPy
@@ -41,15 +41,18 @@ A modern, interactive Python application for analysing ARPES (Angle-Resolved Pho
 ### Quick Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/OlaKenji/ARpest.git
-cd arpest
+# Install a Qt backend (PyQt5)
+pip install PyQt5
+pip install pyqtgraph
 
-# Install dependencies
-pip install PyQt5 numpy matplotlib scipy h5py igor, pyqtgraph
+# Optional: install igor for IBW file support
+pip install igor
 
-# Run the application
-python run.py
+# Install ARpest from PyPI
+pip install arpest
+
+# Launch the GUI
+arpest
 ```
 
 ## Usage
@@ -58,7 +61,7 @@ python run.py
 
 1. **Launch the application**:
    ```bash
-   python run.py
+   arpest
    ```
 
 2. **Load data**:
