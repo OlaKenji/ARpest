@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 from ..models import FileStack
-from .cursor_manager import CursorState
+from .cursor.cursor_manager import CursorState
 
 
 SESSION_FILE_EXTENSION = ".arpest"

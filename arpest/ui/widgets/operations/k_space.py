@@ -19,7 +19,7 @@ from ....operations.k_space import (
     convert_dataset,
     determine_mode,
 )
-from ....utils.cursor_manager import CursorState
+from ....utils.cursor.cursor_manager import CursorState
 from .base import OperationWidget
 
 

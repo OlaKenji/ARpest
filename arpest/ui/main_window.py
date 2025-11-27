@@ -29,7 +29,7 @@ import numpy as np
 from ..models import FileStack, Dataset, Axis, AxisType
 from ..operations import get_registered_operations
 from ..utils.config import Config
-from ..utils.cursor_manager import CursorState
+from ..utils.cursor.cursor_manager import CursorState
 from ..utils.session import (
     SESSION_FILE_EXTENSION,
     SESSION_FORMAT_VERSION,

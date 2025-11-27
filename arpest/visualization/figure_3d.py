@@ -17,9 +17,9 @@ from PyQt5.QtCore import QObject, QEvent, Qt, QPointF, QRectF
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 
 from ..models import FileStack
-from ..utils.cursor_manager import CursorManager, CursorState
-from ..utils.cursor_helpers import DragMode, DragState
-from ..utils.pg_line_cursor import PGLineCursor
+from ..utils.cursor.cursor_manager import CursorManager, CursorState
+from ..utils.cursor.cursor_helpers import DragMode, DragState
+from ..utils.cursor.pg_line_cursor import PGLineCursor
 
 # Configure sane defaults for all plots hosted by this widget
 pg.setConfigOptions(

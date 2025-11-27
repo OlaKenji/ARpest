@@ -24,7 +24,6 @@ class KSpaceConversionMode(Enum):
             return "Photon-energy scan (kz mapping)"
         return "Unknown"
 
-
 @dataclass
 class KSpaceConversionContext:
     mode: KSpaceConversionMode
@@ -34,8 +33,7 @@ class KSpaceConversionContext:
     angle_offset_x: float
     angle_offset_y: float
 
-
-def determine_mode(dataset: Dataset) -> KSpaceConversionMode:
+def determine_mode(dataset: Dataset) -> KSpaceConversionMode:#called from widget
     """Determine the conversion mode supported by the dataset."""
     if dataset.is_2d:
         return KSpaceConversionMode.MAP_2D
@@ -48,7 +46,7 @@ def determine_mode(dataset: Dataset) -> KSpaceConversionMode:
     raise ValueError("Only 2D and 3D datasets are supported for k-space conversion.")
 
 
-def convert_dataset(dataset: Dataset, context: KSpaceConversionContext) -> tuple[Dataset, str]:
+def convert_dataset(dataset: Dataset, context: KSpaceConversionContext) -> tuple[Dataset, str]:#called from widget
     """Convert dataset to k-space according to the provided context."""
     mode = context.mode
     if mode is KSpaceConversionMode.MAP_2D:
@@ -60,7 +58,7 @@ def convert_dataset(dataset: Dataset, context: KSpaceConversionContext) -> tuple
 
     raise ValueError("Unsupported conversion mode.")
 
-
+#2D
 def _convert_2d_map(dataset: Dataset, context: KSpaceConversionContext) -> tuple[Dataset, str]:
     new_dataset = dataset.copy()
     k0 = _wavevector_prefactor(context.photon_energy, context.work_function)
@@ -96,7 +94,7 @@ def _convert_2d_map(dataset: Dataset, context: KSpaceConversionContext) -> tuple
     new_dataset.validate()
     return new_dataset, "k space"
 
-
+#3D
 def _convert_3d_volume(dataset: Dataset, context: KSpaceConversionContext) -> tuple[Dataset, str]:
     new_dataset = dataset.copy()
     k0 = _wavevector_prefactor(context.photon_energy, context.work_function)
@@ -123,17 +121,61 @@ def _convert_3d_volume(dataset: Dataset, context: KSpaceConversionContext) -> tu
         kx_grid[i] = sin_theta_cos_beta + cos_theta * np.cos(a[i]) * np.sin(np.deg2rad(dbeta))
         ky_grid[i] = cos_theta * np.sin(a[i])
 
-    mid_alpha = nkx // 2
-    mid_beta = nky // 2
-    kx_values = kx_grid[mid_alpha, :] * k0
-    ky_values = ky_grid[:, mid_beta] * k0
+    kx_grid *= k0
+    ky_grid *= k0
 
-    new_dataset.x_axis = Axis(kx_values, AxisType.K_PERPENDICULAR, "k_x", "Å⁻¹")
-    new_dataset.y_axis = Axis(ky_values, AxisType.K_PARALLEL, "k_y", "Å⁻¹")
+    ky_axis = _build_regular_axis_from_grid(ky_grid, nkx, new_dataset.y_axis.values)
+    kx_axis = _build_regular_axis_from_grid(kx_grid, nky, new_dataset.x_axis.values)
+
+    resampled_intensity = _resample_volume_intensity(new_dataset.intensity, ky_grid, kx_grid, ky_axis, kx_axis)
+
+    new_dataset.intensity = resampled_intensity
+    new_dataset.x_axis = Axis(kx_axis, AxisType.K_PERPENDICULAR, "k_x", "Å⁻¹")
+    new_dataset.y_axis = Axis(ky_axis, AxisType.K_PARALLEL, "k_y", "Å⁻¹")
     new_dataset.validate()
     return new_dataset, "k space"
 
+def _build_regular_axis_from_grid(grid: np.ndarray, target_len: int, original_axis_values: np.ndarray) -> np.ndarray:
+    axis = np.linspace(float(np.nanmin(grid)), float(np.nanmax(grid)), target_len)
+    if original_axis_values[0] > original_axis_values[-1]:
+        axis = axis[::-1]
+    return axis
 
+def _resample_volume_intensity(
+    intensity: np.ndarray,
+    ky_grid: np.ndarray,
+    kx_grid: np.ndarray,
+    ky_axis: np.ndarray,
+    kx_axis: np.ndarray,
+) -> np.ndarray:
+    if intensity.ndim != 3:
+        raise ValueError("3D volume conversion expects a 3D dataset.")
+
+    ky_len = len(ky_axis)
+    kx_len = len(kx_axis)
+    nz = intensity.shape[2]
+
+    ky_resampled = np.empty((ky_len, kx_grid.shape[1], nz), dtype=float)
+    kx_resampled = np.empty((ky_len, kx_grid.shape[1]), dtype=float)
+
+    for beta_idx in range(kx_grid.shape[1]):
+        ky_source = ky_grid[:, beta_idx]
+        values = intensity[:, beta_idx, :]
+        ky_resampled[:, beta_idx, :] = _vectorized_interp(ky_source, values, ky_axis)
+
+        kx_column = kx_grid[:, beta_idx]
+        kx_interp = _vectorized_interp(ky_source, kx_column[:, None], ky_axis)
+        kx_resampled[:, beta_idx] = kx_interp[:, 0]
+
+    regridded = np.empty((ky_len, kx_len, nz), dtype=float)
+    for ky_idx in range(ky_len):
+        kx_source = kx_resampled[ky_idx, :]
+        values = ky_resampled[ky_idx, :, :]
+        regridded[ky_idx, :, :] = _vectorized_interp(kx_source, values, kx_axis)
+
+    return regridded
+
+#photn energy scan
 def _convert_photon_scan(dataset: Dataset, context: KSpaceConversionContext) -> tuple[Dataset, str]:
     new_dataset = dataset.copy()
     ky_grid, kz_grid = _compute_photon_scan_grids(new_dataset, context)
@@ -149,13 +191,11 @@ def _convert_photon_scan(dataset: Dataset, context: KSpaceConversionContext) -> 
     new_dataset.validate()
     return new_dataset, "k space"
 
-
 def _wavevector_prefactor(photon_energy: float, work_function: float) -> float:
     hv = float(photon_energy)
     work_func = float(work_function)
     diff = max(hv - work_func, 0.0)
     return 0.5124 * np.sqrt(diff)
-
 
 def _convert_to_ky_values(hv: float, dataset: Dataset, context: KSpaceConversionContext) -> np.ndarray:
     k0 = _wavevector_prefactor(hv, context.work_function)
@@ -187,16 +227,14 @@ def _convert_to_ky_values(hv: float, dataset: Dataset, context: KSpaceConversion
     mid_beta = nky // 2
     return ky_grid[:, mid_beta] * k0
 
-def _compute_photon_scan_grids(
-    dataset: Dataset, context: KSpaceConversionContext
-) -> tuple[np.ndarray, np.ndarray]:
+def _compute_photon_scan_grids(dataset: Dataset, context: KSpaceConversionContext) -> tuple[np.ndarray, np.ndarray]:
     hv_values = np.asarray(dataset.x_axis.values, dtype=float)
     ky_values = [_convert_to_ky_values(hv, dataset, context) for hv in hv_values]
     ky_grid = np.transpose(np.asarray(ky_values, dtype=float))
 
     V = context.inner_potential * elementary_charge
     W = context.work_function
-    Eb = 0.0
+    Eb = 0.0#the binding energy
 
     theta_rad = np.deg2rad(np.asarray(dataset.y_axis.values, dtype=float))
     cos_sq = np.cos(theta_rad) ** 2
@@ -205,7 +243,6 @@ def _compute_photon_scan_grids(
     kz_grid = 1e-10 * np.sqrt(2 * electron_mass * kz_terms) / hbar
 
     return ky_grid, kz_grid
-
 
 def _build_k_axes_from_grid(
     dataset: Dataset, ky_grid: np.ndarray, kz_grid: np.ndarray
@@ -222,7 +259,6 @@ def _build_k_axes_from_grid(
         kz_axis = kz_axis[::-1]
 
     return ky_axis, kz_axis
-
 
 def _resample_photon_scan_intensity(
     intensity: np.ndarray,
@@ -284,4 +320,7 @@ def _vectorized_interp(
 
     y0 = y[idx - 1]
     y1 = y[idx]
-    return ((1 - weight)[:, None] * y0) + (weight[:, None] * y1)
+    reshape_shape = (t.size,) + (1,) * (y.ndim - 1)
+    w0 = (1 - weight).reshape(reshape_shape)
+    w1 = weight.reshape(reshape_shape)
+    return (w0 * y0) + (w1 * y1)

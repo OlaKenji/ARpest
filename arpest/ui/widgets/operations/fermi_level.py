@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
 from ....core.loaders import BaseLoader
 from ....models import Dataset
 from .base import OperationWidget
-from ....operations.fermi import correct_fermi_level_2d
+from ....operations.fermi import correct_fermi_level_2d, correct_fermi_level_3d_same, correct_fermi_level_3d
 
 class FermiLevelCorrectionWidget(OperationWidget):
     """Align the dataset Fermi level using a gold reference measurement."""
@@ -143,17 +143,19 @@ class FermiLevelCorrectionWidget(OperationWidget):
             raise ValueError("Load a gold reference before running the correction.")
 
         if dataset.is_2d:
-            if not reference.is_2d:
+            if not self._reference_dataset.is_2d:
                 raise ValueError("Fermi correction currently supports 2D datasets only.")
             corrected_dataset, _ = correct_fermi_level_2d(dataset, self._reference_dataset)
             return corrected_dataset, "Fermi level corrected"
         elif dataset.is_3d:
             if self._reference_dataset.is_2d:
                 'apply the same EF correction for all scan angles'
-                pass
+                corrected_dataset, _ = correct_fermi_level_3d_same(dataset, self._reference_dataset)
+                return corrected_dataset, "Fermi level corrected"
             elif self._reference_dataset.is_3d:
                 'fit each scan angle and correct'
-                pass
+                corrected_dataset, _ = correct_fermi_level_3d(dataset, self._reference_dataset)
+                return corrected_dataset, "Fermi level corrected"
 
 
 

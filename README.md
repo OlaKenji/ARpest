@@ -81,21 +81,11 @@ python run.py
 #### Diamond Light Source - I05
 #### MAX IV - Bloch
 
-## Data Model
-ARpest uses a unified data structure for all beamlines to allow for:
-
-- Consistent processing across different beamlines
-- Easy addition of new data loaders
-- Type-safe operations with proper validation
-
----
-
 ## Roadmap
 
 - [ ] Additional beamline support (SLS, SOLEIL, etc.)
-- [ ] Data processing operations (normalization, Fermi level alignment)
+- [ ] Additional Data processing operations
 - [ ] Export processed data
-- [ ] Batch processing capabilities
 - [ ] Analysis plugins system
 
 ---
