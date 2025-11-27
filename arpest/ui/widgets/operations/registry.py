@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List, Type
 
 from .base import OperationWidget
-from .basic import NormalizeOperationWidget, ScaleOperationWidget
+from .basic import NormalizeOperationWidget, ScaleOperationWidget, CropOperationWidget, ModifyAxesOperationWidget
 from .fermi_level import FermiLevelCorrectionWidget
 from .k_space import KSpaceOperationWidget
 
@@ -17,4 +17,6 @@ def get_registered_operations() -> List[Type[OperationWidget]]:
         ScaleOperationWidget,
         FermiLevelCorrectionWidget,
         KSpaceOperationWidget,
+        CropOperationWidget,
+        ModifyAxesOperationWidget,
     ]

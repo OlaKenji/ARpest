@@ -15,10 +15,8 @@ from typing import Optional, Sequence
 from ..models import FileStack
 from .cursor.cursor_manager import CursorState
 
-
 SESSION_FILE_EXTENSION = ".arpest"
 SESSION_FORMAT_VERSION = 1
-
 
 @dataclass
 class SessionTabState:

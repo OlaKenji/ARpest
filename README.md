@@ -17,10 +17,10 @@ A modern, interactive Python application for analysing ARPES (Angle-Resolved Pho
 - **Interactive analysis**: Real-time cursor tracking with live EDC/MDC updates
 - **State management**: Undo/redo functionality with complete processing history
 - **Tabbed interface**: Work with multiple datasets simultaneously
-- **Save a session**: Save and comeback where you where
+- **Save dataset**: Save and comeback where you where
 
 ### Performance
-- Optimized and rendering for smooth visualisation
+- Optimized rendering for smooth visualisation
 - Fast numpy slicing for data extraction
 - In-place data updates (no memory reallocation)
 - Efficient rendering for large datasets
@@ -66,8 +66,7 @@ python run.py
    - Select your ARPES data file (`.nxs`, `.h5`, `.zip`, or `.ibw`)
 
 3. **Interactive analysis**:
-   - **Move mouse**: Gray dashed crosshair follows cursor
-   - **Click**: Red solid lines mark cut position, EDC/MDC update
+   - **Apply data processing**: Convert to k-space, correct the Fermi level based on a reference measurent and more
    - **Click & drag**: Continuously update cuts in real-time
    - **3D data**: Use energy slider to navigate through different energy slices
 

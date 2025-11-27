@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Callable, List, Type
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -55,6 +56,7 @@ class OperationsPanel(QWidget):
 
                 scroll = QScrollArea()
                 scroll.setWidgetResizable(True)
+                scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
                 scroll.setWidget(container)
                 self.tabs.addTab(scroll, category)
                 category_widgets[category] = vbox

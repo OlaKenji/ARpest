@@ -9,14 +9,15 @@ from setuptools import setup, find_packages
 
 setup(
     name="arpest",
-    version="2.0.0",
+    version="1.0.0",
     packages=find_packages(),
-    python_requires=">=3.10",
+    python_requires=">=3.7.13",
     install_requires=[
-        "numpy>=1.24.0",
-        "matplotlib>=3.7.0",
-        "scipy>=1.11.0",
-        "h5py>=3.0.0",
-        # PyQt5 or PyQt6 should be installed separately
+        "numpy>=1.21.6",
+        "matplotlib>=3.5.3",
+        "scipy>=1.7.3",
+        "h5py>=3.6.0",
+        "pyqtgraph>=0.12.1",
+        # PyQt5 should be installed separately
     ],
 )

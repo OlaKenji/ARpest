@@ -14,6 +14,29 @@ from PyQt5.QtWidgets import QApplication
 from arpest.ui.main_window import MainWindow
 from arpest.utils.config import Config
 
+#TODO
+#subtarct, add and divide by MDC, EDC, bg_Matt
+#divide by gold
+
+#smooth, 2nd derivative, curvature
+#normalise slices (for kz thingy)
+#set cursor position
+#rotate the map for allignment
+#fully integrated MDC, EDC
+#overlap plots to compare
+#export data for additional analysis
+#phi rotation in k convert?
+
+#stuff:
+#bg subtract (there may be angle dependence: bg_matt, bg_fermi)
+#normalisation:
+    #1) by number of sweeps (can chekc the BG above FL to check for number of sweeps),
+    #2) MDC/EDC cuts divided by max value (fake data, just to enhance)
+#select area:
+    #normalise based on some selected area?
+#fermi level for photon ebergy scan? -> Chun does it manually for each hv measuerment
+#range plots
+#fitting?
 
 class ARpestApp:
     """Main ARpest application class."""

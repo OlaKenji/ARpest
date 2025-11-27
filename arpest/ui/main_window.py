@@ -951,9 +951,9 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self._open_files)
         open_action.setToolTip("Open ARPES data file (Ctrl+O)")
 
-        save_action = toolbar.addAction("💾 Save Session")
+        save_action = toolbar.addAction("💾 Save Dataset")
         save_action.triggered.connect(self._save_session)
-        save_action.setToolTip("Save current session (Ctrl+S)")
+        save_action.setToolTip("Save current dataset tab (Ctrl+S)")
         
         # Add separator
         toolbar.addSeparator()
@@ -1001,7 +1001,7 @@ class MainWindow(QMainWindow):
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self._open_files)
 
-        save_action = file_menu.addAction("&Save Session...")
+        save_action = file_menu.addAction("&Save Dataset...")
         save_action.setShortcut(QKeySequence.Save)
         save_action.triggered.connect(self._save_session)
         
@@ -1064,22 +1064,24 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Loaded {total} item(s)", 3000)
 
     def _save_session(self) -> None:
-        """Persist the current application state to a session file."""
-        tab_states: list[SessionTabState] = []
-        for index in range(self.tabs.count()):
-            widget = self.tabs.widget(index)
-            if isinstance(widget, DatasetTab):
-                title = self.tabs.tabText(index)
-                tab_states.append(widget.to_session_state(title))
-
-        if not tab_states:
-            QMessageBox.information(self, "Nothing to Save", "Load data before saving a session.")
+        """Persist the currently selected tab state to a session file."""
+        current_index = self.tabs.currentIndex()
+        if current_index == -1:
+            QMessageBox.information(self, "Nothing to Save", "Load data before saving.")
             return
+
+        widget = self.tabs.widget(current_index)
+        if not isinstance(widget, DatasetTab):
+            QMessageBox.information(self, "Nothing to Save", "Select a dataset tab before saving.")
+            return
+
+        title = self.tabs.tabText(current_index)
+        tab_state = widget.to_session_state(title)
 
         filter_string = f"ARpest Session (*{SESSION_FILE_EXTENSION})"
         filename, _ = QFileDialog.getSaveFileName(
             self,
-            "Save Session",
+            "Save Dataset",
             str(self.config.start_path),
             filter_string,
         )
@@ -1089,7 +1091,7 @@ class MainWindow(QMainWindow):
 
         path = ensure_session_extension(Path(filename))
 
-        session = SessionData(version=SESSION_FORMAT_VERSION, tabs=tab_states)
+        session = SessionData(version=SESSION_FORMAT_VERSION, tabs=[tab_state])
         try:
             save_session(path, session)
         except Exception as exc:
@@ -1097,7 +1099,7 @@ class MainWindow(QMainWindow):
             return
 
         self.config.update_start_path(path)
-        self.statusBar().showMessage(f"Saved session to {path.name}", 3000)
+        self.statusBar().showMessage(f"Saved dataset to {path.name}", 3000)
             
     def _load_file(self, filepath: Path) -> None:
         """
@@ -1167,37 +1169,45 @@ class MainWindow(QMainWindow):
 
         self._remove_welcome_tab_if_present()
 
-        loaded_tabs = 0
+        valid_state: SessionTabState | None = None
         for state in session.tabs:
-            if not state.file_stacks:
-                continue
-            try:
-                tab = DatasetTab(
-                    state.title or filepath.name,
-                    parent=self,
-                    loaders=self.loaders,
-                    config=self.config,
-                    session_state=state,
-                )
-            except Exception as exc:
-                QMessageBox.warning(
-                    self,
-                    "Session Load",
-                    f"Failed to restore tab '{state.title or 'Unnamed'}': {exc}",
-                )
-                continue
+            if state.file_stacks:
+                valid_state = state
+                break
 
-            default_title = Path(state.file_stacks[0].filename).stem or filepath.stem
-            tab_title = state.title or default_title
-            self.tabs.addTab(tab, tab_title)
-            self.tabs.setCurrentWidget(tab)
-            loaded_tabs += 1
-
-        if loaded_tabs == 0:
-            QMessageBox.warning(self, "Session Load", "No valid datasets could be restored from the session.")
+        if valid_state is None:
+            QMessageBox.warning(self, "Session Load", "This session does not contain any datasets.")
             return
 
-        self.statusBar().showMessage(f"Loaded session from {filepath.name}", 3000)
+        try:
+            tab = DatasetTab(
+                valid_state.title or filepath.name,
+                parent=self,
+                loaders=self.loaders,
+                config=self.config,
+                session_state=valid_state,
+            )
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                "Session Load",
+                f"Failed to restore dataset: {exc}",
+            )
+            return
+
+        default_title = Path(valid_state.file_stacks[0].filename).stem or filepath.stem
+        tab_title = valid_state.title or default_title
+        self.tabs.addTab(tab, tab_title)
+        self.tabs.setCurrentWidget(tab)
+
+        if len(session.tabs) > 1:
+            QMessageBox.information(
+                self,
+                "Partial Load",
+                "This file contained multiple datasets; only the first was loaded.",
+            )
+
+        self.statusBar().showMessage(f"Loaded dataset from {filepath.name}", 3000)
     
     def _close_tab(self, index: int) -> None:
         """

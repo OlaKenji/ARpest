@@ -17,7 +17,6 @@ from numpy.typing import NDArray
 from ...models import Axis, AxisType, Dataset, Measurement
 from .base import BaseLoader
 
-
 def start_step_n(start: float, step: float, n: int) -> NDArray[np.floating]:
     """
     Create array from start, step, and number of points.
