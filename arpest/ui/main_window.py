@@ -313,6 +313,8 @@ class DatasetTab(QWidget):
                 "photon_energy_cursor": self._current_photon_energy_value,
                 "available_loaders": self._available_loaders,
                 "start_path": self._current_start_path,
+                "current_edc_curves": self._current_edc_curves,
+                "current_mdc_curves": self._current_mdc_curves,
             },
         )
         operations_layout.addWidget(self.operations_panel)
@@ -434,6 +436,30 @@ class DatasetTab(QWidget):
                 return float(values[len(values) // 2])
 
         return dataset.measurement.photon_energy
+
+    def _current_edc_curves(self):
+        figure = self.figure
+        if figure is None:
+            return None
+        getter = getattr(figure, "get_current_edc_curves", None)
+        if callable(getter):
+            try:
+                return getter()
+            except Exception:
+                return None
+        return None
+
+    def _current_mdc_curves(self):
+        figure = self.figure
+        if figure is None:
+            return None
+        getter = getattr(figure, "get_current_mdc_curves", None)
+        if callable(getter):
+            try:
+                return getter()
+            except Exception:
+                return None
+        return None
 
     def _display_file_stack(self, file_stack: FileStack, previous_index: Optional[int] = None) -> None:
         """Create or replace the figure widget for the selected file stack."""

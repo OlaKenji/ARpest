@@ -181,9 +181,7 @@ def _convert_photon_scan(dataset: Dataset, context: KSpaceConversionContext) -> 
     ky_grid, kz_grid = _compute_photon_scan_grids(new_dataset, context)
     ky_axis, kz_axis = _build_k_axes_from_grid(new_dataset, ky_grid, kz_grid)
 
-    resampled_intensity = _resample_photon_scan_intensity(
-        new_dataset.intensity, ky_grid, kz_grid, ky_axis, kz_axis
-    )
+    resampled_intensity = _resample_photon_scan_intensity(new_dataset.intensity, ky_grid, kz_grid, ky_axis, kz_axis)
 
     new_dataset.intensity = resampled_intensity
     new_dataset.x_axis = Axis(kz_axis, AxisType.K_PERPENDICULAR, "k_z", "Å⁻¹")
@@ -234,7 +232,7 @@ def _compute_photon_scan_grids(dataset: Dataset, context: KSpaceConversionContex
 
     V = context.inner_potential * elementary_charge
     W = context.work_function
-    Eb = 0.0#the binding energy
+    Eb = 0.0  # the binding energy
 
     theta_rad = np.deg2rad(np.asarray(dataset.y_axis.values, dtype=float))
     cos_sq = np.cos(theta_rad) ** 2
@@ -260,6 +258,44 @@ def _build_k_axes_from_grid(
 
     return ky_axis, kz_axis
 
+def _create_validity_mask(
+    ky_grid: np.ndarray,
+    kz_grid: np.ndarray,
+    ky_axis: np.ndarray,
+    kz_axis: np.ndarray,
+) -> np.ndarray:
+    """
+    Create a mask that indicates which points in the rectangular grid
+    fall within the original curved boundary of the data.
+    """
+    ky_len = len(ky_axis)
+    kz_len = len(kz_axis)
+    
+    # Create 2D mesh of target coordinates
+    kz_mesh, ky_mesh = np.meshgrid(kz_axis, ky_axis)
+    
+    # Initialize mask as False (invalid)
+    mask = np.zeros((ky_len, kz_len), dtype=bool)
+    
+    # For each ky value in the target grid, find the valid kz range
+    for ky_idx, ky_target in enumerate(ky_axis):
+        # Find the closest ky indices in the original grid
+        ky_diffs = np.abs(ky_grid - ky_target)
+        closest_ky_idx = np.argmin(ky_diffs, axis=0)
+        
+        # Get the kz values at this ky for each photon energy
+        kz_at_ky = np.array([kz_grid[closest_ky_idx[hv_idx], hv_idx] 
+                              for hv_idx in range(kz_grid.shape[1])])
+        
+        # Find valid kz range (min and max from original curved boundary)
+        kz_min = np.min(kz_at_ky)
+        kz_max = np.max(kz_at_ky)
+        
+        # Mark points in this ky row that fall within the valid kz range
+        mask[ky_idx, :] = (kz_axis >= kz_min) & (kz_axis <= kz_max)
+    
+    return mask
+
 def _resample_photon_scan_intensity(
     intensity: np.ndarray,
     ky_grid: np.ndarray,
@@ -274,21 +310,31 @@ def _resample_photon_scan_intensity(
     kz_len = len(kz_axis)
     nz = intensity.shape[2]
 
+    # First interpolation: resample along ky for each photon energy
     ky_resampled = np.empty((ky_len, ky_grid.shape[1], nz), dtype=float)
     for hv_idx in range(ky_grid.shape[1]):
         ky_source = ky_grid[:, hv_idx]
         values = intensity[:, hv_idx, :]
         ky_resampled[:, hv_idx, :] = _vectorized_interp(ky_source, values, ky_axis)
 
+    # Second interpolation: resample along kz for each ky
     regridded = np.empty((ky_len, kz_len, nz), dtype=float)
     for ky_idx in range(ky_len):
         kz_source = kz_grid[ky_idx, :]
         values = ky_resampled[ky_idx, :, :]
         regridded[ky_idx, :, :] = _vectorized_interp(kz_source, values, kz_axis)
 
+    # Create validity mask to preserve curved boundaries
+    mask = _create_validity_mask(ky_grid, kz_grid, ky_axis, kz_axis)
+    
+    # Apply mask: set invalid regions to NaN
+    mask_3d = mask[:, :, np.newaxis]  # Broadcast mask to 3D
+    regridded = np.where(mask_3d, regridded, np.nan)
+
     return regridded
 
 
+# Common interpolation function
 def _vectorized_interp(
     source_axis: np.ndarray, source_values: np.ndarray, target_axis: np.ndarray
 ) -> np.ndarray:

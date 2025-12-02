@@ -1,7 +1,7 @@
 """
 ARpest application entry point.
 
-This module initializes and runs the main PyQt5 application.
+This module initializes and runs the main PyQt5 application.    
 """
 
 from __future__ import annotations
@@ -14,17 +14,13 @@ from PyQt5.QtWidgets import QApplication
 from arpest.ui.main_window import MainWindow
 from arpest.utils.config import Config
 
-#TODO
-#subtarct, add and divide by MDC, EDC, bg_Matt
-#divide by gold
+#export data for additional analysis
 
-#smooth, 2nd derivative, curvature
 #normalise slices (for kz thingy)
 #set cursor position
 #rotate the map for allignment
 #fully integrated MDC, EDC
 #overlap plots to compare
-#export data for additional analysis
 #phi rotation in k convert?
 
 #stuff:

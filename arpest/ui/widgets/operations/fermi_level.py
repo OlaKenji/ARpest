@@ -24,7 +24,7 @@ class FermiLevelCorrectionWidget(OperationWidget):
     """Align the dataset Fermi level using a gold reference measurement."""
 
     title = "Fermi Level Correction"
-    category = "Alignment"
+    category = "Operate"
     description = (
         "Load a gold reference, fit the Fermi edge for each EDC, and shift the current dataset accordingly."
     )

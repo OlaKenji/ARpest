@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Iterable
+
 import numpy as np
 from PyQt5.QtWidgets import (
+    QFileDialog,
     QDoubleSpinBox,
     QHBoxLayout,
     QLabel,
@@ -13,8 +17,11 @@ from PyQt5.QtWidgets import (
 )
 
 from .base import OperationWidget
+from ....core.loaders import BaseLoader
 from ....models import Dataset
-from ....operations.basic import crop_dataset, modify_axes, normalize_dataset, scale_dataset
+from ....operations.basic import crop_dataset, modify_axes, normalize_dataset, scale_dataset, modify_intensity
+from ....utils.session import SESSION_FILE_EXTENSION, load_session
+from ....operations.basic import crop_dataset, modify_axes, normalize_dataset, scale_dataset, modify_intensity
 
 
 class NormalizeOperationWidget(OperationWidget):
@@ -34,10 +41,9 @@ class NormalizeOperationWidget(OperationWidget):
         result = normalize_dataset(dataset)
         return result, "normalized"
 
-
 class ScaleOperationWidget(OperationWidget):
     title = "Scale Intensity"
-    category = "Arithmetic"
+    category = "General"
     description = "Multiply intensity by a chosen factor."
 
     def _build_ui(self) -> None:
@@ -251,3 +257,177 @@ class CropOperationWidget(OperationWidget):
         self.y_end_spin.setValue(float(np.nanmax(y_vals)))
         self.x_start_spin.setValue(float(np.nanmin(x_vals)))
         self.x_end_spin.setValue(float(np.nanmax(x_vals)))
+
+class ModifyByDataOperationWidget(OperationWidget):
+    title = "Modify data"
+    category = "Operate"
+    description = "Combine dataset intensity with a reference dataset using an arithmetic operation."
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout()
+        layout.setSpacing(6)
+        desc = QLabel("Combine dataset intensity with a reference dataset using an arithmetic operation.")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        self.reference_path_label = QLabel("No reference dataset loaded.")
+        self.reference_path_label.setWordWrap(True)
+        layout.addWidget(self.reference_path_label)
+
+        self.reference_meta_label = QLabel("")
+        self.reference_meta_label.setWordWrap(True)
+        layout.addWidget(self.reference_meta_label)
+
+        load_btn = QPushButton("Load reference data…")
+        load_btn.clicked.connect(self._on_load_reference_clicked)
+        layout.addWidget(load_btn)
+
+        buttons_row = QHBoxLayout()
+        self._operation_buttons: list[QPushButton] = []
+        for op_name, text in [
+            ("add", "Add"),
+            ("subtract", "Sub"),
+            ("multiply", "Mul"),
+            ("divide", "Div"),
+        ]:
+            btn = QPushButton(text)
+            btn.setEnabled(False)
+            btn.setFixedWidth(60)
+            btn.clicked.connect(lambda _, op=op_name: self._apply_operation_with(op))
+            buttons_row.addWidget(btn)
+            self._operation_buttons.append(btn)
+        layout.addLayout(buttons_row)
+
+        layout.addStretch()
+        self.setLayout(layout)
+
+        self._reference_dataset: Dataset | None = None
+        self._reference_path: Path | None = None
+        self._last_reference_dir: Path | None = None
+        self._pending_operation: str | None = None
+
+    def _set_operation_buttons_enabled(self, enabled: bool) -> None:
+        for btn in self._operation_buttons:
+            btn.setEnabled(enabled)
+
+    def _on_load_reference_clicked(self) -> None:
+        loaders = self._available_loaders()
+        if not loaders:
+            self.reference_meta_label.setText(
+                f"No raw data loaders available; only saved datasets (*{SESSION_FILE_EXTENSION}) can be loaded."
+            )
+
+        start_dir = self._start_path()
+        if self._last_reference_dir is not None:
+            start_dir = str(self._last_reference_dir)
+
+        filter_entries: list[str] = []
+        all_exts: list[str] = []
+        for loader in loaders:
+            if not loader.extensions:
+                continue
+            patterns = " ".join(f"*{ext}" for ext in loader.extensions)
+            filter_entries.append(f"{loader.name} ({patterns})")
+            all_exts.extend(loader.extensions)
+
+        all_exts.append(SESSION_FILE_EXTENSION)
+        unique_patterns = " ".join(sorted({f"*{ext}" for ext in all_exts}))
+        filter_entries.insert(0, f"All supported ({unique_patterns})")
+        filter_entries.insert(1, f"Saved datasets (*{SESSION_FILE_EXTENSION})")
+        filter_entries.append("All files (*.*)")
+
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select reference dataset",
+            start_dir,
+            ";;".join(filter_entries),
+        )
+        if not filename:
+            return
+
+        path = Path(filename)
+        try:
+            dataset = self._load_reference_dataset(path, loaders)
+        except ValueError as exc:
+            self.reference_path_label.setText("Failed to load reference dataset.")
+            self.reference_meta_label.setText(str(exc))
+            self._reference_dataset = None
+            self._reference_path = None
+            self._set_operation_buttons_enabled(False)
+            return
+
+        self._reference_dataset = dataset
+        self._reference_path = path
+        self._last_reference_dir = path.parent
+        self.reference_path_label.setText(f"Reference: {path.name}")
+        self.reference_meta_label.setText(f"{dataset.ndim}D dataset with grid {dataset.shape}")
+        self._set_operation_buttons_enabled(True)
+
+    def _apply_operation_with(self, operation: str) -> None:
+        self._pending_operation = operation
+        self._trigger_apply()
+
+    def _apply_operation(self, dataset: Dataset) -> tuple[Dataset, str]:
+        if self._reference_dataset is None:
+            raise ValueError("Load a reference dataset before applying an operation.")
+
+        operation = self._pending_operation
+        self._pending_operation = None
+        if operation is None:
+            raise ValueError("Select an operation to apply.")
+
+        result = modify_intensity(dataset, self._reference_dataset, operation)
+        verb = {
+            "add": "added reference intensity",
+            "subtract": "subtracted reference intensity",
+            "multiply": "multiplied by reference intensity",
+            "divide": "divided by reference intensity",
+        }.get(operation, "modified by reference")
+        return result, verb
+
+    def _available_loaders(self) -> list[BaseLoader]:
+        loaders = self._get_context_value("available_loaders")
+        if isinstance(loaders, list):
+            return loaders
+        return []
+
+    def _start_path(self) -> str:
+        path = self._get_context_value("start_path")
+        if isinstance(path, (str, Path)):
+            return str(path)
+        return str(Path.home())
+
+    def _load_reference_dataset(self, path: Path, loaders: Iterable[BaseLoader]) -> Dataset:
+        if path.suffix == SESSION_FILE_EXTENSION:
+            return self._load_session_reference(path)
+
+        for loader in loaders:
+            try:
+                if loader.can_load(path):
+                    return loader.load(path)
+            except Exception as exc:  # pragma: no cover - defensive
+                raise ValueError(f"Failed to load {path.name} with {loader.name}: {exc}") from exc
+        raise ValueError(f"No loader available for {path.name}")
+
+    def _load_session_reference(self, path: Path) -> Dataset:
+        try:
+            session = load_session(path)
+        except Exception as exc:
+            raise ValueError(f"Could not read {path.name}: {exc}") from exc
+
+        if not session.tabs:
+            raise ValueError("Session does not contain any datasets.")
+
+        tab_state = session.tabs[0]
+        if not tab_state.file_stacks:
+            raise ValueError("Session does not contain any file stacks.")
+
+        stack_index = max(0, min(tab_state.current_index, len(tab_state.file_stacks) - 1))
+        file_stack = tab_state.file_stacks[stack_index]
+        if not file_stack.states:
+            dataset = file_stack.raw_data
+        else:
+            state_index = max(0, min(file_stack.current_index, len(file_stack.states) - 1))
+            dataset = file_stack.states[state_index]
+
+        return dataset

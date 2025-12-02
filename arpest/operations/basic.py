@@ -123,3 +123,37 @@ def modify_axes(
         new_dataset.y_axis.values = apply_op(np.asarray(new_dataset.y_axis.values, dtype=float), float(y_value))
     new_dataset.validate()
     return new_dataset
+
+def modify_intensity(
+    dataset: Dataset,
+    reference_dataset: Dataset,
+    operation: str,
+) -> Dataset:
+    """Combine dataset intensity with a reference dataset using an arithmetic operation."""
+    if operation not in {"add", "subtract", "multiply", "divide"}:
+        raise ValueError("operation must be add, subtract, multiply, or divide.")
+
+    target_shape = dataset.intensity.shape
+    reference_shape = reference_dataset.intensity.shape
+    if target_shape != reference_shape:
+        raise ValueError(
+            "Reference dataset must have the same intensity shape as the current dataset "
+            f"(got {reference_shape}, expected {target_shape})."
+        )
+
+    new_dataset = dataset.copy()
+    reference_values = np.asarray(reference_dataset.intensity)
+
+    if operation == "add":
+        new_dataset.intensity = new_dataset.intensity + reference_values
+    elif operation == "subtract":
+        new_dataset.intensity = new_dataset.intensity - reference_values
+    elif operation == "multiply":
+        new_dataset.intensity = new_dataset.intensity * reference_values
+    elif operation == "divide":
+        if np.any(reference_values == 0):
+            raise ValueError("Cannot divide by reference dataset containing zero intensity values.")
+        new_dataset.intensity = new_dataset.intensity / reference_values
+
+    new_dataset.validate()
+    return new_dataset

@@ -166,6 +166,9 @@ class Figure2D(QWidget):
         edc = self._compute_edc(cut)
         mdc = self._compute_mdc(cut)
 
+        self._current_edc_curve = np.asarray(edc, dtype=float)
+        self._current_mdc_curve = np.asarray(mdc, dtype=float)
+
         self.line_edc = self.ax_edc.plot(edc, self.y_axis.values, pen=pg.mkPen("k", width=1.5), name="EDC")
         self.line_mdc = self.ax_mdc.plot(self.x_axis.values, mdc, pen=pg.mkPen("k", width=1.5), name="MDC")
 
@@ -203,6 +206,20 @@ class Figure2D(QWidget):
         )
 
         self._update_integration_overlays()
+
+    def get_current_edc_curves(self) -> dict[str, np.ndarray]:
+        """Return the currently displayed MDC curve keyed by its axis."""
+        curve = getattr(self, "_current_mdc_curve", None)
+        if curve is None or curve.size == 0:
+            return {}
+        return {"x": np.asarray(curve, dtype=float).copy()}
+
+    def get_current_mdc_curves(self) -> dict[str, np.ndarray]:
+        """Return the currently displayed EDC curve keyed by its axis."""
+        curve = getattr(self, "_current_edc_curve", None)
+        if curve is None or curve.size == 0:
+            return {}
+        return {"y": np.asarray(curve, dtype=float).copy()}
 
     # ------------------------------------------------------------------
     # Mouse handling & callbacks
@@ -262,6 +279,8 @@ class Figure2D(QWidget):
     def _update_cut_visuals(self, cut: CursorState) -> None:
         edc = self._compute_edc(cut)
         mdc = self._compute_mdc(cut)
+        self._current_edc_curve = np.asarray(edc, dtype=float)
+        self._current_mdc_curve = np.asarray(mdc, dtype=float)
         self.line_edc.setData(edc, self.y_axis.values)
         self.line_mdc.setData(self.x_axis.values, mdc)
         self._update_edc_axis_limits(edc)

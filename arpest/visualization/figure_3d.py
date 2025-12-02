@@ -244,6 +244,8 @@ class Figure3D(QWidget):
             pen=pg.mkPen("#ff7f0e", width=1.5),
             name="EDC top-right",
         )
+        self._current_edc_cut_y = np.asarray(edc_from_cut_y, dtype=float)
+        self._current_edc_cut_x = np.asarray(edc_from_cut_x, dtype=float)
         self.ax_curves.setXRange(z_extent[0], z_extent[1], padding=0)
         self._update_edc_axis_limits(edc_from_cut_y, edc_from_cut_x)
 
@@ -259,6 +261,8 @@ class Figure3D(QWidget):
             pen=pg.mkPen("#ff7f0e", width=1.5),
             name="MDC top-right",
         )
+        self._current_mdc_cut_y = np.asarray(mdc_from_cut_y, dtype=float)
+        self._current_mdc_cut_x = np.asarray(mdc_from_cut_x, dtype=float)
         self._update_mdc_axis_limits(mdc_from_cut_y, mdc_from_cut_x)
 
     def _plot_cursors(self) -> None:
@@ -462,10 +466,14 @@ class Figure3D(QWidget):
         self.ax_cut_x.setTitle(f"Band @ {self.dataset.x_axis.name}={cut.x_value:.2f}°")
 
         edc_from_cut_y, edc_from_cut_x = self._compute_edc_curves(cut)
+        self._current_edc_cut_y = np.asarray(edc_from_cut_y, dtype=float)
+        self._current_edc_cut_x = np.asarray(edc_from_cut_x, dtype=float)
         self.line_edc_cut_y.setData(self.dataset.z_axis.values, edc_from_cut_y)
         self.line_edc_cut_x.setData(self.dataset.z_axis.values, edc_from_cut_x)
         self._update_edc_axis_limits(edc_from_cut_y, edc_from_cut_x)
         mdc_from_cut_y, mdc_from_cut_x = self._compute_mdc_curves(cut, cut_y, cut_x)
+        self._current_mdc_cut_y = np.asarray(mdc_from_cut_y, dtype=float)
+        self._current_mdc_cut_x = np.asarray(mdc_from_cut_x, dtype=float)
         self.line_mdc_cut_y.setData(self.dataset.x_axis.values, mdc_from_cut_y)
         self.line_mdc_cut_x.setData(self.dataset.y_axis.values, mdc_from_cut_x)
         self._update_mdc_axis_limits(mdc_from_cut_y, mdc_from_cut_x)
@@ -475,10 +483,14 @@ class Figure3D(QWidget):
         x_extent, y_extent = self._image_extents["fermi"]
         self._set_image_data("fermi", intensity, x_extent, y_extent)
         edc_from_cut_y, edc_from_cut_x = self._compute_edc_curves(self.cursor_mgr.cut)
+        self._current_edc_cut_y = np.asarray(edc_from_cut_y, dtype=float)
+        self._current_edc_cut_x = np.asarray(edc_from_cut_x, dtype=float)
         self.line_edc_cut_y.setData(self.dataset.z_axis.values, edc_from_cut_y)
         self.line_edc_cut_x.setData(self.dataset.z_axis.values, edc_from_cut_x)
         self._update_edc_axis_limits(edc_from_cut_y, edc_from_cut_x)
         mdc_from_cut_y, mdc_from_cut_x = self._compute_mdc_curves(self.cursor_mgr.cut)
+        self._current_mdc_cut_y = np.asarray(mdc_from_cut_y, dtype=float)
+        self._current_mdc_cut_x = np.asarray(mdc_from_cut_x, dtype=float)
         self.line_mdc_cut_y.setData(self.dataset.x_axis.values, mdc_from_cut_y)
         self.line_mdc_cut_x.setData(self.dataset.y_axis.values, mdc_from_cut_x)
         self._update_mdc_axis_limits(mdc_from_cut_y, mdc_from_cut_x)
@@ -607,6 +619,28 @@ class Figure3D(QWidget):
         self.energy_cursor.set_band_region(z_low, z_high)
         self.cut_y_z_line.set_band_region(z_low, z_high)
         self.cut_x_z_line.set_band_region(z_low, z_high)
+
+    def get_current_edc_curves(self) -> dict[str, np.ndarray]:
+        """Return the currently displayed EDC curve keyed by axis."""
+        curve_a = getattr(self, "_current_edc_cut_y", None)
+        curve_b = getattr(self, "_current_edc_cut_x", None)
+        collected = [np.asarray(c, dtype=float) for c in (curve_a, curve_b) if c is not None and c.size]
+        if not collected:
+            return {}
+        stacked = np.vstack(collected)
+        averaged = np.nanmean(stacked, axis=0)
+        return {"z": averaged}
+
+    def get_current_mdc_curves(self) -> dict[str, np.ndarray]:
+        """Return the currently displayed MDC curves keyed by their axes."""
+        curves: dict[str, np.ndarray] = {}
+        curve_x = getattr(self, "_current_mdc_cut_y", None)
+        if curve_x is not None and curve_x.size:
+            curves["x"] = np.asarray(curve_x, dtype=float)
+        curve_y = getattr(self, "_current_mdc_cut_x", None)
+        if curve_y is not None and curve_y.size:
+            curves["y"] = np.asarray(curve_y, dtype=float)
+        return curves
 
     # ------------------------------------------------------------------
     # State persistence
