@@ -15,13 +15,11 @@ from arpest.ui.main_window import MainWindow
 from arpest.utils.config import Config
 
 #export data for additional analysis
+#overlap plots to compare
 
 #normalise slices (for kz thingy)
 #set cursor position
-#rotate the map for allignment
 #fully integrated MDC, EDC
-#overlap plots to compare
-#phi rotation in k convert?
 
 #stuff:
 #bg subtract (there may be angle dependence: bg_matt, bg_fermi)
