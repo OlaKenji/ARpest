@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QSlider,
     QLineEdit,
+    QStackedLayout,
 )
 
 from ..core.loaders import BlochLoader, I05Loader
@@ -29,6 +30,7 @@ import numpy as np
 from ..models import FileStack, Dataset, Axis, AxisType
 from ..operations import get_registered_operations
 from ..utils.config import Config
+from ..utils.colour_map import add_colour_map
 from ..utils.cursor.cursor_manager import CursorState
 from ..utils.session import (
     SESSION_FILE_EXTENSION,
@@ -43,9 +45,11 @@ from ..utils.session import (
 from .widgets.file_catalog import FileCatalogWidget
 from .widgets.operations_panel import OperationsPanel
 from .widgets.state_history import StateHistoryWidget
+from .widgets.analysis_panel import AnalysisPanel
 
 from ..visualization.figure_2d import Figure2D
 from ..visualization.figure_3d import Figure3D
+from ..visualization.analysis_canvas import AnalysisCanvas
 
 class DatasetTab(QWidget):
     """
@@ -83,9 +87,16 @@ class DatasetTab(QWidget):
         self.config = config
         self.figure = None
         self.left_layout: Optional[QVBoxLayout] = None
+        self.visual_stack: Optional[QStackedLayout] = None
+        self.figure_container: Optional[QWidget] = None
+        self.figure_container_layout: Optional[QVBoxLayout] = None
         self.meta_text: Optional[QLabel] = None
         self.data_text: Optional[QLabel] = None
         self.state_history: Optional[StateHistoryWidget] = None
+        self.analysis_panel: Optional[AnalysisPanel] = None
+        self.analysis_canvas: Optional[AnalysisCanvas] = None
+        self.side_tabs: Optional[QTabWidget] = None
+        self._analysis_tab_index: Optional[int] = None
         self.colormap_combo: Optional[QComboBox] = None
         self.color_scale_slider: Optional[QSlider] = None
         self.vmin_input: Optional[QLineEdit] = None
@@ -94,16 +105,10 @@ class DatasetTab(QWidget):
         self.integration_value_label: Optional[QLabel] = None
         self._cursor_states: list[Optional[CursorState]] = []
         self._cut_states: list[Optional[CursorState]] = []
-        self.available_colormaps = [
-            "RdYlBu_r",
-            "viridis",
-            "plasma",
-            "inferno",
-            "magma",
-            "cividis",
-            "turbo",
-            "gray",
-        ]
+        
+        add_colour_map()
+        colours = ['arpest', 'RdYlBu_r', 'terrain','binary', 'binary_r'] + sorted(['RdBu_r','Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])        
+        self.available_colormaps = colours
         self.current_colormap = self.available_colormaps[0]
         self._base_color_limits: tuple[Optional[float], Optional[float]] = (None, None)
         self._current_color_limits: tuple[Optional[float], Optional[float]] = (None, None)
@@ -153,9 +158,23 @@ class DatasetTab(QWidget):
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
         self.left_layout = left_layout
-        
+
+        self.visual_stack = QStackedLayout()
+        self.figure_container = QWidget()
+        self.figure_container_layout = QVBoxLayout()
+        self.figure_container_layout.setContentsMargins(0, 0, 0, 0)
+        self.figure_container.setLayout(self.figure_container_layout)
+
+        self.analysis_canvas = AnalysisCanvas()
+
+        self.visual_stack.addWidget(self.figure_container)
+        self.visual_stack.addWidget(self.analysis_canvas)
+        left_layout.addLayout(self.visual_stack)
+
         left_widget.setLayout(left_layout)
         self._display_file_stack(self.file_stacks[self.current_index])
+        if self.visual_stack is not None and self.figure_container is not None:
+            self.visual_stack.setCurrentWidget(self.figure_container)
         
         # Right side tabs
         right_widget = QWidget()
@@ -165,7 +184,10 @@ class DatasetTab(QWidget):
         right_widget.setMaximumWidth(380)
 
         side_tabs = QTabWidget()
+        side_tabs.setTabPosition(QTabWidget.North)
+        side_tabs.setElideMode(Qt.ElideRight)
         right_layout.addWidget(side_tabs)
+        self.side_tabs = side_tabs
 
         # overview tab
         overview_tab = QWidget()
@@ -321,6 +343,27 @@ class DatasetTab(QWidget):
         operations_layout.addStretch()
 
         side_tabs.addTab(operations_tab, "Operations")
+
+        # Analysis tab
+        analysis_tab = QWidget()
+        analysis_layout = QVBoxLayout()
+        analysis_layout.setContentsMargins(0, 0, 0, 0)
+        analysis_tab.setLayout(analysis_layout)
+
+        self.analysis_panel = AnalysisPanel(
+            get_file_stack=self._current_file_stack,
+            canvas=self.analysis_canvas,
+            capture_view_callback=lambda view=None: self._capture_current_view_for_analysis(view=view),
+            context_providers={
+                "current_edc_curves": self._current_edc_curves,
+                "current_mdc_curves": self._current_mdc_curves,
+            },
+        )
+        analysis_layout.addWidget(self.analysis_panel)
+        side_tabs.addTab(analysis_tab, "Analysis")
+        self._analysis_tab_index = side_tabs.indexOf(analysis_tab)
+        side_tabs.currentChanged.connect(self._on_side_tab_changed)
+        self._on_side_tab_changed(side_tabs.currentIndex())
         
         # Use splitter to allow resizing
         splitter = QSplitter(Qt.Horizontal)
@@ -463,7 +506,7 @@ class DatasetTab(QWidget):
 
     def _display_file_stack(self, file_stack: FileStack, previous_index: Optional[int] = None) -> None:
         """Create or replace the figure widget for the selected file stack."""
-        if self.left_layout is None:
+        if self.figure_container_layout is None:
             return
         if previous_index is None:
             previous_index = self.current_index
@@ -485,12 +528,12 @@ class DatasetTab(QWidget):
         )
 
         if self.figure is not None:
-            self.left_layout.removeWidget(self.figure)
+            self.figure_container_layout.removeWidget(self.figure)
             self.figure.setParent(None)
             self.figure.deleteLater()
 
         self.figure = new_figure
-        self.left_layout.addWidget(self.figure)
+        self.figure_container_layout.addWidget(self.figure)
         self._apply_colormap_to_current_figure()
         self._apply_integration_radius_to_current_figure()
         self._update_color_scale_controls(file_stack)
@@ -507,6 +550,63 @@ class DatasetTab(QWidget):
     def _update_state_history_widget(self, file_stack: FileStack) -> None:
         if self.state_history is not None:
             self.state_history.set_file_stack(file_stack)
+
+    def _capture_current_view_for_analysis(
+        self, view: Optional[str] = None, *, set_tab: bool = True
+    ) -> bool:
+        if self.analysis_canvas is None:
+            raise ValueError("Analysis canvas is not available.")
+        dataset = self._export_dataset_for_analysis(view)
+        self.analysis_canvas.display_dataset(
+            dataset,
+            colormap=self.current_colormap,
+            integration_radius=self.integration_radius,
+        )
+        if (
+            set_tab
+            and self.side_tabs is not None
+            and self._analysis_tab_index is not None
+        ):
+            self.side_tabs.setCurrentIndex(self._analysis_tab_index)
+        return True
+
+    def _export_dataset_for_analysis(self, view: Optional[str]) -> Dataset:
+        if not self.file_stacks:
+            raise ValueError("No dataset is loaded.")
+        if self.figure is None:
+            raise ValueError("No figure is currently active.")
+
+        exporter = getattr(self.figure, "export_panel_dataset", None)
+        dataset: Optional[Dataset] = None
+        if callable(exporter):
+            try:
+                dataset = exporter(view)
+            except Exception as exc:
+                raise ValueError(f"Could not capture the current figure: {exc}") from exc
+        elif view is None:
+            fallback = getattr(self.figure, "export_display_dataset", None)
+            if callable(fallback):
+                dataset = fallback()
+
+        if dataset is None:
+            raise ValueError("The current figure cannot provide the requested view.")
+        return dataset
+
+    def _on_side_tab_changed(self, index: int) -> None:
+        if (
+            self.visual_stack is None
+            or self.analysis_canvas is None
+            or self.figure_container is None
+        ):
+            return
+        if self._analysis_tab_index is not None and index == self._analysis_tab_index:
+            self.visual_stack.setCurrentWidget(self.analysis_canvas)
+            try:
+                self._capture_current_view_for_analysis(set_tab=False)
+            except ValueError:
+                pass
+        else:
+            self.visual_stack.setCurrentWidget(self.figure_container)
 
     def _on_operation_result(self, file_stack: FileStack, dataset: Dataset, state_name: str) -> None:
         """Persist an operation result as a new state and refresh UI."""

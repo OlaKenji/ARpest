@@ -16,7 +16,7 @@ from matplotlib import cm
 from PyQt5.QtCore import QObject, QEvent, Qt, QPointF, QRectF
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 
-from ..models import FileStack
+from ..models import Axis, Dataset, FileStack
 from ..utils.cursor.cursor_manager import CursorManager, CursorState
 from ..utils.cursor.cursor_helpers import DragMode, DragState
 from ..utils.cursor.pg_line_cursor import PGLineCursor
@@ -665,6 +665,21 @@ class Figure3D(QWidget):
             return
         self.cursor_mgr.set_cut(state.x_value, state.y_value)
 
+    def export_display_dataset(self) -> Dataset:
+        """Return the primary (top-left) view as a dataset."""
+        return self._export_fermi_dataset()
+
+    def export_panel_dataset(self, view: Optional[str] = None) -> Dataset:
+        """Export the specified panel as a standalone dataset."""
+        key = (view or "fermi").lower()
+        if key in {"fermi", "main", "top_left"}:
+            return self._export_fermi_dataset()
+        if key in {"cut_x", "top_right"}:
+            return self._export_cut_x_dataset()
+        if key in {"cut_y", "bottom_left"}:
+            return self._export_cut_y_dataset()
+        raise ValueError(f"Unknown panel '{view}'. Available panels: top_left, top_right, bottom_left.")
+
     # ------------------------------------------------------------------
     # Appearance controls
     # ------------------------------------------------------------------
@@ -696,3 +711,58 @@ class Figure3D(QWidget):
             cmap = cm.get_cmap("viridis", 512)
         lut = (cmap(np.linspace(0, 1, 512)) * 255).astype(np.uint8)
         return lut
+
+    def _export_fermi_dataset(self) -> Dataset:
+        dataset_copy = self.file_stack.current_state.copy()
+        slice_data = np.asarray(self._get_intensity_slice(), dtype=float)
+        dataset_copy.intensity = slice_data
+        dataset_copy.z_axis = None
+        dataset_copy.w_axis = None
+        self._append_export_suffix(dataset_copy, "fermi")
+        dataset_copy.validate()
+        return dataset_copy
+
+    def _export_cut_x_dataset(self) -> Dataset:
+        data = np.asarray(self._latest_cut_x_data(), dtype=float)
+        dataset_copy = self.file_stack.current_state.copy()
+        dataset_copy.intensity = data
+        dataset_copy.x_axis = self._clone_axis(self.dataset.z_axis)
+        dataset_copy.y_axis = self._clone_axis(self.dataset.y_axis)
+        dataset_copy.z_axis = None
+        dataset_copy.w_axis = None
+        self._append_export_suffix(dataset_copy, "cut_x")
+        dataset_copy.validate()
+        return dataset_copy
+
+    def _export_cut_y_dataset(self) -> Dataset:
+        data = np.asarray(self._latest_cut_y_data(), dtype=float).T
+        dataset_copy = self.file_stack.current_state.copy()
+        dataset_copy.intensity = data
+        dataset_copy.x_axis = self._clone_axis(self.dataset.x_axis)
+        dataset_copy.y_axis = self._clone_axis(self.dataset.z_axis)
+        dataset_copy.z_axis = None
+        dataset_copy.w_axis = None
+        self._append_export_suffix(dataset_copy, "cut_y")
+        dataset_copy.validate()
+        return dataset_copy
+
+    def _latest_cut_x_data(self) -> np.ndarray:
+        data = getattr(self, "_cut_x_data", None)
+        if data is None:
+            data = self._compute_cut_x(self.cursor_mgr.cut)
+            self._cut_x_data = data
+        return data
+
+    def _latest_cut_y_data(self) -> np.ndarray:
+        data = getattr(self, "_cut_y_data", None)
+        if data is None:
+            data = self._compute_cut_y(self.cursor_mgr.cut)
+            self._cut_y_data = data
+        return data
+
+    def _clone_axis(self, axis: Axis) -> Axis:
+        return Axis(axis.values.copy(), axis.axis_type, axis.name, axis.unit)
+
+    def _append_export_suffix(self, dataset: Dataset, suffix: str) -> None:
+        base = dataset.filename or self.file_stack.filename or ""
+        dataset.filename = f"{base}_{suffix}" if base else suffix

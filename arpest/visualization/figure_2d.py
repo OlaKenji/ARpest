@@ -16,7 +16,7 @@ from matplotlib import cm
 from PyQt5.QtCore import QObject, QEvent, Qt, QPointF, QRectF
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 
-from ..models import FileStack
+from ..models import Dataset, FileStack
 from ..utils.cursor.cursor_manager import CursorManager, CursorState
 from ..utils.cursor.cursor_helpers import DragMode, DragState
 from ..utils.cursor.pg_line_cursor import PGLineCursor
@@ -370,6 +370,14 @@ class Figure2D(QWidget):
         if state is None:
             return
         self.cursor_mgr.set_cut(state.x_value, state.y_value)
+
+    def export_display_dataset(self) -> Dataset:
+        """Return a copy of the dataset currently shown in this figure."""
+        return self.file_stack.current_state.copy()
+
+    def export_panel_dataset(self, view: Optional[str] = None) -> Dataset:
+        """Return the requested panel; 2D figures only expose the main image."""
+        return self.export_display_dataset()
 
     # ------------------------------------------------------------------
     # Axis helpers

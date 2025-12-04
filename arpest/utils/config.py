@@ -27,7 +27,7 @@ class Config:
     start_path: Path = Path.home()
     
     # Visualization defaults
-    default_colormap: str = "RdYlBu_r"
+    default_colormap: str = "arpest"
     figure_dpi: int = 100
     
     # Figure positions and sizes (can be adjusted)
