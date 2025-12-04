@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QLabel,
 )
 
-from ...models import FileStack
+from .....models import FileStack
 
 
 class FileCatalogWidget(QWidget):

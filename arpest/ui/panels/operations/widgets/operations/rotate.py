@@ -17,9 +17,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ....models import Dataset
-from ....operations.rotate import rotate_dataset
-from ....utils.cursor.cursor_manager import CursorState
+from ......models import Dataset
+from ......operations.rotate import rotate_dataset
+from ......utils.cursor.cursor_manager import CursorState
 from .base import OperationWidget
 
 

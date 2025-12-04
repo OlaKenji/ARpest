@@ -11,8 +11,8 @@ from PyQt5.QtWidgets import (
 )
 
 from .base import OperationWidget
-from ....models import Dataset
-from ....operations.background import subtract_background
+from ......models import Dataset
+from ......operations.background import subtract_background
 
 
 class BackgroundOperationWidget(OperationWidget):

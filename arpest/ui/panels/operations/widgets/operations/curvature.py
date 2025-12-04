@@ -5,8 +5,8 @@ from __future__ import annotations
 from PyQt5.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSpinBox, QVBoxLayout
 
 from .base import OperationWidget
-from ....models import Dataset
-from ....operations.curvature import derivative, smooth, zhang_curvature
+from ......models import Dataset
+from ......operations.curvature import derivative, smooth, zhang_curvature
 
 
 class CurvatureOperationWidget(OperationWidget):

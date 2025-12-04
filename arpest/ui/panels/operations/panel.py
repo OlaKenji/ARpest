@@ -13,8 +13,8 @@ from PyQt5.QtWidgets import (
     QFrame,
 )
 
-from ...models import FileStack, Dataset
-from .operations.base import OperationWidget
+from ....models import FileStack, Dataset
+from .widgets.operations.base import OperationWidget
 
 
 class OperationsPanel(QWidget):

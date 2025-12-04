@@ -12,14 +12,14 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-from ....models import AxisType, Dataset
-from ....operations.k_space import (
+from ......models import AxisType, Dataset
+from ......operations.k_space import (
     KSpaceConversionContext,
     KSpaceConversionMode,
     convert_dataset,
     determine_mode,
 )
-from ....utils.cursor.cursor_manager import CursorState
+from ......utils.cursor.cursor_manager import CursorState
 from .base import OperationWidget
 
 

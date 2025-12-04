@@ -7,7 +7,7 @@ from typing import Optional
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 
-from ...models import FileStack
+from .....models import FileStack
 
 
 class StateHistoryWidget(QWidget):

@@ -7,7 +7,7 @@ from typing import Any, Callable, Optional
 
 from PyQt5.QtWidgets import QGroupBox, QMessageBox
 
-from ....models import Dataset, FileStack
+from ......models import Dataset, FileStack
 
 
 class OperationWidget(QGroupBox):

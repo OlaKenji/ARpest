@@ -17,11 +17,11 @@ from PyQt5.QtWidgets import (
 )
 
 from .base import OperationWidget
-from ....core.loaders import BaseLoader
-from ....models import Dataset
-from ....operations.basic import crop_dataset, modify_axes, normalize_dataset, scale_dataset, modify_intensity
-from ....utils.session import SESSION_FILE_EXTENSION, load_session
-from ....operations.basic import crop_dataset, modify_axes, normalize_dataset, scale_dataset, modify_intensity
+from ......core.loaders import BaseLoader
+from ......models import Dataset
+from ......operations.basic import crop_dataset, modify_axes, normalize_dataset, scale_dataset, modify_intensity
+from ......utils.session import SESSION_FILE_EXTENSION, load_session
+from ......operations.basic import crop_dataset, modify_axes, normalize_dataset, scale_dataset, modify_intensity
 
 
 class NormalizeOperationWidget(OperationWidget):

@@ -14,10 +14,10 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
-from ....core.loaders import BaseLoader
-from ....models import Dataset
-from ....operations.fermi import correct_fermi_level_2d, correct_fermi_level_3d_same, correct_fermi_level_3d
-from ....utils.session import SESSION_FILE_EXTENSION, load_session
+from ......core.loaders import BaseLoader
+from ......models import Dataset
+from ......operations.fermi import correct_fermi_level_2d, correct_fermi_level_3d_same, correct_fermi_level_3d
+from ......utils.session import SESSION_FILE_EXTENSION, load_session
 from .base import OperationWidget
 
 class FermiLevelCorrectionWidget(OperationWidget):

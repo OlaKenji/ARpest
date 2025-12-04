@@ -20,8 +20,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ...models import Axis, Dataset, FileStack
-from ...visualization.analysis_canvas import AnalysisCanvas, CurveDisplayData
+from ....models import Axis, Dataset, FileStack
+from ....visualization.analysis_canvas import AnalysisCanvas, CurveDisplayData
 
 
 class AnalysisPanel(QWidget):
