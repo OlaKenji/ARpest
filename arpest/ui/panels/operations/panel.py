@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QTabWidget,
     QScrollArea,
     QFrame,
+    QSizePolicy,
 )
 
 from ....models import FileStack, Dataset
@@ -34,11 +35,16 @@ class OperationsPanel(QWidget):
         self.operation_classes = operation_classes
         self.context_providers = context_providers or {}
         self._build_ui()
+        # Encourage the operations panel to claim vertical space so more widgets
+        # are visible without scrolling.
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumHeight(550)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         self.tabs = QTabWidget()
+        self.tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(self.tabs)
         self.setLayout(layout)
 

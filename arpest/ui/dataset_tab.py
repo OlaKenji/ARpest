@@ -260,6 +260,9 @@ class DatasetTab(QWidget):
                 "start_path": self._current_start_path,
                 "current_edc_curves": self._current_edc_curves,
                 "current_mdc_curves": self._current_mdc_curves,
+                "panel_dataset_top_left": lambda: self._export_dataset_for_operations("top_left"),
+                "panel_dataset_top_right": lambda: self._export_dataset_for_operations("top_right"),
+                "panel_dataset_bottom_left": lambda: self._export_dataset_for_operations("bottom_left"),
             },
         )
         operations_layout.addWidget(self.operations_panel)
@@ -427,6 +430,12 @@ class DatasetTab(QWidget):
                 return None
         return None
 
+    def _export_dataset_for_operations(self, view: Optional[str]):
+        try:
+            return self._export_dataset_for_analysis(view)
+        except ValueError:
+            return None
+
     def _display_file_stack(self, file_stack: FileStack, previous_index: Optional[int] = None) -> None:
         """Create or replace the figure widget for the selected file stack."""
         if self.figure_container_layout is None:
@@ -524,10 +533,6 @@ class DatasetTab(QWidget):
             return
         if self._analysis_tab_index is not None and index == self._analysis_tab_index:
             self.visual_stack.setCurrentWidget(self.analysis_canvas)
-            try:
-                self._capture_current_view_for_analysis(set_tab=False)
-            except ValueError:
-                pass
         else:
             self.visual_stack.setCurrentWidget(self.figure_container)
 

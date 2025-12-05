@@ -11,6 +11,9 @@ from .k_space import KSpaceOperationWidget
 from .curvature import CurvatureOperationWidget
 from .background import BackgroundOperationWidget
 from .rotate import RotateOperationWidget
+from .normalise_slices import NormaliseSlicesOperationWidget
+from .export import ExportWidget
+
 
 def get_registered_operations() -> List[Type[OperationWidget]]:
     """Return the list of available operation widgets."""
@@ -25,4 +28,6 @@ def get_registered_operations() -> List[Type[OperationWidget]]:
         ModifyByDataOperationWidget,
         CurvatureOperationWidget,
         BackgroundOperationWidget,
+        NormaliseSlicesOperationWidget,
+        ExportWidget,
     ]

@@ -14,10 +14,6 @@ from PyQt5.QtWidgets import QApplication
 from arpest.ui.main_window import MainWindow
 from arpest.utils.config import Config
 
-#export data for additional analysis
-#overlap plots to compare
-
-#normalise slices (for kz thingy)
 #set cursor position
 #fully integrated MDC, EDC
 

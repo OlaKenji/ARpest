@@ -621,15 +621,15 @@ class Figure3D(QWidget):
         self.cut_x_z_line.set_band_region(z_low, z_high)
 
     def get_current_edc_curves(self) -> dict[str, np.ndarray]:
-        """Return the currently displayed EDC curve keyed by axis."""
+        """Return all available EDC curves keyed by axis identifier."""
+        curves: dict[str, np.ndarray] = {}
         curve_a = getattr(self, "_current_edc_cut_y", None)
+        if curve_a is not None and curve_a.size:
+            curves["z_cut_y"] = np.asarray(curve_a, dtype=float)
         curve_b = getattr(self, "_current_edc_cut_x", None)
-        collected = [np.asarray(c, dtype=float) for c in (curve_a, curve_b) if c is not None and c.size]
-        if not collected:
-            return {}
-        stacked = np.vstack(collected)
-        averaged = np.nanmean(stacked, axis=0)
-        return {"z": averaged}
+        if curve_b is not None and curve_b.size:
+            curves["z_cut_x"] = np.asarray(curve_b, dtype=float)
+        return curves
 
     def get_current_mdc_curves(self) -> dict[str, np.ndarray]:
         """Return the currently displayed MDC curves keyed by their axes."""

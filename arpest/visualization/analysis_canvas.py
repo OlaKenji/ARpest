@@ -63,7 +63,7 @@ class AnalysisCanvas(QWidget):
         self,
         dataset: Dataset,
         *,
-        colormap: str = "RdYlBu_r",
+        colormap: str = "arpest",
         integration_radius: int = 0,
     ) -> None:
         """

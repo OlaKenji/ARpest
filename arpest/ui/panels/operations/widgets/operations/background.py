@@ -17,7 +17,7 @@ from ......operations.background import subtract_background
 
 class BackgroundOperationWidget(OperationWidget):
     title = "Background operations"
-    category = "Background"
+    category = "Operate"
     description = "Subtract EDC/MDC curves or their minimum-based baselines."
 
     _modes = ["EDC", "MDC", "EDC_min", "MDC_min"]

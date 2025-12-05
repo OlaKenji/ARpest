@@ -285,7 +285,7 @@ class OverplotModule(QWidget):
         return color
 
     def _axis_from_key(self, dataset: Dataset, key: str) -> Axis | None:
-        key_lower = key.lower()
+        key_lower = key.lower().split("_", 1)[0]
         if key_lower == "x":
             return dataset.x_axis
         if key_lower == "y":
