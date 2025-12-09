@@ -67,6 +67,7 @@ class FitComponentResult:
     parameters: dict[str, float]
     contribution: np.ndarray
     component_id: str | None = None
+    metadata: dict[str, dict[str, float | bool | None]] | None = None
 
 
 @dataclass
@@ -218,6 +219,15 @@ def perform_curve_fit(
     for spec, label, params, component_id in resolved_components:
         param_values = {name: cfg.value for name, cfg in params.items()}
         contribution = spec.evaluate(x_vals, param_values)
+        metadata = {
+            name: {
+                "value": cfg.value,
+                "fixed": cfg.fixed,
+                "lower": cfg.lower,
+                "upper": cfg.upper,
+            }
+            for name, cfg in params.items()
+        }
         components_result.append(
             FitComponentResult(
                 label=label,
@@ -225,6 +235,7 @@ def perform_curve_fit(
                 parameters=param_values,
                 contribution=contribution,
                 component_id=component_id,
+                metadata=metadata,
             )
         )
 

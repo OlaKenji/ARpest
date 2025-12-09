@@ -56,6 +56,8 @@ class _FitHistoryEntry:
     id: str
     label: str
     result: FitResult
+    capture_id: str
+    fit_range: tuple[float, float]
 
 
 class _FitComponentWidget(QGroupBox):
@@ -158,6 +160,27 @@ class _FitComponentWidget(QGroupBox):
         except ValueError:
             return None
 
+    def set_display_label(self, label: str | None) -> None:
+        self.label_edit.setText(label or self.spec.label)
+
+    def set_parameters(self, metadata: dict[str, dict[str, float | bool | None]] | None) -> None:
+        if not metadata:
+            return
+        for name, meta in metadata.items():
+            row = self._rows.get(name)
+            if row is None:
+                continue
+            value = meta.get("value")
+            if value is not None:
+                row.value.setValue(float(value))
+            fixed = meta.get("fixed")
+            if fixed is not None:
+                row.fixed.setChecked(bool(fixed))
+            lower = meta.get("lower")
+            upper = meta.get("upper")
+            row.lower.setText("" if lower is None else str(lower))
+            row.upper.setText("" if upper is None else str(upper))
+
 
 class FittingModule(QWidget):
     """Allows fitting captured curves with configurable components."""
@@ -189,12 +212,13 @@ class FittingModule(QWidget):
         self.canvas = canvas
         self.context_providers = context_providers
         self._function_specs = available_fit_functions()
+        self._function_lookup = {spec.id: spec for spec in self._function_specs}
         self._component_widgets: list[_FitComponentWidget] = []
         self._component_counter = 1
         self._active_curve: CurveCaptureEntry | None = None
-        self._fit_history: list[_FitHistoryEntry] = []
+        self._fit_histories: dict[str, list[_FitHistoryEntry]] = {}
+        self._selected_result_ids: dict[str, str | None] = {}
         self._result_counter = 1
-        self._selected_result_id: str | None = None
 
         self._build_ui()
         if register_curve_selection_callback is not None:
@@ -274,6 +298,8 @@ class FittingModule(QWidget):
         self.results_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.results_tree.itemSelectionChanged.connect(self._on_results_selection_changed)
         self.results_tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.results_tree.itemClicked.connect(self._on_result_item_clicked)
+        self.results_tree.itemDoubleClicked.connect(self._on_result_item_clicked)
         layout.addWidget(self.results_tree)
 
         self.status_label = QLabel("")
@@ -292,6 +318,7 @@ class FittingModule(QWidget):
             self._active_curve = None
             self.region_min_spin.setEnabled(False)
             self.region_max_spin.setEnabled(False)
+            self._refresh_results_view()
             return
 
         self._active_curve = entry
@@ -304,6 +331,7 @@ class FittingModule(QWidget):
         self.region_max_spin.setRange(axis_min, axis_max)
         self.region_min_spin.setValue(axis_min)
         self.region_max_spin.setValue(axis_max)
+        self._refresh_results_view()
 
     # ------------------------------------------------------------------
     # Component handling
@@ -323,23 +351,26 @@ class FittingModule(QWidget):
         self.components_area.addWidget(widget)
 
     def _clear_components(self) -> None:
-        while self._component_widgets:
-            widget = self._component_widgets.pop()
-            widget.setParent(None)
-            widget.deleteLater()
+        self._remove_all_components(preserve_history=True)
         self._component_counter = 1
 
     def _remove_component(self, component_id: str) -> None:
-        removed = False
         for idx, widget in enumerate(self._component_widgets):
             if widget.component_id == component_id:
                 self.components_area.removeWidget(widget)
                 widget.setParent(None)
                 widget.deleteLater()
                 self._component_widgets.pop(idx)
-                removed = True
-                break
-        if removed:
+                return
+
+    def _remove_all_components(self, *, preserve_history: bool) -> None:
+        while self._component_widgets:
+            widget = self._component_widgets.pop()
+            self.components_area.removeWidget(widget)
+            widget.setParent(None)
+            widget.deleteLater()
+        if not preserve_history:
+            self._component_counter = 1
             self._clear_results_history()
 
     def _collect_components(self) -> list[FitComponentConfig]:
@@ -355,6 +386,9 @@ class FittingModule(QWidget):
                 )
             )
         return components
+
+    def _current_capture_id(self) -> str | None:
+        return self._active_curve.id if self._active_curve is not None else None
 
     # ------------------------------------------------------------------
     # Fitting logic
@@ -418,69 +452,93 @@ class FittingModule(QWidget):
         self.canvas.display_curves(curves)
 
     def _store_fit_result(self, result: FitResult) -> None:
+        capture_id = self._current_capture_id()
+        if capture_id is None:
+            return
         description = ", ".join(component.label for component in result.components if component.label)
         label = f"Model #{self._result_counter}"
         if description:
             label = f"{label} ({description})"
-        entry = _FitHistoryEntry(id=str(uuid4()), label=label, result=result)
-        self._fit_history.insert(0, entry)
+        fit_range = (self.region_min_spin.value(), self.region_max_spin.value())
+        entry = _FitHistoryEntry(
+            id=str(uuid4()),
+            label=label,
+            result=result,
+            capture_id=capture_id,
+            fit_range=fit_range,
+        )
+        history = self._fit_histories.setdefault(capture_id, [])
+        history.insert(0, entry)
         self._result_counter += 1
-        self._selected_result_id = entry.id
+        self._selected_result_ids[capture_id] = entry.id
         self._refresh_results_view()
         self._update_status_for_result(result)
         if self._active_curve is not None:
             self._plot_fit_result(self._active_curve, result)
+        self._apply_fit_range(entry.fit_range)
+        self._rebuild_components_from_result(result)
 
     def _refresh_results_view(self) -> None:
+        capture_id = self._current_capture_id()
         self.results_tree.blockSignals(True)
         self.results_tree.clear()
-        for entry in self._fit_history:
-            r_squared = entry.result.r_squared
-            r2_display = f"{r_squared:.4f}" if r_squared is not None else "n/a"
-            parent = QTreeWidgetItem([entry.label, "R²", r2_display, ""])
-            parent.setData(0, Qt.UserRole, entry.id)
-            for component in entry.result.components:
-                component_item = QTreeWidgetItem([component.label, "", "", ""])
-                for name, value in component.parameters.items():
-                    component_item.addChild(QTreeWidgetItem(["", name, f"{value:.6g}", ""]))
-                parent.addChild(component_item)
-            remove_btn = QPushButton("Remove")
-            remove_btn.setProperty("class", "danger")
-            remove_btn.clicked.connect(
-                lambda _, entry_id=entry.id: self._remove_fit_entry(entry_id)
-            )
-            self.results_tree.addTopLevelItem(parent)
-            self.results_tree.setItemWidget(parent, 3, remove_btn)
-            if self._selected_result_id == entry.id:
-                self.results_tree.setCurrentItem(parent)
+        created_items: dict[str, QTreeWidgetItem] = {}
+        if capture_id is not None:
+            for entry in self._fit_histories.get(capture_id, []):
+                r_squared = entry.result.r_squared
+                r2_display = f"{r_squared:.4f}" if r_squared is not None else "n/a"
+                parent = QTreeWidgetItem([entry.label, "R²", r2_display, ""])
+                parent.setData(0, Qt.UserRole, entry.id)
+                for component in entry.result.components:
+                    component_item = QTreeWidgetItem([component.label, "", "", ""])
+                    for name, value in component.parameters.items():
+                        component_item.addChild(QTreeWidgetItem(["", name, f"{value:.6g}", ""]))
+                    parent.addChild(component_item)
+                remove_btn = QPushButton("Remove")
+                remove_btn.setProperty("class", "danger")
+                remove_btn.clicked.connect(
+                    lambda _, cap_id=entry.capture_id, entry_id=entry.id: self._remove_fit_entry(cap_id, entry_id)
+                )
+                self.results_tree.addTopLevelItem(parent)
+                self.results_tree.setItemWidget(parent, 3, remove_btn)
+                created_items[entry.id] = parent
         self.results_tree.blockSignals(False)
 
-    def _remove_fit_entry(self, entry_id: str) -> None:
-        removed = None
-        new_history: list[_FitHistoryEntry] = []
-        for existing in self._fit_history:
-            if existing.id == entry_id:
-                removed = existing
-            else:
-                new_history.append(existing)
-        if removed is None:
+        if capture_id is None or not created_items:
+            self.results_tree.clearSelection()
+            self._status_label_no_result()
+            self._plot_data_only()
             return
-        self._fit_history = new_history
-        if self._selected_result_id == entry_id:
-            self._selected_result_id = self._fit_history[0].id if self._fit_history else None
-        self._refresh_results_view()
-        if self._selected_result_id is not None:
-            entry = self._find_fit_entry(self._selected_result_id)
-            if entry and self._active_curve is not None:
-                self._plot_fit_result(self._active_curve, entry.result)
+
+        selected_id = self._selected_result_ids.get(capture_id)
+        if selected_id and selected_id in created_items:
+            item = created_items[selected_id]
+            self.results_tree.setCurrentItem(item)
+            self._activate_result_item(item)
         else:
+            self.results_tree.clearSelection()
             self._status_label_no_result()
             self._plot_data_only()
 
-    def _find_fit_entry(self, entry_id: str | None) -> _FitHistoryEntry | None:
-        if entry_id is None:
+    def _remove_fit_entry(self, capture_id: str, entry_id: str) -> None:
+        history = self._fit_histories.get(capture_id)
+        if not history:
+            return
+        history = [entry for entry in history if entry.id != entry_id]
+        if history:
+            self._fit_histories[capture_id] = history
+        else:
+            self._fit_histories.pop(capture_id, None)
+        selected_id = self._selected_result_ids.get(capture_id)
+        if selected_id == entry_id:
+            self._selected_result_ids[capture_id] = history[0].id if history else None
+        if capture_id == self._current_capture_id():
+            self._refresh_results_view()
+
+    def _find_fit_entry(self, capture_id: str | None, entry_id: str | None) -> _FitHistoryEntry | None:
+        if not capture_id or not entry_id:
             return None
-        for entry in self._fit_history:
+        for entry in self._fit_histories.get(capture_id, []):
             if entry.id == entry_id:
                 return entry
         return None
@@ -492,18 +550,31 @@ class FittingModule(QWidget):
             self._plot_data_only()
             return
         item = items[0]
+        self._activate_result_item(item)
+
+    def _on_result_item_clicked(self, item: QTreeWidgetItem) -> None:
+        if item is None:
+            return
+        self.results_tree.setCurrentItem(item)
+        self._activate_result_item(item)
+
+    def _activate_result_item(self, item: QTreeWidgetItem) -> None:
+        capture_id = self._current_capture_id()
         parent = item
         while parent.parent() is not None:
             parent = parent.parent()
         entry_id = parent.data(0, Qt.UserRole)
         if not entry_id:
             return
-        entry = self._find_fit_entry(entry_id)
+        entry = self._find_fit_entry(capture_id, entry_id)
         if entry is None:
             return
-        self._selected_result_id = entry_id
+        if capture_id is not None:
+            self._selected_result_ids[capture_id] = entry_id
         if self._active_curve is not None:
             self._plot_fit_result(self._active_curve, entry.result)
+        self._apply_fit_range(entry.fit_range)
+        self._rebuild_components_from_result(entry.result)
 
     def _update_status_for_result(self, result: FitResult) -> None:
         if result.success and not result.message:
@@ -537,8 +608,38 @@ class FittingModule(QWidget):
         self.canvas.display_curves([curve])
 
     def _clear_results_history(self) -> None:
-        self._fit_history.clear()
-        self._selected_result_id = None
+        capture_id = self._current_capture_id()
+        if capture_id:
+            self._fit_histories.pop(capture_id, None)
+            self._selected_result_ids[capture_id] = None
         self.results_tree.clear()
         self.status_label.clear()
         self._plot_data_only()
+
+    def _apply_fit_range(self, fit_range: tuple[float, float] | None) -> None:
+        if fit_range is None or self._active_curve is None:
+            return
+        if not (self.region_min_spin.isEnabled() and self.region_max_spin.isEnabled()):
+            return
+        axis_min = self.region_min_spin.minimum()
+        axis_max = self.region_max_spin.maximum()
+        lower = max(axis_min, min(axis_max, float(fit_range[0])))
+        upper = max(axis_min, min(axis_max, float(fit_range[1])))
+        if upper < lower:
+            lower, upper = upper, lower
+        self.region_min_spin.setValue(lower)
+        self.region_max_spin.setValue(upper)
+
+    def _rebuild_components_from_result(self, result: FitResult) -> None:
+        self._remove_all_components(preserve_history=True)
+        for component in result.components:
+            spec = self._function_lookup.get(component.function_id)
+            if spec is None:
+                continue
+            widget = _FitComponentWidget(spec, self._component_counter)
+            self._component_counter += 1
+            widget.removed.connect(self._remove_component)
+            widget.set_display_label(component.label)
+            widget.set_parameters(component.metadata)
+            self._component_widgets.append(widget)
+            self.components_area.addWidget(widget)

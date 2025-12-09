@@ -14,8 +14,10 @@ A modern, interactive GUI application for analysing ARPES (Angle-Resolved Photoe
 - **Multi-beamline support**: Load data from Diamond Light Source (I05) and MAX IV (Bloch)
 - **Multiple file formats**: `.nxs`, `.h5`, `.zip`, `.ibw`
 - **2D & 3D visualisation**: Single cuts and photon energy/deflector angle scans
-- **Interactive analysis**: Real-time cursor tracking with live EDC/MDC updates
+- **Interactive visualisation**: Real-time cursor tracking with live EDC/MDC updates
+- **Proces the data**: Convert to k-space, correct the Fermi level based on a reference measurent etc.
 - **State management**: Undo/redo functionality with complete processing history
+- **Analyse the data**: Fit the process data
 - **Tabbed interface**: Work with multiple datasets simultaneously
 - **Save dataset**: Save and comeback where you where
 
@@ -73,10 +75,13 @@ arpest
    - Click the 📂 **Open File** button in the toolbar
    - Select your ARPES data file (`.nxs`, `.h5`, `.zip`, or `.ibw`)
 
-4. **Interactive analysis**:
-   - **Apply data processing**: Convert to k-space, correct the Fermi level based on a reference measurent and more
+4. **Interactive visualisation**:
    - **Click & drag**: Continuously update cuts in real-time
    - **3D data**: Use energy slider to navigate through different energy slices
+
+5. **Analyse and process the data**:
+   - **Apply data processing**: Convert to k-space, correct the Fermi level based on a reference measurent and more
+   - **Analyse by fitting the processed data**: Fit EDC/MDC curves
 
 ### Supported Beamlines
 
@@ -86,7 +91,7 @@ arpest
 ## Roadmap
 
 - [ ] Additional beamline support (SLS, SOLEIL, etc.)
-- [ ] Analysis plugins system
+- [ ] Additional analysis methods
 
 ---
 ## Contributing
@@ -102,7 +107,7 @@ Contributions are welcome! Please:
 ---
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ---
 ## Citation
