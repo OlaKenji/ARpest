@@ -1,8 +1,8 @@
 # ARpest
 
-**A**ngle-**R**esolved **P**hotoemission **E**lectron **S**pectroscopy **T**ool
+**A**ngle **R**esolved **P**hotoemission **E**lectron **S**pectroscopy **T**ool
 
-A modern, interactive Python application for analysing ARPES (Angle-Resolved Photoemission Spectroscopy) data from multiple synchrotron beamlines.
+A modern, interactive GUI application for analysing ARPES (Angle-Resolved Photoemission Spectroscopy) data from multiple synchrotron beamlines. Coding or scripting is not needed.
 
 ![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![PyQt5](https://img.shields.io/badge/PyQt5-5.15+-green.svg)
@@ -64,19 +64,19 @@ arpest
    arpest
    ```
 
-2. **Load data**:
-   - Click the 📂 **Open File** button in the toolbar
-   - Select your ARPES data file (`.nxs`, `.h5`, `.zip`, or `.ibw`)
-
-3. **Interactive analysis**:
-   - **Apply data processing**: Convert to k-space, correct the Fermi level based on a reference measurent and more
-   - **Click & drag**: Continuously update cuts in real-time
-   - **3D data**: Use energy slider to navigate through different energy slices
-
-4. **Configure settings**:
+2. **Configure settings**:
    - Click ⚙️ **Settings** to set default data directory
    - Choose preferred colormap
    - Settings persist between sessions
+
+3. **Load data**:
+   - Click the 📂 **Open File** button in the toolbar
+   - Select your ARPES data file (`.nxs`, `.h5`, `.zip`, or `.ibw`)
+
+4. **Interactive analysis**:
+   - **Apply data processing**: Convert to k-space, correct the Fermi level based on a reference measurent and more
+   - **Click & drag**: Continuously update cuts in real-time
+   - **3D data**: Use energy slider to navigate through different energy slices
 
 ### Supported Beamlines
 
@@ -86,8 +86,6 @@ arpest
 ## Roadmap
 
 - [ ] Additional beamline support (SLS, SOLEIL, etc.)
-- [ ] Additional Data processing operations
-- [ ] Export processed data
 - [ ] Analysis plugins system
 
 ---
@@ -124,12 +122,11 @@ If you use ARpest in your research, please cite:
 
 ## Screenshots
 
-### 2D Single Cut Analysis
-![2D Analysis](docs/images/2d_analysis.png)
-*Interactive band structure visualization with EDC and MDC*
-
 ### 3D Fermi Surface Mapping
+
 ![3D Analysis](docs/images/3d_analysis.png)
-*Fermi surface with momentum cuts*
+
+*Fermi surface with momentum cuts. Data from Phys. Rev. Lett. **134**, 126602 (<https://doi.org/10.1103/PhysRevLett.134.126602>)*.
+
 
 ---

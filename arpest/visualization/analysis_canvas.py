@@ -25,6 +25,8 @@ class CurveDisplayData:
     axis_label: str
     color: str = "#1f77b4"
     intensity_label: str = "Intensity"
+    style: str = "solid"
+    width: int = 2
 
 
 class AnalysisCanvas(QWidget):
@@ -100,7 +102,13 @@ class AnalysisCanvas(QWidget):
             y = np.asarray(curve.intensity, dtype=float)
             if x.size == 0 or y.size == 0 or x.size != y.size:
                 continue
-            pen = pg.mkPen(curve.color or "#1f77b4", width=2)
+            if curve.style == "dash":
+                pen_style = Qt.DashLine
+            elif curve.style == "dot":
+                pen_style = Qt.DotLine
+            else:
+                pen_style = Qt.SolidLine
+            pen = pg.mkPen(curve.color or "#1f77b4", width=curve.width or 2, style=pen_style)
             plot.plot(x, y, pen=pen, name=curve.label)
 
         self._set_canvas_widget(plot)

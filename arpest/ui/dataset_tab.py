@@ -485,7 +485,7 @@ class DatasetTab(QWidget):
 
     def _capture_current_view_for_analysis(
         self, view: Optional[str] = None, *, set_tab: bool = True
-    ) -> bool:
+    ) -> tuple[Dataset, str, int]:
         if self.analysis_canvas is None:
             raise ValueError("Analysis canvas is not available.")
         dataset = self._export_dataset_for_analysis(view)
@@ -500,7 +500,7 @@ class DatasetTab(QWidget):
             and self._analysis_tab_index is not None
         ):
             self.side_tabs.setCurrentIndex(self._analysis_tab_index)
-        return True
+        return dataset, self.current_colormap, self.integration_radius
 
     def _export_dataset_for_analysis(self, view: Optional[str]) -> Dataset:
         if not self.file_stacks:
