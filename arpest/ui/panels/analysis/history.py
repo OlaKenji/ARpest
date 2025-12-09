@@ -64,6 +64,10 @@ class CaptureHistoryModel(QObject):
     def entries(self) -> list[CaptureEntry]:
         return list(self._entries)
 
+    def set_entries(self, entries: Iterable[CaptureEntry]) -> None:
+        self._entries = list(entries)
+        self.entries_changed.emit()
+
     def view_entries(self) -> list[ViewCaptureEntry]:
         return [entry for entry in self._entries if isinstance(entry, ViewCaptureEntry)]
 

@@ -16,7 +16,7 @@ from ..models import FileStack
 from .cursor.cursor_manager import CursorState
 
 SESSION_FILE_EXTENSION = ".arpest"
-SESSION_FORMAT_VERSION = 1
+SESSION_FORMAT_VERSION = 2
 
 @dataclass
 class SessionTabState:
@@ -32,6 +32,7 @@ class SessionTabState:
         integration_radius: Integration radius applied to plots.
         cursor_states: Per-file cursor positions.
         cut_states: Per-file cut anchor positions.
+        analysis_state: Serialized capture/analysis information.
     """
 
     title: str
@@ -42,6 +43,7 @@ class SessionTabState:
     integration_radius: int
     cursor_states: list[Optional[CursorState]] = field(default_factory=list)
     cut_states: list[Optional[CursorState]] = field(default_factory=list)
+    analysis_state: Optional[dict] = None
 
 
 @dataclass
@@ -78,6 +80,7 @@ def _coerce_tab_state(state: SessionTabState | dict) -> SessionTabState:
             integration_radius=int(state.get("integration_radius", 0)),
             cursor_states=list(state.get("cursor_states", [])),
             cut_states=list(state.get("cut_states", [])),
+            analysis_state=state.get("analysis_state"),
         )
     raise ValueError("Invalid tab state in session file")
 

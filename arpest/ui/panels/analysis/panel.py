@@ -24,7 +24,7 @@ from PyQt5.QtWidgets import (
 
 from ....models import Axis, Dataset, FileStack
 from ....visualization.analysis_canvas import AnalysisCanvas, CurveDisplayData
-from .history import CaptureHistoryModel, CurveCaptureEntry, ViewCaptureEntry
+from .history import CaptureEntry, CaptureHistoryModel, CurveCaptureEntry, ViewCaptureEntry
 from .widgets import FittingModule, OverplotModule
 
 
@@ -346,6 +346,41 @@ class AnalysisPanel(QWidget):
         self._current_curve_selection = entry
         for callback in self._curve_selection_callbacks:
             callback(entry)
+
+    def serialize_state(self) -> dict:
+        selected_id = self._current_curve_selection.id if self._current_curve_selection else None
+        return {
+            "capture_entries": self.capture_history.entries(),
+            "selected_entry_id": selected_id,
+            "fitting": self.fitting_module.serialize_state(),
+        }
+
+    def apply_state(self, state: dict | None) -> None:
+        if not state:
+            self.capture_history.set_entries([])
+            self.fitting_module.apply_state(None, set())
+            if hasattr(self, "history_tree"):
+                self.history_tree.clearSelection()
+            return
+        entries = list(state.get("capture_entries") or [])
+        self.capture_history.set_entries(entries)
+        available_ids = {entry.id for entry in entries if isinstance(entry, CaptureEntry)}
+        self.fitting_module.apply_state(state.get("fitting"), available_ids)
+        selected_id = state.get("selected_entry_id")
+        if selected_id:
+            self._select_history_entry(selected_id)
+        elif hasattr(self, "history_tree"):
+            self.history_tree.clearSelection()
+
+    def _select_history_entry(self, entry_id: str) -> None:
+        if not hasattr(self, "history_tree"):
+            return
+        for idx in range(self.history_tree.topLevelItemCount()):
+            item = self.history_tree.topLevelItem(idx)
+            if item.data(0, Qt.UserRole) == entry_id:
+                self.history_tree.setCurrentItem(item)
+                return
+        self.history_tree.clearSelection()
 
     def _describe_view(self, view_id: Optional[str]) -> str:
         mapping = {

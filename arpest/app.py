@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import QApplication
 
 from arpest.ui.main_window import MainWindow
 from arpest.utils.config import Config
+from arpest.utils.colour_map import add_colour_map
 
 #set cursor position
 #fully integrated MDC, EDC
@@ -36,7 +37,8 @@ class ARpestApp:
         self.app = QApplication(sys.argv)
         self.app.setApplicationName("ARpest")
         self.app.setOrganizationName("ARpest")
-        
+                
+        add_colour_map()#add arpest colour map
         # Load configuration
         self.config = Config()
         

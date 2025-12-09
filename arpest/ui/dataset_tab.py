@@ -27,7 +27,6 @@ from ..core.loaders import BlochLoader, I05Loader
 from ..models import FileStack, Dataset, Axis, AxisType
 from ..operations import get_registered_operations
 from ..utils.config import Config
-from ..utils.colour_map import add_colour_map
 from ..utils.cursor.cursor_manager import CursorState
 from ..utils.session import SessionTabState
 from .panels.analysis.panel import AnalysisPanel
@@ -93,7 +92,6 @@ class DatasetTab(QWidget):
         self._cursor_states: list[Optional[CursorState]] = []
         self._cut_states: list[Optional[CursorState]] = []
         
-        add_colour_map()
         colours = ['arpest', 'RdYlBu_r', 'terrain','binary', 'binary_r'] + sorted(['RdBu_r','Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])        
         self.available_colormaps = colours
         self.current_colormap = self.available_colormaps[0]
@@ -130,6 +128,8 @@ class DatasetTab(QWidget):
                 self._cut_states[idx] = saved_cuts[idx]
         
         self._setup_ui()
+        if session_state is not None and getattr(session_state, "analysis_state", None):
+            self.analysis_panel.apply_state(session_state.analysis_state)
         self._apply_pending_visual_state()
         
     def _setup_ui(self) -> None:
@@ -935,6 +935,9 @@ class DatasetTab(QWidget):
     def to_session_state(self, title: str) -> SessionTabState:
         """Serialize this tab to a SessionTabState."""
         self._capture_current_visual_state()
+        analysis_state = None
+        if self.analysis_panel is not None:
+            analysis_state = self.analysis_panel.serialize_state()
         return SessionTabState(
             title=title,
             file_stacks=list(self.file_stacks),
@@ -944,6 +947,7 @@ class DatasetTab(QWidget):
             integration_radius=self.integration_radius,
             cursor_states=list(self._cursor_states),
             cut_states=list(self._cut_states),
+            analysis_state=analysis_state,
         )
     
     def _format_data_info(self, file_stack: FileStack) -> str:

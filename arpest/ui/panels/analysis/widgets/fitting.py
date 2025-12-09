@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -615,6 +616,51 @@ class FittingModule(QWidget):
         self.results_tree.clear()
         self.status_label.clear()
         self._plot_data_only()
+
+    def serialize_state(self) -> dict:
+        return {
+            "fit_histories": copy.deepcopy(self._fit_histories),
+            "selected_result_ids": dict(self._selected_result_ids),
+            "result_counter": self._result_counter,
+        }
+
+    def apply_state(self, state: dict | None, available_capture_ids: Iterable[str]) -> None:
+        available_ids = {capture_id for capture_id in available_capture_ids if capture_id}
+        self._fit_histories.clear()
+        self._selected_result_ids.clear()
+        self.results_tree.clear()
+        self.status_label.clear()
+        self._result_counter = 1
+        if not state:
+            self._plot_data_only()
+            return
+        histories = state.get("fit_histories") or {}
+        selected_ids = state.get("selected_result_ids") or {}
+        try:
+            self._result_counter = max(1, int(state.get("result_counter", 1)))
+        except (TypeError, ValueError):
+            self._result_counter = 1
+        for capture_id, entries in histories.items():
+            if capture_id not in available_ids:
+                continue
+            sanitized: list[_FitHistoryEntry] = []
+            for entry in entries:
+                if isinstance(entry, _FitHistoryEntry):
+                    sanitized.append(entry)
+                elif isinstance(entry, dict):
+                    try:
+                        sanitized.append(_FitHistoryEntry(**entry))
+                    except TypeError:
+                        continue
+            if sanitized:
+                self._fit_histories[capture_id] = sanitized
+        for capture_id, entries in self._fit_histories.items():
+            selected = selected_ids.get(capture_id)
+            if selected and any(entry.id == selected for entry in entries):
+                self._selected_result_ids[capture_id] = selected
+            else:
+                self._selected_result_ids[capture_id] = entries[0].id if entries else None
+        self._refresh_results_view()
 
     def _apply_fit_range(self, fit_range: tuple[float, float] | None) -> None:
         if fit_range is None or self._active_curve is None:
