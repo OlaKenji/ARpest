@@ -212,7 +212,7 @@ class Figure2D(QWidget):
         curve = getattr(self, "_current_mdc_curve", None)
         if curve is None or curve.size == 0:
             return {}
-        return {"x": np.asarray(curve, dtype=float).copy()}
+        return {"x": np.asarray(curve, dtype=float).copy()}        
 
     def get_current_mdc_curves(self) -> dict[str, np.ndarray]:
         """Return the currently displayed EDC curve keyed by its axis."""

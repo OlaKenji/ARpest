@@ -14,11 +14,11 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
-from .....visualization.analysis_canvas import AnalysisCanvas, CurveDisplayData
-from ..history import CaptureHistoryModel, CurveCaptureEntry
+from .....visualization.analysis_canvas import CurveDisplayData
+from ..history import CurveCaptureEntry
+from .base import AnalysisModule, AnalysisModuleContext
 
 
 @dataclass
@@ -31,7 +31,7 @@ class _CurveEntry:
         return f"{self.capture.dataset_label} – {self.capture.label}"
 
 
-class OverplotModule(QWidget):
+class OverplotModule(AnalysisModule):
     """Overlay captured EDC/MDC curves sourced from the shared history."""
 
     _color_palette = [
@@ -46,16 +46,12 @@ class OverplotModule(QWidget):
         "#17becf",
     ]
 
-    def __init__(
-        self,
-        *,
-        canvas: AnalysisCanvas,
-        capture_history: CaptureHistoryModel,
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self.canvas = canvas
-        self.capture_history = capture_history
+    title = "Overplot"
+
+    def __init__(self, context: AnalysisModuleContext, parent: Optional["QWidget"] = None) -> None:
+        super().__init__(context, parent)
+        self.canvas = context.canvas
+        self.capture_history = context.capture_history
         self._curves: list[_CurveEntry] = []
         self._color_index = 0
         layout = QVBoxLayout()

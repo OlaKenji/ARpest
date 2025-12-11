@@ -78,15 +78,29 @@ def _normalize_curve_dict(curves: Any) -> dict[str, np.ndarray]:
     if items is None:
         return result
 
+    grouped: dict[str, list[np.ndarray]] = {}
     for axis_key, values in items:
         if values is None or axis_key is None:
             continue
         axis = str(axis_key).lower()
+        base_axis = axis.split("_", 1)[0]
         array = np.asarray(values, dtype=float)
         if array.ndim == 0:
             continue
         array = np.nan_to_num(array, nan=0.0)
-        result[axis] = array
+        grouped.setdefault(base_axis, []).append(array)
+
+    for axis, arrays in grouped.items():
+        if not arrays:
+            continue
+        if len(arrays) == 1:
+            result[axis] = arrays[0]
+            continue
+        lengths = {arr.shape[0] for arr in arrays}
+        if len(lengths) != 1:
+            raise ValueError(f"Curve length mismatch for axis {axis.upper()}.")
+        stacked = np.vstack(arrays)
+        result[axis] = np.nanmean(stacked, axis=0)
     return result
 
 

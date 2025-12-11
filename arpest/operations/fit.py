@@ -184,6 +184,7 @@ def perform_curve_fit(
     success = True
     message = None
     covariance = None
+    param_errors: list[float | None] | None = None
     optimized = np.array(variable_initial, dtype=float)
     if variable_initial:
         bounds = (np.array(lower_bounds, dtype=float), np.array(upper_bounds, dtype=float))
@@ -196,9 +197,18 @@ def perform_curve_fit(
                 bounds=bounds,
                 maxfev=max_evaluations,
             )
+            if covariance is not None:
+                diag = np.diag(covariance)
+                param_errors = []
+                for value in diag:
+                    if not np.isfinite(value) or value < 0:
+                        param_errors.append(None)
+                    else:
+                        param_errors.append(float(np.sqrt(value)))
         except Exception as exc:  # pragma: no cover - SciPy errors are runtime specific
             success = False
             message = str(exc)
+            covariance = None
 
     theta_idx = 0
     for comp_idx, (_, _, params, _) in enumerate(resolved_components):
@@ -216,18 +226,24 @@ def perform_curve_fit(
     r_squared = None if ss_tot == 0 else 1 - ss_res / ss_tot
 
     components_result: list[FitComponentResult] = []
+    error_idx = 0
     for spec, label, params, component_id in resolved_components:
         param_values = {name: cfg.value for name, cfg in params.items()}
         contribution = spec.evaluate(x_vals, param_values)
-        metadata = {
-            name: {
+        metadata: dict[str, dict[str, float | bool | None]] = {}
+        for name, cfg in params.items():
+            error = None
+            if not cfg.fixed:
+                if param_errors is not None and error_idx < len(param_errors):
+                    error = param_errors[error_idx]
+                error_idx += 1
+            metadata[name] = {
                 "value": cfg.value,
                 "fixed": cfg.fixed,
                 "lower": cfg.lower,
                 "upper": cfg.upper,
+                "error": error,
             }
-            for name, cfg in params.items()
-        }
         components_result.append(
             FitComponentResult(
                 label=label,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Callable, Iterable, Optional
+from typing import Iterable, Optional
 from uuid import uuid4
 
 import numpy as np
@@ -27,8 +27,6 @@ from PyQt5.QtWidgets import (
     QWidget,
     QSizePolicy,
 )
-
-from .....models import FileStack
 from .....operations.fit import (
     FitComponentConfig,
     FitParameterConfig,
@@ -36,8 +34,9 @@ from .....operations.fit import (
     available_fit_functions,
     perform_curve_fit,
 )
-from .....visualization.analysis_canvas import AnalysisCanvas, CurveDisplayData
+from .....visualization.analysis_canvas import CurveDisplayData
 from ..history import CurveCaptureEntry
+from .base import AnalysisModule, AnalysisModuleContext
 
 
 @dataclass
@@ -183,7 +182,7 @@ class _FitComponentWidget(QGroupBox):
             row.upper.setText("" if upper is None else str(upper))
 
 
-class FittingModule(QWidget):
+class FittingModule(AnalysisModule):
     """Allows fitting captured curves with configurable components."""
 
     _component_colors = [
@@ -197,21 +196,12 @@ class FittingModule(QWidget):
         "#17becf",
     ]
 
-    def __init__(
-        self,
-        *,
-        get_file_stack: Callable[[], FileStack | None],
-        canvas: AnalysisCanvas,
-        context_providers: dict[str, Callable[[], object]],
-        register_curve_selection_callback: Optional[
-            Callable[[Callable[[CurveCaptureEntry | None], None]], None]
-        ] = None,
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self.get_file_stack = get_file_stack
-        self.canvas = canvas
-        self.context_providers = context_providers
+    title = "Fitting"
+    wrap_in_scroll = True
+
+    def __init__(self, context: AnalysisModuleContext, parent: Optional[QWidget] = None) -> None:
+        super().__init__(context, parent)
+        self.canvas = context.canvas
         self._function_specs = available_fit_functions()
         self._function_lookup = {spec.id: spec for spec in self._function_specs}
         self._component_widgets: list[_FitComponentWidget] = []
@@ -222,10 +212,7 @@ class FittingModule(QWidget):
         self._result_counter = 1
 
         self._build_ui()
-        if register_curve_selection_callback is not None:
-            register_curve_selection_callback(self._on_external_curve_selected)
-        else:
-            self._on_external_curve_selected(None)
+        context.register_curve_selection_callback(self._on_external_curve_selected)
 
     # ------------------------------------------------------------------
     # UI construction
@@ -293,8 +280,8 @@ class FittingModule(QWidget):
 
         layout.addWidget(QLabel("Fit components and parameters:"))
         self.results_tree = QTreeWidget()
-        self.results_tree.setColumnCount(4)
-        self.results_tree.setHeaderLabels(["Result / Component", "Parameter", "Value", "Actions"])
+        self.results_tree.setColumnCount(5)
+        self.results_tree.setHeaderLabels(["Result / Component", "Parameter", "Value", "Error", "Actions"])
         self.results_tree.setFixedHeight(120)
         self.results_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.results_tree.itemSelectionChanged.connect(self._on_results_selection_changed)
@@ -488,12 +475,18 @@ class FittingModule(QWidget):
             for entry in self._fit_histories.get(capture_id, []):
                 r_squared = entry.result.r_squared
                 r2_display = f"{r_squared:.4f}" if r_squared is not None else "n/a"
-                parent = QTreeWidgetItem([entry.label, "R²", r2_display, ""])
+                parent = QTreeWidgetItem([entry.label, "R²", r2_display, "", ""])
                 parent.setData(0, Qt.UserRole, entry.id)
                 for component in entry.result.components:
-                    component_item = QTreeWidgetItem([component.label, "", "", ""])
+                    component_item = QTreeWidgetItem([component.label, "", "", "", ""])
                     for name, value in component.parameters.items():
-                        component_item.addChild(QTreeWidgetItem(["", name, f"{value:.6g}", ""]))
+                        meta = (component.metadata or {}).get(name, {})
+                        error_value = meta.get("error")
+                        if error_value is None or not np.isfinite(error_value):
+                            error_text = "—"
+                        else:
+                            error_text = f"{error_value:.3g}"
+                        component_item.addChild(QTreeWidgetItem(["", name, f"{value:.6g}", error_text, ""]))
                     parent.addChild(component_item)
                 remove_btn = QPushButton("Remove")
                 remove_btn.setProperty("class", "danger")
@@ -501,7 +494,7 @@ class FittingModule(QWidget):
                     lambda _, cap_id=entry.capture_id, entry_id=entry.id: self._remove_fit_entry(cap_id, entry_id)
                 )
                 self.results_tree.addTopLevelItem(parent)
-                self.results_tree.setItemWidget(parent, 3, remove_btn)
+                self.results_tree.setItemWidget(parent, 4, remove_btn)
                 created_items[entry.id] = parent
         self.results_tree.blockSignals(False)
 

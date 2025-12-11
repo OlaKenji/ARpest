@@ -109,10 +109,7 @@ class I05Loader(BaseLoader):
             print(f"\n[2] Extracted axes:")
             print(f"    xscale: {len(xscale)} points (angle)")
             print(f"    yscale: {len(yscale)} points (energy)")
-            print(f"    zscale: {len(zscale)} points (photon energy)")
-            
-            # Extract metadata
-            measurement = self._extract_metadata(infile)
+            print(f"    zscale: {len(zscale)} points (photon energy)")        
             
             # Handle different data shapes
             print(f"\n[3] Processing data shape...")
@@ -134,17 +131,24 @@ class I05Loader(BaseLoader):
             
             # Now determine if 2D or 3D based on actual data dimensions
             if data.ndim == 2 or len(zscale) == 1:  # 2D data
+                # Extract metadata
+                measurement = self._extract_metadata(infile)            
                 print(f"\n[4] Creating 2D Dataset...")
                 dataset = self._create_2d_dataset(
                     data, xscale, yscale, measurement, filepath
                 )
-            else:  # 3D data (data.ndim == 3 and len(zscale) > 1)
+            elif data.ndim == 3:  # 3D data (data.ndim == 3 and len(zscale) > 1)
+                # Extract metadata
+                measurement = self._extract_metadata(infile)            
                 print(f"\n[4] Creating 3D Dataset...")
                 print(f"    Data shape: {data.shape}")
                 print(f"    Expected: ({len(zscale)}, {len(yscale)}, {len(xscale)})")
                 dataset = self._create_3d_dataset(
                     data, yscale, xscale, zscale, measurement, filepath, is_photon_energy_scan
                 )
+            else:#4D data
+                measurement = None
+                dataset = self._create_4d_dataset(data, yscale, xscale, zscale, measurement, filepath)
             
             print(f"\n[5] Final Dataset:")
             print(f"    Dimensions: {dataset.ndim}D")
@@ -160,7 +164,6 @@ class I05Loader(BaseLoader):
             
             return dataset
                 
-
     def _extract_axes(
         self, infile: h5py.File, data: NDArray
     ) -> tuple[NDArray, NDArray, NDArray]:
@@ -532,6 +535,63 @@ class I05Loader(BaseLoader):
             x_axis=Axis(
                 values=xscale,
                 axis_type = x_axis_type,
+                name="Scan axis",
+                unit="a.u.",
+            ),
+            y_axis=Axis(
+                values=yscale,
+                axis_type=AxisType.ANGLE,
+                name="Angle",
+                unit="°",
+            ),
+            z_axis=Axis(
+                values=zscale,
+                axis_type=AxisType.ENERGY_KINETIC,
+                name="Kinetic Energy",
+                unit="eV",
+            ),
+            intensity=data,
+            measurement=measurement,
+            filename=filepath.name,
+        )
+
+    def _create_4d_dataset(
+        self,
+        data: NDArray,
+        xscale: NDArray,
+        yscale: NDArray,
+        zscale: NDArray,
+        measurement: Measurement,
+        filepath: Path,
+    ) -> Dataset:
+        """Create a 4D Dataset."""
+        print(f"\n    [_create_3d_dataset]")
+        print(f"      Input data shape: {data.shape}")
+        print(f"      xscale (angle): {len(xscale)} points")
+        print(f"      yscale (energy): {len(yscale)} points")
+        print(f"      zscale (scan): {len(zscale)} points")
+        
+        # Data from I05 comes as (n_scan, n_angle, n_energy)
+        # We need it as (n_angle, n_energy, n_scan) for Dataset
+        # Which is: (xscale, yscale, zscale)
+        
+        # Expected shape
+        expected_shape = (len(xscale), len(yscale), len(zscale))
+        print(f"      Expected: {expected_shape}")
+        
+        # Transpose: (n_scan, n_angle, n_energy) -> (n_angle, n_energy, n_scan)
+        # That's: (0, 1, 2) -> (1, 2, 0)
+        expected_shape = (len(yscale), len(xscale), len(zscale))
+        print(f"      Target: x=scan ({len(xscale)} pts, horizontal), y=angle ({len(yscale)} pts, vertical)")
+        print(f"      Expected shape: {expected_shape} (angle, scan, energy)")
+        
+        # Transpose: (n_scan, n_angle, n_energy) -> (n_angle, n_scan, n_energy)
+        # That's: (0, 1, 2) -> (1, 0, 2)
+            
+        return Dataset(
+            x_axis=Axis(
+                values=xscale,
+                axis_type = AxisType.ANGLE,
                 name="Scan axis",
                 unit="a.u.",
             ),

@@ -621,7 +621,7 @@ class Figure3D(QWidget):
         self.cut_x_z_line.set_band_region(z_low, z_high)
 
     def get_current_edc_curves(self) -> dict[str, np.ndarray]:
-        """Return all available EDC curves keyed by axis identifier."""
+        """Return all available EDC curves keyed by their originating cut."""
         curves: dict[str, np.ndarray] = {}
         curve_a = getattr(self, "_current_edc_cut_y", None)
         if curve_a is not None and curve_a.size:
@@ -632,7 +632,7 @@ class Figure3D(QWidget):
         return curves
 
     def get_current_mdc_curves(self) -> dict[str, np.ndarray]:
-        """Return the currently displayed MDC curves keyed by their axes."""
+        """Return MDC curves for the cut panels keyed by their axis."""
         curves: dict[str, np.ndarray] = {}
         curve_x = getattr(self, "_current_mdc_cut_y", None)
         if curve_x is not None and curve_x.size:

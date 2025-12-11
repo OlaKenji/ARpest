@@ -17,7 +17,6 @@ from PyQt5.QtWidgets import (
 from ....models import FileStack, Dataset
 from .widgets.operations.base import OperationWidget
 
-
 class OperationsPanel(QWidget):
     """Container widget that groups available operations by category."""
 

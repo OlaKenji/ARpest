@@ -9,14 +9,21 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
 )
 
 from ......core.loaders import BaseLoader
 from ......models import Dataset
-from ......operations.fermi import correct_fermi_level_2d, correct_fermi_level_3d_same, correct_fermi_level_3d
+from ......operations.fermi import (
+    DEFAULT_WORK_FUNCTION,
+    correct_fermi_level_2d,
+    correct_fermi_level_3d_same,
+    correct_fermi_level_3d,
+)
 from ......utils.session import SESSION_FILE_EXTENSION, load_session
 from .base import OperationWidget
 
@@ -57,6 +64,45 @@ class FermiLevelCorrectionWidget(OperationWidget):
         reference_group.setLayout(reference_layout)
         layout.addWidget(reference_group)
 
+        fit_group = QGroupBox("Fitting options")
+        fit_layout = QVBoxLayout()
+
+        stride_row = QHBoxLayout()
+        stride_row.addWidget(QLabel("Average every"))
+        self._fit_stride_spin = QSpinBox()
+        self._fit_stride_spin.setRange(1, 10000)
+        self._fit_stride_spin.setValue(1)
+        self._fit_stride_spin.setToolTip("Number of neighboring EDCs to average for each Fermi fit.")
+        stride_row.addWidget(self._fit_stride_spin)
+        stride_row.addWidget(QLabel("EDCs"))
+        stride_row.addStretch()
+        fit_layout.addLayout(stride_row)
+
+        order_row = QHBoxLayout()
+        order_row.addWidget(QLabel("Polynomial order"))
+        self._poly_order_spin = QSpinBox()
+        self._poly_order_spin.setRange(0, 6)
+        self._poly_order_spin.setValue(3)
+        self._poly_order_spin.setToolTip("Degree for interpolating EF between fitted EDCs.")
+        order_row.addWidget(self._poly_order_spin)
+        order_row.addStretch()
+        fit_layout.addLayout(order_row)
+
+        guess_row = QHBoxLayout()
+        self._fermi_guess_label = QLabel()
+        self._fermi_guess_label.setWordWrap(True)
+        guess_row.addWidget(self._fermi_guess_label, stretch=1)
+        set_guess_btn = QPushButton("Set Fermi level…")
+        set_guess_btn.clicked.connect(self._on_set_fermi_guess_clicked)
+        guess_row.addWidget(set_guess_btn)
+        reset_guess_btn = QPushButton("Reset")
+        reset_guess_btn.clicked.connect(self._on_reset_fermi_guess_clicked)
+        guess_row.addWidget(reset_guess_btn)
+        fit_layout.addLayout(guess_row)
+
+        fit_group.setLayout(fit_layout)
+        layout.addWidget(fit_group)
+
         self.compat_label = QLabel("")
         self.compat_label.setWordWrap(True)
         layout.addWidget(self.compat_label)
@@ -71,6 +117,8 @@ class FermiLevelCorrectionWidget(OperationWidget):
         self._reference_dataset: Dataset | None = None
         self._reference_path: Path | None = None
         self._last_reference_dir: Path | None = None
+        self._initial_fermi_guess: float | None = None
+        self._update_fermi_guess_label()
 
     # ------------------------------------------------------------------ Helpers
     def _on_load_reference_clicked(self) -> None:
@@ -172,20 +220,73 @@ class FermiLevelCorrectionWidget(OperationWidget):
         if self._reference_dataset is None:
             raise ValueError("Load a gold reference before running the correction.")
 
+        options = {
+            "initial_fermi_guess": self._initial_fermi_guess,
+            "fit_stride": self._fit_stride_spin.value(),
+            "poly_order": self._poly_order_spin.value(),
+        }
+
         if dataset.is_2d:
             if not self._reference_dataset.is_2d:
                 raise ValueError("Fermi correction currently supports 2D datasets only.")
-            corrected_dataset, _ = correct_fermi_level_2d(dataset, self._reference_dataset)
+            corrected_dataset, _ = correct_fermi_level_2d(
+                dataset,
+                self._reference_dataset,
+                **options,
+            )
             return corrected_dataset, "Fermi level corrected"
         elif dataset.is_3d:
             if self._reference_dataset.is_2d:
                 'apply the same EF correction for all scan angles'
-                corrected_dataset, _ = correct_fermi_level_3d_same(dataset, self._reference_dataset)
+                corrected_dataset, _ = correct_fermi_level_3d_same(
+                    dataset,
+                    self._reference_dataset,
+                    **options,
+                )
                 return corrected_dataset, "Fermi level corrected"
             elif self._reference_dataset.is_3d:
                 'fit each scan angle and correct'
                 corrected_dataset, _ = correct_fermi_level_3d(dataset, self._reference_dataset)
                 return corrected_dataset, "Fermi level corrected"
+        raise ValueError("Unsupported dataset dimensionality for Fermi correction.")
 
+    # ------------------------------------------------------------------ EF guess helpers
+    def _on_set_fermi_guess_clicked(self) -> None:
+        """Prompt user for a manual initial EF guess."""
+        default_guess = self._initial_fermi_guess
+        if default_guess is None:
+            default_guess = self._suggest_fermi_guess()
 
+        value, ok = QInputDialog.getDouble(
+            self,
+            "Set Fermi level",
+            "Initial Fermi level guess (eV):",
+            value=default_guess,
+            decimals=3,
+        )
+        if ok:
+            self._initial_fermi_guess = value
+            self._update_fermi_guess_label()
 
+    def _on_reset_fermi_guess_clicked(self) -> None:
+        """Clear manual EF override."""
+        self._initial_fermi_guess = None
+        self._update_fermi_guess_label()
+
+    def _suggest_fermi_guess(self) -> float:
+        """Estimate a reasonable EF starting point for the prompt."""
+        file_stack = self.get_file_stack()
+        dataset = file_stack.current_state if file_stack is not None else None
+        photon_energy = getattr(getattr(dataset, "measurement", None), "photon_energy", None)
+        if photon_energy is not None:
+            return float(photon_energy - DEFAULT_WORK_FUNCTION)
+        return 0.0
+
+    def _update_fermi_guess_label(self) -> None:
+        """Update the label summarizing the active initial EF guess."""
+        if self._initial_fermi_guess is None:
+            self._fermi_guess_label.setText(
+                "Initial EF guess: Auto (uses photon energy minus work function when available)."
+            )
+        else:
+            self._fermi_guess_label.setText(f"Initial EF guess: {self._initial_fermi_guess:.3f} eV")

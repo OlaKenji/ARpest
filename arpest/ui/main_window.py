@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
         
     def _setup_ui(self) -> None:
         """Set up the user interface."""
-        self.setWindowTitle("ARpest 2.0")
+        self.setWindowTitle("ARpest")
         self.resize(*self.config.window_size)
         
         # Create toolbar
@@ -349,21 +349,21 @@ class MainWindow(QMainWindow):
         layout.setAlignment(Qt.AlignCenter)
         
         # Title
-        title = QLabel("Welcome to ARpest 2.0")
+        title = QLabel("Welcome to ARpest")
         title.setStyleSheet("font-size: 24px; font-weight: bold; margin: 20px;")
+        title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
         
         # Instructions
         instructions = QLabel(
-            "🚀 Get started by opening ARPES data:\n\n"
+            "Get started by opening ARPES data:\n"
             "• Click the '📂 Open File' button in the toolbar\n"
-            "• Or use File → Open (Ctrl+O)\n"
-            "• Or drag and drop files here (coming soon)\n\n"
-            "📁 Configure your default data directory:\n"
+            "• Or use File → Open (Ctrl+O)\n\n"
+            "Configure your default data directory:\n"
             "• Click the '⚙️ Settings' button\n\n"
             "Supported formats:\n"
-            "• Bloch/MAX IV: .zip files\n"
-            "• I05/Diamond: .nxs, .h5 files"
+            "• Bloch/MAX IV: .zip, .ibw files\n"
+            "• I05/Diamond: .nxs, files"
         )
         instructions.setStyleSheet("font-size: 14px; padding: 20px; color: #666;")
         instructions.setAlignment(Qt.AlignCenter)

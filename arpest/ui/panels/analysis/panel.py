@@ -25,8 +25,9 @@ from PyQt5.QtWidgets import (
 from ....models import Axis, Dataset, FileStack
 from ....visualization.analysis_canvas import AnalysisCanvas, CurveDisplayData
 from .history import CaptureEntry, CaptureHistoryModel, CurveCaptureEntry, ViewCaptureEntry
-from .widgets import FittingModule, OverplotModule
-
+from .widgets.base import AnalysisModuleContext
+from .widgets.fitting import FittingModule
+from .widgets.registry import get_registered_analysis_modules
 
 class AnalysisPanel(QWidget):
     """Container for analysis modules and the shared visualization canvas."""
@@ -93,12 +94,12 @@ class AnalysisPanel(QWidget):
         curve_row.addWidget(QLabel("Capture curves:"))
         self.capture_edc_btn = QPushButton("Current EDC")
         self.capture_edc_btn.setToolTip("Capture the current EDC trace (energy distribution curve).")
-        self.capture_edc_btn.clicked.connect(lambda: self._capture_curves("current_mdc_curves", "EDC"))
+        self.capture_edc_btn.clicked.connect(lambda: self._capture_curves("current_edc_curves", "EDC"))
         curve_row.addWidget(self.capture_edc_btn)
 
         self.capture_mdc_btn = QPushButton("Current MDC")
         self.capture_mdc_btn.setToolTip("Capture the current MDC trace (momentum distribution curve).")
-        self.capture_mdc_btn.clicked.connect(lambda: self._capture_curves("current_edc_curves", "MDC"))
+        self.capture_mdc_btn.clicked.connect(lambda: self._capture_curves("current_mdc_curves", "MDC"))
         curve_row.addWidget(self.capture_mdc_btn)
         curve_row.addStretch()
         layout.addLayout(curve_row)
@@ -141,21 +142,28 @@ class AnalysisPanel(QWidget):
         self.modules_tab.setTabPosition(QTabWidget.North)
         self.modules_tab.setDocumentMode(True)
 
-        self.overplot_module = OverplotModule(canvas=self.canvas, capture_history=self.capture_history)
-
-        self.modules_tab.addTab(self.overplot_module, "Overplot")
-
-        self.fitting_module = FittingModule(
+        module_context = AnalysisModuleContext(
+            canvas=self.canvas,
+            capture_history=self.capture_history,
             get_file_stack=self.get_file_stack,
             context_providers=self.context_providers,
-            canvas=self.canvas,
             register_curve_selection_callback=self.register_curve_selection_listener,
         )
-        fitting_scroll = QScrollArea()
-        fitting_scroll.setWidgetResizable(True)
-        fitting_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        fitting_scroll.setWidget(self.fitting_module)
-        self.modules_tab.addTab(fitting_scroll, "Fitting")
+        self._modules = []
+        self.fitting_module: FittingModule | None = None
+        for module_cls in get_registered_analysis_modules():
+            module = module_cls(module_context)
+            container = module
+            if getattr(module, "wrap_in_scroll", False):
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True)
+                scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                scroll.setWidget(module)
+                container = scroll
+            self.modules_tab.addTab(container, getattr(module, "title", module_cls.__name__))
+            self._modules.append(module)
+            if isinstance(module, FittingModule):
+                self.fitting_module = module
         layout.addWidget(self.modules_tab)
 
         self.setLayout(layout)
@@ -349,23 +357,26 @@ class AnalysisPanel(QWidget):
 
     def serialize_state(self) -> dict:
         selected_id = self._current_curve_selection.id if self._current_curve_selection else None
+        fitting_state = self.fitting_module.serialize_state() if self.fitting_module else None
         return {
             "capture_entries": self.capture_history.entries(),
             "selected_entry_id": selected_id,
-            "fitting": self.fitting_module.serialize_state(),
+            "fitting": fitting_state,
         }
 
     def apply_state(self, state: dict | None) -> None:
         if not state:
             self.capture_history.set_entries([])
-            self.fitting_module.apply_state(None, set())
+            if self.fitting_module:
+                self.fitting_module.apply_state(None, set())
             if hasattr(self, "history_tree"):
                 self.history_tree.clearSelection()
             return
         entries = list(state.get("capture_entries") or [])
         self.capture_history.set_entries(entries)
         available_ids = {entry.id for entry in entries if isinstance(entry, CaptureEntry)}
-        self.fitting_module.apply_state(state.get("fitting"), available_ids)
+        if self.fitting_module:
+            self.fitting_module.apply_state(state.get("fitting"), available_ids)
         selected_id = state.get("selected_entry_id")
         if selected_id:
             self._select_history_entry(selected_id)

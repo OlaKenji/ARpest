@@ -7,14 +7,28 @@ import numpy as np
 from ..models import Dataset
 from ..utils.functions.fermi_dirac_ditribution import fit_fermi_dirac
 
-def correct_fermi_level_2d(dataset: Dataset,reference: Dataset, work_function: float = 4.38) -> tuple[Dataset, np.ndarray]:
+DEFAULT_WORK_FUNCTION = 4.38
+DEFAULT_POLY_ORDER = 3
+
+def correct_fermi_level_2d(
+    dataset: Dataset,
+    reference: Dataset,
+    *,
+    initial_fermi_guess: float | None = None,
+    work_function: float | None = DEFAULT_WORK_FUNCTION,
+    fit_stride: int = 1,
+    poly_order: int = DEFAULT_POLY_ORDER,
+) -> tuple[Dataset, np.ndarray]:
     """
     Apply a per-EDC Fermi level correction using a 2D gold reference.
 
     Args:
         dataset: Dataset to correct (must be 2D)
         reference: Gold reference dataset with matching pixel count (2D)
-        work_function: Work function estimate for initial EF guess
+        initial_fermi_guess: Optional manual EF guess to seed the first fit
+        work_function: Work function estimate (only used if no manual guess is provided)
+        fit_stride: Number of neighboring EDCs to average per Fermi fit
+        poly_order: Polynomial order used to interpolate EF values between fitted points
 
     Returns:
         Tuple of (corrected_dataset, fitted_fermi_levels)
@@ -27,19 +41,26 @@ def correct_fermi_level_2d(dataset: Dataset,reference: Dataset, work_function: f
     if dataset_intensity.shape[0] != n_pixels:
         raise ValueError("Reference and dataset must have the same number of EDC pixels.")
 
-    temperature = dataset.measurement.temperature or reference.measurement.temperature or 10.0
-    hv = dataset.measurement.photon_energy
-    e_guess = hv - work_function
+    temperature = (
+        getattr(dataset.measurement, "temperature", None)
+        or getattr(reference.measurement, "temperature", None)
+        or 10.0
+    )
+    e_guess = _resolve_initial_guess(
+        dataset,
+        energies,
+        initial_fermi_guess=initial_fermi_guess,
+        work_function=work_function,
+    )
 
-    params: list[np.ndarray] = []
-    for edc in gold:
-        length = int(len(edc) * 0.75)
-        p, _ = fit_fermi_dirac(energies[length:-1], edc[length:-1], e_guess, T=temperature)
-        params.append(p)
-        e_guess = p[0]
-
-    param_array = np.asarray(params)
-    fermi_levels = param_array[:, 0]
+    fermi_levels = _fit_reference_fermi_levels(
+        gold,
+        energies,
+        temperature,
+        e_guess,
+        fit_stride=fit_stride,
+        poly_order=poly_order,
+    )
 
     corrected_intensity, corrected_axis = shift_edcs_to_common_axis(dataset_intensity, dataset.x_axis.values,fermi_levels)
 
@@ -100,14 +121,25 @@ def shift_edcs_to_common_axis(intensity: np.ndarray, energies: np.ndarray, fermi
 
     return corrected, target_axis
 
-def correct_fermi_level_3d_same(dataset: Dataset,reference: Dataset, work_function: float = 4.38) -> tuple[Dataset, np.ndarray]:
+def correct_fermi_level_3d_same(
+    dataset: Dataset,
+    reference: Dataset,
+    *,
+    initial_fermi_guess: float | None = None,
+    work_function: float | None = DEFAULT_WORK_FUNCTION,
+    fit_stride: int = 1,
+    poly_order: int = DEFAULT_POLY_ORDER,
+) -> tuple[Dataset, np.ndarray]:
     """
     Shift each EDC independently and resample onto a common energy axis for each scan angle.
 
     Args:
         dataset: Dataset to correct (3D)
         reference: Gold reference dataset with matching pixel count (2D)
-        work_function: Work function estimate for initial EF guess
+        initial_fermi_guess: Optional manual EF guess to seed the first fit
+        work_function: Work function estimate (used when no manual guess is provided)
+        fit_stride: Number of neighboring EDCs to average per Fermi fit
+        poly_order: Polynomial order used to interpolate EF values between fitted points
 
     Returns:
         Tuple of (corrected_dataset, fitted_fermi_levels)
@@ -120,19 +152,25 @@ def correct_fermi_level_3d_same(dataset: Dataset,reference: Dataset, work_functi
     if dataset_intensity.shape[0] != n_pixels:
         raise ValueError("Reference and dataset must have the same number of EDC pixels.")
 
-    temperature = dataset.measurement.temperature or reference.measurement.temperature or 10.0
-    hv = dataset.measurement.photon_energy
-    e_guess = hv - work_function
-
-    params: list[np.ndarray] = []
-    for edc in gold:
-        length = int(len(edc) * 0.75)
-        p, _ = fit_fermi_dirac(energies[length:-1], edc[length:-1], e_guess, T=temperature)
-        params.append(p)
-        e_guess = p[0]
-
-    param_array = np.asarray(params)
-    fermi_levels = param_array[:, 0]#fermi levels
+    temperature = (
+        getattr(dataset.measurement, "temperature", None)
+        or getattr(reference.measurement, "temperature", None)
+        or 10.0
+    )
+    e_guess = _resolve_initial_guess(
+        dataset,
+        energies,
+        initial_fermi_guess=initial_fermi_guess,
+        work_function=work_function,
+    )
+    fermi_levels = _fit_reference_fermi_levels(
+        gold,
+        energies,
+        temperature,
+        e_guess,
+        fit_stride=fit_stride,
+        poly_order=poly_order,
+    )
 
     corrected_intensity, corrected_axis = shift_edcs_to_common_axis_3d_same(dataset_intensity, dataset.z_axis.values, fermi_levels)
 
@@ -173,7 +211,11 @@ def shift_edcs_to_common_axis_3d_same(intensity: np.ndarray, energies: np.ndarra
 
     return corrected, target_axis
 
-def correct_fermi_level_3d(dataset: Dataset,reference: Dataset, work_function: float = 4.38) -> tuple[Dataset, np.ndarray]:
+def correct_fermi_level_3d(
+    dataset: Dataset,
+    reference: Dataset,
+    work_function: float = DEFAULT_WORK_FUNCTION,
+) -> tuple[Dataset, np.ndarray]:
     """
     Apply a per-EDC Fermi level correction using a 3D gold reference.
 
@@ -186,3 +228,68 @@ def correct_fermi_level_3d(dataset: Dataset,reference: Dataset, work_function: f
         Tuple of (corrected_dataset, fitted_fermi_levels)
     """
     pass
+
+def _resolve_initial_guess(
+    dataset: Dataset,
+    energies: np.ndarray,
+    *,
+    initial_fermi_guess: float | None,
+    work_function: float | None,
+) -> float:
+    """Return the initial EF guess to seed the first Fermi fit."""
+    if initial_fermi_guess is not None:
+        return float(initial_fermi_guess)
+
+    photon_energy = getattr(dataset.measurement, "photon_energy", None)
+    if photon_energy is not None and work_function is not None:
+        return float(photon_energy - work_function)
+
+    return float(np.median(energies))
+
+def _fit_reference_fermi_levels(
+    gold_reference: np.ndarray,
+    energies: np.ndarray,
+    temperature: float,
+    e_guess: float,
+    *,
+    fit_stride: int,
+    poly_order: int,
+) -> np.ndarray:
+    """Fit the Fermi edge on block-averaged EDCs and interpolate across all pixels."""
+    if fit_stride < 1:
+        raise ValueError("fit_stride must be at least 1.")
+
+    n_pixels = gold_reference.shape[0]
+    stride = min(int(fit_stride), n_pixels)
+
+    block_levels: list[float] = []
+    block_positions: list[float] = []
+    guess = e_guess
+    for start in range(0, n_pixels, stride):
+        stop = min(start + stride, n_pixels)
+        block = gold_reference[start:stop]
+        if block.size == 0:
+            continue
+        averaged_edc = np.nanmean(block, axis=0)
+        length = int(len(averaged_edc) * 0.75)
+        energies_slice = energies[length:-1]
+        edc_slice = averaged_edc[length:-1]
+        p, _ = fit_fermi_dirac(energies_slice, edc_slice, guess, T=temperature)
+        ef = float(p[0])
+        block_levels.append(ef)
+        block_positions.append(start + (stop - start) / 2.0)
+        guess = ef
+
+    if not block_levels:
+        raise ValueError("Failed to fit any Fermi edges from the reference dataset.")
+
+    block_levels_array = np.asarray(block_levels, dtype=float)
+    block_positions_array = np.asarray(block_positions, dtype=float)
+    deg = max(0, min(int(poly_order), len(block_levels_array) - 1))
+
+    if deg == 0:
+        fitted = np.full(n_pixels, block_levels_array[0], dtype=float)
+    else:
+        coeffs = np.polyfit(block_positions_array, block_levels_array, deg=deg)
+        fitted = np.polyval(coeffs, np.arange(n_pixels, dtype=float))
+    return fitted
