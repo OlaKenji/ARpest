@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "arpest"
-version = "1.0.1"
+version = "1.0.2"
 description = "ARPES data analysis and visualization tool"
 authors = [{name = "Ola Kenjiforslund"}]
 readme = "README.md"
@@ -17,13 +17,9 @@ dependencies = [
     "scipy>=1.7.3",
     "h5py>=3.6.0",
     "pyqtgraph>=0.12.1",
+     "PyQt5>=5.15.6",
+      "igor>=0.3",
 ]
-
-# Note: Install PyQt5 manually
-# pip install PyQt5 
-#
-# Optional: For IBW file support (Bloch beamline)
-# pip install igor
 
 [project.optional-dependencies]
 dev = [
