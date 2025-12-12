@@ -36,6 +36,7 @@ from .panels.overview.panel import OverviewPanel
 from ..visualization.analysis_canvas import AnalysisCanvas
 from ..visualization.figure_2d import Figure2D
 from ..visualization.figure_3d import Figure3D
+from ..visualization.figure_4d import Figure4D
 
 class DatasetTab(QWidget):
     """
@@ -269,6 +270,7 @@ class DatasetTab(QWidget):
         operations_layout.addStretch()
 
         side_tabs.addTab(operations_tab, "Operations")
+        self._operations_tab_index = side_tabs.indexOf(operations_tab)
 
         # Analysis tab
         analysis_tab = QWidget()
@@ -290,6 +292,8 @@ class DatasetTab(QWidget):
         self._analysis_tab_index = side_tabs.indexOf(analysis_tab)
         side_tabs.currentChanged.connect(self._on_side_tab_changed)
         self._on_side_tab_changed(side_tabs.currentIndex())
+        # Apply initial enable/disable state after panels exist
+        self._update_panel_availability(self.file_stacks[self.current_index].current_state)
         
         # Use splitter to allow resizing
         splitter = QSplitter(Qt.Horizontal)
@@ -445,19 +449,27 @@ class DatasetTab(QWidget):
         if self.figure is not None:
             self._capture_current_visual_state(previous_index)
 
-        new_figure = (
-            Figure2D(
+        current_dataset = file_stack.current_state
+        if current_dataset.is_2d:
+            new_figure = Figure2D(
                 file_stack,
                 colormap=self.current_colormap,
                 integration_radius=self.integration_radius,
             )
-            if file_stack.current_state.is_2d
-            else Figure3D(
+        elif current_dataset.is_3d:
+            new_figure = Figure3D(
                 file_stack,
                 colormap=self.current_colormap,
                 integration_radius=self.integration_radius,
             )
-        )
+        elif current_dataset.is_4d:
+            new_figure = Figure4D(
+                file_stack,
+                colormap=self.current_colormap,
+                integration_radius=self.integration_radius,
+            )
+        else:
+            raise ValueError(f"Unsupported dataset dimensionality: {current_dataset.ndim}D")
 
         if self.figure is not None:
             self.figure_container_layout.removeWidget(self.figure)
@@ -470,6 +482,7 @@ class DatasetTab(QWidget):
         self._apply_integration_radius_to_current_figure()
         self._update_color_scale_controls(file_stack)
         self._apply_saved_cursor_state(self.current_index)
+        self._update_panel_availability(current_dataset)
 
     def _update_info_panels(self, file_stack: FileStack) -> None:
         """Refresh metadata/data info labels for the given file stack."""
@@ -482,6 +495,14 @@ class DatasetTab(QWidget):
     def _update_state_history_widget(self, file_stack: FileStack) -> None:
         if self.state_history is not None:
             self.state_history.set_file_stack(file_stack)
+
+    def _update_panel_availability(self, dataset: Dataset) -> None:
+        disable_panels = dataset.is_4d
+        if self.side_tabs is not None:
+            if hasattr(self, "_operations_tab_index") and self._operations_tab_index is not None:
+                self.side_tabs.setTabEnabled(self._operations_tab_index, not disable_panels)
+            if hasattr(self, "_analysis_tab_index") and self._analysis_tab_index is not None:
+                self.side_tabs.setTabEnabled(self._analysis_tab_index, not disable_panels)
 
     def _capture_current_view_for_analysis(
         self, view: Optional[str] = None, *, set_tab: bool = True

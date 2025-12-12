@@ -72,6 +72,7 @@ class OperationsPanel(QWidget):
                 context_providers=self.context_providers,
             )
             category_widgets[category].addWidget(widget)
+            widget.setProperty("category_group", category)
 
         # add stretch to each tab layout
         for vbox in category_widgets.values():

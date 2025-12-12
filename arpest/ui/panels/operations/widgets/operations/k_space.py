@@ -94,6 +94,7 @@ class KSpaceOperationWidget(OperationWidget):
         layout.addStretch()
         self.setLayout(layout)
         self._last_dataset_id: int | None = None
+        self._current_mode: KSpaceConversionMode | None = None
         self._init_from_current_dataset()
 
     def _init_from_current_dataset(self) -> None:
@@ -131,10 +132,24 @@ class KSpaceOperationWidget(OperationWidget):
         if dataset is None:
             self.dataset_info_label.setText("No dataset selected.")
             self.mode_hint_label.setText("Mode: unavailable.")
+            self.convert_btn.setEnabled(False)
             self._last_dataset_id = None
+            self._current_mode = None
             return
 
-        mode = determine_mode(dataset)
+        try:
+            mode = determine_mode(dataset)
+        except ValueError:
+            self.dataset_info_label.setText("Dataset dimensionality is not supported for k-space conversion.")
+            self.mode_hint_label.setText("Mode: unavailable for this dataset.")
+            self.convert_btn.setEnabled(False)
+            self._current_mode = None
+            self._last_dataset_id = id(dataset)
+            return
+
+        self.convert_btn.setEnabled(True)
+        self._current_mode = mode
+
         axis_lines = [
             f"X-axis: {dataset.x_axis.name} ({dataset.x_axis.unit})",
             f"Y-axis: {dataset.y_axis.name} ({dataset.y_axis.unit})",
@@ -162,9 +177,10 @@ class KSpaceOperationWidget(OperationWidget):
         self._last_dataset_id = id(dataset)
 
     def _build_context(self, dataset: Dataset) -> KSpaceConversionContext:
-        mode = determine_mode(dataset)
+        if self._current_mode is None:
+            raise ValueError("Dataset cannot be converted to k-space.")
         return KSpaceConversionContext(
-            mode=mode,
+            mode=self._current_mode,
             photon_energy=self.photon_energy_spin.value() or dataset.measurement.photon_energy,
             work_function=self.work_function_spin.value(),
             inner_potential=self.inner_potential_spin.value(),

@@ -363,7 +363,7 @@ class MainWindow(QMainWindow):
             "• Click the '⚙️ Settings' button\n\n"
             "Supported formats:\n"
             "• Bloch/MAX IV: .zip, .ibw files\n"
-            "• I05/Diamond: .nxs, files"
+            "• I05/Diamond: .nxs files"
         )
         instructions.setStyleSheet("font-size: 14px; padding: 20px; color: #666;")
         instructions.setAlignment(Qt.AlignCenter)

@@ -12,8 +12,8 @@ A modern, interactive GUI application for analysing ARPES (Angle-Resolved Photoe
 
 ### Core Capabilities
 - **Multi-beamline support**: Load data from Diamond Light Source (I05) and MAX IV (Bloch)
-- **Multiple file formats**: `.nxs`, `.h5`, `.zip`, `.ibw`
-- **2D & 3D visualisation**: Single cuts and photon energy/deflector angle scans
+- **Multiple file formats**: `.nxs`, `.zip`, `.ibw`
+- **2D, 3D & 4D visualisation**: Single cuts and photon energy/deflector angle scans
 - **Interactive visualisation**: Real-time cursor tracking with live EDC/MDC updates
 - **Proces the data**: Convert to k-space, correct the Fermi level based on a reference measurent etc.
 - **State management**: Undo/redo functionality with complete processing history
@@ -24,8 +24,7 @@ A modern, interactive GUI application for analysing ARPES (Angle-Resolved Photoe
 ### Performance
 - Optimized rendering for smooth visualisation
 - Fast numpy slicing for data extraction
-- In-place data updates (no memory reallocation)
-- Efficient rendering for large datasets
+- In-place data updates 
 
 ---
 
@@ -37,19 +36,12 @@ A modern, interactive GUI application for analysing ARPES (Angle-Resolved Photoe
 - NumPy
 - SciPy
 - h5py
-- igor (optional, for `.ibw` files)
+- igor
 - pyqtgraph
 
 ### Quick Install
 
 ```bash
-# Install a Qt backend (PyQt5)
-pip install PyQt5
-pip install pyqtgraph
-
-# Optional: install igor for IBW file support
-pip install igor
-
 # Install ARpest from PyPI
 pip install arpest
 

@@ -18,7 +18,10 @@ class DragMode(Enum):
     CUT_Y = auto()
     CUT_X = auto()
     ENERGY = auto()
-
+    ANGLE = auto()
+    POINT = auto()
+    ENERGY_TRACK = auto()
+    ANGLE_TRACK = auto()
 
 @dataclass
 class DragState:

@@ -114,6 +114,9 @@ class I05Loader(BaseLoader):
             # Handle different data shapes
             print(f"\n[3] Processing data shape...")
             
+            # Extract metadata
+            measurement = self._extract_metadata(infile)            
+
             # Check if single cut (original code: if data.shape[2] == 1)
             is_single_cut = (data.shape[0] == 1) or (data.ndim == 3 and data.shape[2] == 1)
             
@@ -132,14 +135,11 @@ class I05Loader(BaseLoader):
             # Now determine if 2D or 3D based on actual data dimensions
             if data.ndim == 2 or len(zscale) == 1:  # 2D data
                 # Extract metadata
-                measurement = self._extract_metadata(infile)            
                 print(f"\n[4] Creating 2D Dataset...")
                 dataset = self._create_2d_dataset(
                     data, xscale, yscale, measurement, filepath
                 )
             elif data.ndim == 3:  # 3D data (data.ndim == 3 and len(zscale) > 1)
-                # Extract metadata
-                measurement = self._extract_metadata(infile)            
                 print(f"\n[4] Creating 3D Dataset...")
                 print(f"    Data shape: {data.shape}")
                 print(f"    Expected: ({len(zscale)}, {len(yscale)}, {len(xscale)})")
@@ -147,8 +147,21 @@ class I05Loader(BaseLoader):
                     data, yscale, xscale, zscale, measurement, filepath, is_photon_energy_scan
                 )
             else:#4D data
-                measurement = None
-                dataset = self._create_4d_dataset(data, yscale, xscale, zscale, measurement, filepath)
+                spatial_axes = self._extract_spatial_scan_axes(infile)
+                if len(spatial_axes) < 2:
+                    raise ValueError("Unable to determine spatial scan axes for 4D dataset.")
+                (axis_a_name, axis_a_values), (axis_b_name, axis_b_values) = spatial_axes[:2]
+                dataset = self._create_4d_dataset(
+                    data,
+                    axis_a_values,
+                    axis_b_values,
+                    zscale,
+                    xscale,
+                    measurement,
+                    filepath,
+                    axis_a_name=axis_a_name,
+                    axis_b_name=axis_b_name,
+                )
             
             print(f"\n[5] Final Dataset:")
             print(f"    Dimensions: {dataset.ndim}D")
@@ -344,6 +357,29 @@ class I05Loader(BaseLoader):
         print(f"    DEBUG: Creating default angle array with {n_angles} points")
         return np.arange(n_angles, dtype=float)
 
+    def _extract_spatial_scan_axes(self, infile: h5py.File) -> list[tuple[str, NDArray]]:
+        """Parse scan command to obtain spatial scan axes (e.g., SAX, SAY)."""
+        command = self._read_hdf5_string(infile["/entry1/scan_command"])
+        tokens = command.replace(",", " ").split()
+        axes: list[tuple[str, NDArray]] = []
+        idx = 1
+        while idx + 3 < len(tokens):
+            axis_name = tokens[idx]
+            axis_lower = axis_name.lower()
+            if axis_lower in {"analyser", "analyzer", "detector"}:
+                break
+            try:
+                start = float(tokens[idx + 1])
+                stop = float(tokens[idx + 2])
+                step = float(tokens[idx + 3])
+            except (ValueError, IndexError):
+                break
+            values = np.arange(start, stop + step * 0.5, step)
+            axes.append((axis_lower, values))
+            idx += 4
+        print(f"    DEBUG: Spatial scan axes parsed: {[name for name, _ in axes]}")
+        return axes
+
     def _read_hdf5_string(self, x):
         value = x[()]                  # read the dataset
         if isinstance(value, np.ndarray):
@@ -369,12 +405,19 @@ class I05Loader(BaseLoader):
         x = None
         y = None
         z = None
+        manipulator_arrays: dict[str, np.ndarray] = {}
         try:
             manipulator = infile["/entry1/instrument/manipulator"]
             for position in np.array(manipulator):
-                value = float(np.array(manipulator[position])[0])
-                # Normalize angle names
+                raw = np.array(manipulator[position])
+                flat = raw.ravel()
+                if flat.size == 0:
+                    continue
+                value = float(flat[0])
                 pos_lower = position.lower()
+
+                if raw.size > 1:
+                    manipulator_arrays[pos_lower] = raw
 
                 if "satilt" in pos_lower:
                     chi = value
@@ -384,10 +427,10 @@ class I05Loader(BaseLoader):
                     theta = value
                 elif "sax" in pos_lower:
                     x = value
-                elif  "say" in pos_lower:
-                    y = value       
+                elif "say" in pos_lower:
+                    y = value
                 elif "saz" in pos_lower:
-                    z = value                                                                                               
+                    z = value
         except (KeyError, IndexError):
             pass
             
@@ -408,6 +451,9 @@ class I05Loader(BaseLoader):
                 custom[f"analyser_{key}"] = str(np.array(analyser[key]))
             except:
                 pass
+
+        for key, values in manipulator_arrays.items():
+            custom[f"manipulator_{key}"] = values
 
         deflector = custom.get('analyser_deflector_x', None)
         mode = custom.get('analyser_acquisition_mode', None)
@@ -558,56 +604,75 @@ class I05Loader(BaseLoader):
     def _create_4d_dataset(
         self,
         data: NDArray,
-        xscale: NDArray,
-        yscale: NDArray,
-        zscale: NDArray,
+        scan_axis_a: NDArray,
+        scan_axis_b: NDArray,
+        energy_scale: NDArray,
+        angle_scale: NDArray,
         measurement: Measurement,
         filepath: Path,
+        *,
+        axis_a_name: str = "sax",
+        axis_b_name: str = "saz",
     ) -> Dataset:
-        """Create a 4D Dataset."""
-        print(f"\n    [_create_3d_dataset]")
-        print(f"      Input data shape: {data.shape}")
-        print(f"      xscale (angle): {len(xscale)} points")
-        print(f"      yscale (energy): {len(yscale)} points")
-        print(f"      zscale (scan): {len(zscale)} points")
-        
-        # Data from I05 comes as (n_scan, n_angle, n_energy)
-        # We need it as (n_angle, n_energy, n_scan) for Dataset
-        # Which is: (xscale, yscale, zscale)
-        
-        # Expected shape
-        expected_shape = (len(xscale), len(yscale), len(zscale))
-        print(f"      Expected: {expected_shape}")
-        
-        # Transpose: (n_scan, n_angle, n_energy) -> (n_angle, n_energy, n_scan)
-        # That's: (0, 1, 2) -> (1, 2, 0)
-        expected_shape = (len(yscale), len(xscale), len(zscale))
-        print(f"      Target: x=scan ({len(xscale)} pts, horizontal), y=angle ({len(yscale)} pts, vertical)")
-        print(f"      Expected shape: {expected_shape} (angle, scan, energy)")
-        
-        # Transpose: (n_scan, n_angle, n_energy) -> (n_angle, n_scan, n_energy)
-        # That's: (0, 1, 2) -> (1, 0, 2)
-            
-        return Dataset(
-            x_axis=Axis(
-                values=xscale,
-                axis_type = AxisType.ANGLE,
-                name="Scan axis",
-                unit="a.u.",
-            ),
-            y_axis=Axis(
-                values=yscale,
-                axis_type=AxisType.ANGLE,
-                name="Angle",
-                unit="°",
-            ),
-            z_axis=Axis(
-                values=zscale,
-                axis_type=AxisType.ENERGY_KINETIC,
-                name="Kinetic Energy",
-                unit="eV",
-            ),
-            intensity=data,
+        """Create a 4D Dataset for spatial scans (x, y, energy, angle)."""
+        print(f"\n    [_create_4d_dataset]")
+        print(f"      Raw data shape: {data.shape}")
+        print(f"      Scan axis A '{axis_a_name}': {len(scan_axis_a)} points")
+        print(f"      Scan axis B '{axis_b_name}': {len(scan_axis_b)} points")
+        print(f"      Angle axis: {len(angle_scale)} points")
+        print(f"      Energy axis: {len(energy_scale)} points")
+
+        if data.ndim != 4:
+            raise ValueError(f"Expected 4D intensity data, received {data.ndim}D.")
+
+        expected_shape = (
+            len(scan_axis_a),
+            len(scan_axis_b),
+            len(angle_scale),
+            len(energy_scale),
+        )
+        if data.shape != expected_shape:
+            raise ValueError(
+                f"4D data shape mismatch. Got {data.shape}, expected {expected_shape} "
+                "(scan_a, scan_b, angle, energy)."
+            )
+
+        intensity = np.transpose(data, (1, 0, 3, 2))
+        print(f"      Transposed intensity shape: {intensity.shape} (y, x, energy, angle)")
+
+        x_axis = Axis(
+            values=scan_axis_a,
+            axis_type=AxisType.POSITION,
+            name=f"{axis_a_name.upper()} position",
+            unit="mm",
+        )
+        y_axis = Axis(
+            values=scan_axis_b,
+            axis_type=AxisType.POSITION,
+            name=f"{axis_b_name.upper()} position",
+            unit="mm",
+        )
+        z_axis = Axis(
+            values=energy_scale,
+            axis_type=AxisType.ENERGY_KINETIC,
+            name="Kinetic Energy",
+            unit="eV",
+        )
+        w_axis = Axis(
+            values=angle_scale,
+            axis_type=AxisType.ANGLE,
+            name="Analyzer angle",
+            unit="°",
+        )
+
+        dataset = Dataset(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            z_axis=z_axis,
+            w_axis=w_axis,
+            intensity=intensity,
             measurement=measurement,
             filename=filepath.name,
         )
+        dataset.validate()
+        return dataset
