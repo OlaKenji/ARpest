@@ -96,9 +96,9 @@ class Measurement:
     deflector: Optional[float] = None
     
     # Tilt angles - beamline loaders should normalize these names
-    chi: Optional[float] = None  # Polar angle
+    chi: Optional[float] = None  #tilt
     phi: Optional[float] = None  # Azimuthal angle
-    theta: Optional[float] = None
+    theta: Optional[float] = None# Polar angle
     x: Optional[float] = None
     y: Optional[float] = None
     z: Optional[float] = None

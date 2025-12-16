@@ -345,23 +345,34 @@ class DatasetTab(QWidget):
         dataset = file_stack.current_state
         meta = dataset.measurement
 
-        info = f"Beamline: {meta.beamline}\n"
-        info += f"Photon Energy: {meta.photon_energy:.2f} eV\n"
-        info += f"Temperature: {meta.temperature} K\n"
-        
-        info += f"Count time: {meta.time}\n"             
-        info += f"χ: {meta.chi:.2f}°\n"        
-        info += f"φ: {meta.phi:.2f}°\n"
-        info += f"θ: {meta.theta:.2f}°\n"            
-        info += f"x: {meta.x:.2f}\n"            
-        info += f"y: {meta.y:.2f}\n"            
-        info += f"z: {meta.z:.2f}\n"                                                        
-        info += f"Polarisation: {meta.polarization}\n"        
-        info += f"Slit size: {meta.slit_size:.2f}\n"                
-        info += f"Mode: {meta.mode}\n"        
-        info += f"Center energy: {meta.center_energy} eV\n"                
-        info += f"Pass energy: {meta.pass_energy} eV\n"            
-        info += f"Deflector: {meta.deflector}°\n"                             
+        def fmt_float(value, unit: str = "", precision: int = 2) -> str:
+            if value is None:
+                return "—"
+            try:
+                formatted = f"{float(value):.{precision}f}"
+            except (TypeError, ValueError):
+                formatted = str(value)
+            return f"{formatted}{unit}"
+
+        def fmt_text(value) -> str:
+            return str(value) if value not in (None, "") else "—"
+
+        info = f"Beamline: {fmt_text(meta.beamline)}\n"
+        info += f"Photon Energy: {fmt_float(meta.photon_energy, ' eV')}\n"
+        info += f"Temperature: {fmt_float(meta.temperature, ' K', precision=1)}\n"
+        info += f"Count time: {fmt_text(meta.time)}\n"
+        info += f"χ: {fmt_float(meta.chi, '°')}\n"
+        info += f"φ: {fmt_float(meta.phi, '°')}\n"
+        info += f"θ: {fmt_float(meta.theta, '°')}\n"
+        info += f"x: {fmt_float(meta.x)}\n"
+        info += f"y: {fmt_float(meta.y)}\n"
+        info += f"z: {fmt_float(meta.z)}\n"
+        info += f"Polarisation: {fmt_text(meta.polarization)}\n"
+        info += f"Slit size: {fmt_float(meta.slit_size)}\n"
+        info += f"Mode: {fmt_text(meta.mode)}\n"
+        info += f"Center energy: {fmt_float(meta.center_energy, ' eV')}\n"
+        info += f"Pass energy: {fmt_float(meta.pass_energy, ' eV')}\n"
+        info += f"Deflector: {fmt_float(meta.deflector, '°')}\n"
         return info
 
     def _current_file_stack(self) -> FileStack:
