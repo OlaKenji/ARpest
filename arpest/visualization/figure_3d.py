@@ -465,6 +465,7 @@ class Figure3D(QWidget):
         self.ax_cut_y.setTitle(f"Band @ {self.dataset.y_axis.name}={cut.y_value:.2f}°")
         self.ax_cut_x.setTitle(f"Band @ {self.dataset.x_axis.name}={cut.x_value:.2f}°")
 
+
         edc_from_cut_y, edc_from_cut_x = self._compute_edc_curves(cut)
         self._current_edc_cut_y = np.asarray(edc_from_cut_y, dtype=float)
         self._current_edc_cut_x = np.asarray(edc_from_cut_x, dtype=float)
@@ -494,6 +495,9 @@ class Figure3D(QWidget):
         self.line_mdc_cut_y.setData(self.dataset.x_axis.values, mdc_from_cut_y)
         self.line_mdc_cut_x.setData(self.dataset.y_axis.values, mdc_from_cut_x)
         self._update_mdc_axis_limits(mdc_from_cut_y, mdc_from_cut_x)
+        self.ax_fermi.setTitle(
+            f"Fermi Surface @ {self.dataset.z_axis.values[self.z_index]:.2f} {self.dataset.z_axis.unit}"
+        )                
 
     def _update_edc_axis_limits(self, curve_a: np.ndarray, curve_b: np.ndarray) -> None:
         edc_y_min = min(np.nanmin(curve_a), np.nanmin(curve_b))

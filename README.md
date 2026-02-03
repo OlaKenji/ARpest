@@ -37,6 +37,7 @@ A modern, interactive GUI application for analysing ARPES (Angle-Resolved Photoe
 - SciPy
 - h5py
 - igor
+- matplotlib
 - pyqtgraph
 
 ### Quick Install
