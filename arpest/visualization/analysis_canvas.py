@@ -113,6 +113,32 @@ class AnalysisCanvas(QWidget):
 
         self._set_canvas_widget(plot)
 
+    def set_overlay_points(
+        self,
+        x_values: np.ndarray,
+        y_values: np.ndarray,
+        *,
+        color: str = "#ff8800",
+        size: int = 6,
+        symbol: str = "o",
+    ) -> None:
+        widget = self._current_widget
+        setter = getattr(widget, "set_overlay_points", None)
+        if callable(setter):
+            setter(x_values, y_values, color=color, size=size, symbol=symbol)
+
+    def clear_overlay_points(self) -> None:
+        widget = self._current_widget
+        clearer = getattr(widget, "clear_overlay_points", None)
+        if callable(clearer):
+            clearer()
+
+    def set_overlay_series(self, series: list[dict]) -> None:
+        widget = self._current_widget
+        setter = getattr(widget, "set_overlay_series", None)
+        if callable(setter):
+            setter(series)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

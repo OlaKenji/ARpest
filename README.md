@@ -26,6 +26,10 @@ A modern, interactive GUI application for analysing ARPES (Angle-Resolved Photoe
 - Fast numpy slicing for data extraction
 - In-place data updates 
 
+## 🎥 Live Demo
+Watch real-time interaction with a 3D ARPES dataset:
+➡️ https://github.com/OlaKenji/ARpest/wiki/Live-Demo
+
 ---
 
 ## Installation

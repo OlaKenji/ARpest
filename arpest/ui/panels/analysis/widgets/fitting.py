@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QStackedLayout,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -34,6 +35,7 @@ from .....operations.fit import (
     available_fit_functions,
     perform_curve_fit,
 )
+from ..history import ViewCaptureEntry
 from .....visualization.analysis_canvas import CurveDisplayData
 from ..history import CurveCaptureEntry
 from .base import AnalysisModule, AnalysisModuleContext
@@ -58,6 +60,32 @@ class _FitHistoryEntry:
     result: FitResult
     capture_id: str
     fit_range: tuple[float, float]
+
+
+@dataclass
+class _BatchFitEntry:
+    """Stores results from a batch MDC fit."""
+
+    id: str
+    label: str
+    view_id: str
+    energies: np.ndarray
+    r_squared: np.ndarray
+    components: list["_BatchComponentResult"]
+
+
+@dataclass
+class _BatchComponentResult:
+    """One component traced across the batch energies."""
+
+    component_id: str
+    label: str
+    centers: np.ndarray
+    center_errors: np.ndarray
+    gammas: np.ndarray
+    gamma_errors: np.ndarray
+    amplitudes: np.ndarray
+    amplitude_errors: np.ndarray
 
 
 class _FitComponentWidget(QGroupBox):
@@ -202,6 +230,7 @@ class FittingModule(AnalysisModule):
     def __init__(self, context: AnalysisModuleContext, parent: Optional[QWidget] = None) -> None:
         super().__init__(context, parent)
         self.canvas = context.canvas
+        self.capture_history = context.capture_history
         self._function_specs = available_fit_functions()
         self._function_lookup = {spec.id: spec for spec in self._function_specs}
         self._component_widgets: list[_FitComponentWidget] = []
@@ -210,9 +239,17 @@ class FittingModule(AnalysisModule):
         self._fit_histories: dict[str, list[_FitHistoryEntry]] = {}
         self._selected_result_ids: dict[str, str | None] = {}
         self._result_counter = 1
+        self._batch_results: list[_BatchFitEntry] = []
+        self._view_entries: list[ViewCaptureEntry] = []
+        self._selected_view_entry: ViewCaptureEntry | None = None
+        self._mode = "1d"
+        self._selected_batch_id: str | None = None
 
         self._build_ui()
+        self.capture_history.entries_changed.connect(self._refresh_view_entries)
+        self._refresh_view_entries()
         context.register_curve_selection_callback(self._on_external_curve_selected)
+        context.register_view_selection_callback(self._on_external_view_selected)
 
     # ------------------------------------------------------------------
     # UI construction
@@ -223,12 +260,30 @@ class FittingModule(AnalysisModule):
         layout.setSpacing(8)
         layout.setAlignment(Qt.AlignTop)
 
-        intro = QLabel(
-            "Select a captured EDC/MDC curve from the capture history."
-        )
+        intro = QLabel("Select a captured image from the capture history.")
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Mode:"))
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem("1D fit (EDC/MDC)")
+        self.mode_combo.addItem("2D batch MDC")
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        mode_row.addWidget(self.mode_combo)
+        mode_row.addStretch()
+        layout.addLayout(mode_row)
+
+        mode_group = QGroupBox("Fit controls")
+        mode_group_layout = QVBoxLayout()
+        mode_group_layout.setContentsMargins(8, 8, 8, 8)
+        self.mode_stack = QStackedLayout()
+        mode_container = QWidget()
+        mode_container.setLayout(self.mode_stack)
+
+        fit_controls = QWidget()
+        fit_layout = QVBoxLayout()
+        fit_layout.setContentsMargins(0, 0, 0, 0)
         region_row = QHBoxLayout()
         region_row.addWidget(QLabel("Fit range:"))
         self.region_min_spin = QDoubleSpinBox()
@@ -243,7 +298,103 @@ class FittingModule(AnalysisModule):
         region_row.addWidget(QLabel("to"))
         region_row.addWidget(self.region_max_spin)
         region_row.addStretch()
-        layout.addLayout(region_row)
+        fit_layout.addLayout(region_row)
+
+        action_row = QHBoxLayout()
+        self.fit_btn = QPushButton("Fit curve")
+        self.fit_btn.clicked.connect(self._run_fit)
+        action_row.addWidget(self.fit_btn)
+        action_row.addStretch()
+        fit_layout.addLayout(action_row)
+        fit_controls.setLayout(fit_layout)
+
+        batch_controls = QWidget()
+        batch_layout = QVBoxLayout()
+        batch_layout.setContentsMargins(0, 0, 0, 0)
+        batch_layout.setSpacing(6)
+
+        self.batch_source_label = QLabel("Select a captured 2D view in the history list.")
+        self.batch_source_label.setWordWrap(True)
+        batch_layout.addWidget(self.batch_source_label)
+
+        energy_row = QHBoxLayout()
+        self.batch_energy_label = QLabel("Y range:")
+        energy_row.addWidget(self.batch_energy_label)
+        self.batch_energy_min = QDoubleSpinBox()
+        self.batch_energy_min.setDecimals(6)
+        self.batch_energy_min.setRange(-1e9, 1e9)
+        self.batch_energy_min.setEnabled(False)
+        self.batch_energy_min.setFixedWidth(90)
+        self.batch_energy_max = QDoubleSpinBox()
+        self.batch_energy_max.setDecimals(6)
+        self.batch_energy_max.setRange(-1e9, 1e9)
+        self.batch_energy_max.setEnabled(False)
+        self.batch_energy_max.setFixedWidth(90)
+        energy_row.addWidget(self.batch_energy_min)
+        energy_row.addWidget(QLabel("to"))
+        energy_row.addWidget(self.batch_energy_max)
+        batch_layout.addLayout(energy_row)
+
+        step_row = QHBoxLayout()
+        step_row.addWidget(QLabel("Energy step:"))
+        self.batch_energy_step = QDoubleSpinBox()
+        self.batch_energy_step.setDecimals(6)
+        self.batch_energy_step.setRange(1e-6, 1e9)
+        self.batch_energy_step.setEnabled(False)
+        self.batch_energy_step.setFixedWidth(90)
+        step_row.addWidget(self.batch_energy_step)
+        step_row.addStretch()
+        batch_layout.addLayout(step_row)
+
+        integration_row = QHBoxLayout()
+        self.batch_integration_label = QLabel("Y integration (±):")
+        integration_row.addWidget(self.batch_integration_label)
+        self.batch_energy_integration = QDoubleSpinBox()
+        self.batch_energy_integration.setDecimals(6)
+        self.batch_energy_integration.setRange(0.0, 1e9)
+        self.batch_energy_integration.setEnabled(False)
+        self.batch_energy_integration.setFixedWidth(90)
+        integration_row.addWidget(self.batch_energy_integration)
+        self.batch_integration_unit = QLabel("")
+        integration_row.addWidget(self.batch_integration_unit)
+        integration_row.addStretch()
+        batch_layout.addLayout(integration_row)
+
+        mdc_row = QHBoxLayout()
+        self.batch_mdc_label = QLabel("X fit range:")
+        mdc_row.addWidget(self.batch_mdc_label)
+        self.batch_mdc_min = QDoubleSpinBox()
+        self.batch_mdc_min.setDecimals(6)
+        self.batch_mdc_min.setRange(-1e9, 1e9)
+        self.batch_mdc_min.setEnabled(False)
+        self.batch_mdc_min.setFixedWidth(90)
+        self.batch_mdc_max = QDoubleSpinBox()
+        self.batch_mdc_max.setDecimals(6)
+        self.batch_mdc_max.setRange(-1e9, 1e9)
+        self.batch_mdc_max.setEnabled(False)
+        self.batch_mdc_max.setFixedWidth(90)
+        mdc_row.addWidget(self.batch_mdc_min)
+        mdc_row.addWidget(QLabel("to"))
+        mdc_row.addWidget(self.batch_mdc_max)
+        batch_layout.addLayout(mdc_row)
+
+        run_row = QHBoxLayout()
+        self.batch_fit_btn = QPushButton("Run batch MDC fit")
+        self.batch_fit_btn.clicked.connect(self._run_batch_fit)
+        run_row.addWidget(self.batch_fit_btn)
+        run_row.addStretch()
+        batch_layout.addLayout(run_row)
+        batch_controls.setLayout(batch_layout)
+
+        self.mode_stack.addWidget(fit_controls)
+        self.mode_stack.addWidget(batch_controls)
+        mode_group_layout.addWidget(mode_container)
+        mode_group.setLayout(mode_group_layout)
+        layout.addWidget(mode_group)
+
+        components_group = QGroupBox("Fit model components")
+        components_layout = QVBoxLayout()
+        components_layout.setSpacing(6)
 
         builder_row = QHBoxLayout()
         self.component_selector = QComboBox()
@@ -257,7 +408,7 @@ class FittingModule(AnalysisModule):
         clear_components_btn.clicked.connect(self._clear_components)
         builder_row.addWidget(clear_components_btn)
         builder_row.addStretch()
-        layout.addLayout(builder_row)
+        components_layout.addLayout(builder_row)
 
         self.components_area = QVBoxLayout()
         self.components_area.setSpacing(8)
@@ -269,16 +420,15 @@ class FittingModule(AnalysisModule):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setWidget(container)
         scroll.setMinimumHeight(180)
-        layout.addWidget(scroll)
+        components_layout.addWidget(scroll)
 
-        action_row = QHBoxLayout()
-        self.fit_btn = QPushButton("Fit curve")
-        self.fit_btn.clicked.connect(self._run_fit)
-        action_row.addWidget(self.fit_btn)
-        action_row.addStretch()
-        layout.addLayout(action_row)
+        components_group.setLayout(components_layout)
+        layout.addWidget(components_group)
 
-        layout.addWidget(QLabel("Fit components and parameters:"))
+        results_group = QGroupBox("Fit results")
+        results_layout = QVBoxLayout()
+        results_layout.setSpacing(6)
+        results_layout.addWidget(QLabel("Fit components and parameters:"))
         self.results_tree = QTreeWidget()
         self.results_tree.setColumnCount(5)
         self.results_tree.setHeaderLabels(["Result / Component", "Parameter", "Value", "Error", "Actions"])
@@ -288,15 +438,37 @@ class FittingModule(AnalysisModule):
         self.results_tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.results_tree.itemClicked.connect(self._on_result_item_clicked)
         self.results_tree.itemDoubleClicked.connect(self._on_result_item_clicked)
-        layout.addWidget(self.results_tree)
+        results_layout.addWidget(self.results_tree)
 
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("color: #555555;")
-        layout.addWidget(self.status_label)
+        results_layout.addWidget(self.status_label)
+        results_group.setLayout(results_layout)
+        layout.addWidget(results_group)
 
         layout.addStretch()
         self.setLayout(layout)
         self.setMaximumWidth(480)
+
+    def _on_mode_changed(self, index: int) -> None:
+        self._mode = "1d" if index == 0 else "2d"
+        self.mode_stack.setCurrentIndex(index)
+        if self._mode == "1d":
+            self._set_results_headers_1d()
+            self._refresh_results_view()
+        else:
+            self._set_results_headers_batch()
+            self._refresh_batch_results()
+
+    def _set_results_headers_1d(self) -> None:
+        self.results_tree.setHeaderLabels(["Result / Component", "Parameter", "Value", "Error", "Actions"])
+
+    def _set_results_headers_batch(self) -> None:
+        self._set_results_headers_1d()
+
+    def _clear_batch_results_view(self) -> None:
+        self.results_tree.clear()
+        self.status_label.setText("No batch results yet.")
 
     # ------------------------------------------------------------------
     # Curve selection / history integration
@@ -306,7 +478,8 @@ class FittingModule(AnalysisModule):
             self._active_curve = None
             self.region_min_spin.setEnabled(False)
             self.region_max_spin.setEnabled(False)
-            self._refresh_results_view()
+            if self._mode == "1d":
+                self._refresh_results_view()
             return
 
         self._active_curve = entry
@@ -319,7 +492,8 @@ class FittingModule(AnalysisModule):
         self.region_max_spin.setRange(axis_min, axis_max)
         self.region_min_spin.setValue(axis_min)
         self.region_max_spin.setValue(axis_max)
-        self._refresh_results_view()
+        if self._mode == "1d":
+            self._refresh_results_view()
 
     # ------------------------------------------------------------------
     # Component handling
@@ -402,6 +576,333 @@ class FittingModule(AnalysisModule):
             return
         self._store_fit_result(result)
 
+    # ------------------------------------------------------------------
+    # Batch MDC fitting
+    # ------------------------------------------------------------------
+    def _refresh_view_entries(self) -> None:
+        entries = self.capture_history.view_entries()
+        self._view_entries = [entry for entry in entries if entry.dataset.is_2d]
+        if not self._view_entries and self._selected_view_entry is None:
+            self._clear_batch_controls()
+
+    def _clear_batch_controls(self) -> None:
+        for widget in (
+            self.batch_energy_min,
+            self.batch_energy_max,
+            self.batch_energy_step,
+            self.batch_energy_integration,
+            self.batch_mdc_min,
+            self.batch_mdc_max,
+        ):
+            widget.setEnabled(False)
+        self.batch_source_label.setText("Select a captured 2D view in the history list.")
+        self.batch_energy_label.setText("Y range:")
+        self.batch_mdc_label.setText("X fit range:")
+        self.batch_integration_label.setText("Y integration (±):")
+        self.batch_integration_unit.setText("")
+
+    def _on_external_view_selected(self, entry: ViewCaptureEntry | None) -> None:
+        if entry is None or not entry.dataset.is_2d:
+            self._selected_view_entry = None
+            self._clear_batch_controls()
+            return
+        self._selected_view_entry = entry
+        self._apply_batch_view(entry)
+        self.batch_source_label.setText(
+            f"Using selected 2D capture")
+
+    def _apply_batch_view(self, entry: ViewCaptureEntry) -> None:
+        dataset = entry.dataset
+        if not dataset.is_2d:
+            self._clear_batch_controls()
+            return
+        x_vals = np.asarray(dataset.x_axis.values, dtype=float)
+        y_vals = np.asarray(dataset.y_axis.values, dtype=float)
+        if x_vals.size == 0 or y_vals.size == 0:
+            self._clear_batch_controls()
+            return
+
+        for widget in (
+            self.batch_energy_min,
+            self.batch_energy_max,
+            self.batch_energy_step,
+            self.batch_energy_integration,
+            self.batch_mdc_min,
+            self.batch_mdc_max,
+        ):
+            widget.setEnabled(True)
+
+        y_min = float(np.nanmin(y_vals))
+        y_max = float(np.nanmax(y_vals))
+        if y_min > y_max:
+            y_min, y_max = y_max, y_min
+        self.batch_energy_min.setRange(y_min, y_max)
+        self.batch_energy_max.setRange(y_min, y_max)
+        self.batch_energy_min.setValue(y_min)
+        self.batch_energy_max.setValue(y_max)
+
+        y_range = y_max - y_min
+        y_step = y_range / 10 if np.isfinite(y_range) and y_range > 0 else 1.0
+        if y_step <= 0 or not np.isfinite(y_step):
+            y_step = 1.0
+        self.batch_energy_step.setValue(y_step)
+        self.batch_energy_integration.setValue(0.0)
+
+        x_min = float(np.nanmin(x_vals))
+        x_max = float(np.nanmax(x_vals))
+        if x_min > x_max:
+            x_min, x_max = x_max, x_min
+        self.batch_mdc_min.setRange(x_min, x_max)
+        self.batch_mdc_max.setRange(x_min, x_max)
+        self.batch_mdc_min.setValue(x_min)
+        self.batch_mdc_max.setValue(x_max)
+
+        y_label = self._axis_label(dataset.y_axis, "Y")
+        x_label = self._axis_label(dataset.x_axis, "X")
+        self.batch_energy_label.setText(f"{y_label} range:")
+        self.batch_mdc_label.setText(f"{x_label} fit range:")
+        self.batch_integration_label.setText(f"{y_label} integration (±):")
+        unit = getattr(dataset.y_axis, "unit", "") or ""
+        self.batch_integration_unit.setText(unit)
+
+    def _run_batch_fit(self) -> None:
+        entry = self._selected_view_entry
+        if entry is None:
+            QMessageBox.information(self, "No selection", "Select a 2D capture from the history list first.")
+            return
+        dataset = entry.dataset
+        if not dataset.is_2d:
+            QMessageBox.warning(self, "Unsupported", "Batch MDC fitting requires a 2D dataset.")
+            return
+
+        components = self._collect_components()
+        if not components:
+            QMessageBox.information(self, "Components required", "Add at least one component to fit.")
+            return
+        lorentz_components = [comp for comp in components if comp.function_id == "lorentzian"]
+        if not lorentz_components:
+            QMessageBox.warning(self, "Lorentzian required", "Add at least one Lorentzian component for MDC fits.")
+            return
+
+        x_vals = np.asarray(dataset.x_axis.values, dtype=float)
+        y_vals = np.asarray(dataset.y_axis.values, dtype=float)
+        intensity = np.asarray(dataset.intensity, dtype=float)
+
+        y_min = float(self.batch_energy_min.value())
+        y_max = float(self.batch_energy_max.value())
+        if y_min > y_max:
+            y_min, y_max = y_max, y_min
+        y_step = float(self.batch_energy_step.value())
+        if y_step <= 0:
+            QMessageBox.warning(self, "Invalid step", "Energy step must be > 0.")
+            return
+        integration_half = float(self.batch_energy_integration.value())
+        if integration_half < 0:
+            QMessageBox.warning(self, "Invalid integration", "Integration must be ≥ 0.")
+            return
+        fit_range = (self.batch_mdc_min.value(), self.batch_mdc_max.value())
+
+        y_targets = np.arange(y_min, y_max + 0.5 * y_step, y_step)
+        y_indices = [int(np.argmin(np.abs(y_vals - target))) for target in y_targets]
+        energies: list[float] = []
+        r2_values: list[float] = []
+        component_keys: list[tuple[str, str]] = []
+        for comp in lorentz_components:
+            key = comp.component_id or comp.label or "lorentzian"
+            label = comp.label or "Lorentzian"
+            component_keys.append((key, label))
+        component_buffers: dict[str, dict[str, list[float]]] = {}
+        for key, _ in component_keys:
+            component_buffers[key] = {
+                "center": [],
+                "center_err": [],
+                "gamma": [],
+                "gamma_err": [],
+                "amplitude": [],
+                "amplitude_err": [],
+            }
+
+        for idx in y_indices:
+            if integration_half > 0:
+                center_val = y_vals[idx]
+                mask = (y_vals >= center_val - integration_half) & (y_vals <= center_val + integration_half)
+                if not np.any(mask):
+                    continue
+                mdc = np.nanmean(intensity[mask, :], axis=0)
+            else:
+                mdc = intensity[idx, :]
+            try:
+                result = perform_curve_fit(
+                    x_vals,
+                    mdc,
+                    components,
+                    fit_range=fit_range,
+                )
+            except ValueError:
+                continue
+            energies.append(float(y_vals[idx]))
+            components_by_key: dict[str, FitComponentResult] = {}
+            for comp in result.components:
+                if comp.function_id != "lorentzian":
+                    continue
+                key = comp.component_id or comp.label or "lorentzian"
+                components_by_key[key] = comp
+            for key, _label in component_keys:
+                comp = components_by_key.get(key)
+                if comp is None:
+                    buffer = component_buffers[key]
+                    buffer["center"].append(np.nan)
+                    buffer["center_err"].append(np.nan)
+                    buffer["gamma"].append(np.nan)
+                    buffer["gamma_err"].append(np.nan)
+                    buffer["amplitude"].append(np.nan)
+                    buffer["amplitude_err"].append(np.nan)
+                    continue
+                meta = comp.metadata or {}
+                buffer = component_buffers[key]
+                buffer["center"].append(float(comp.parameters.get("center", np.nan)))
+                buffer["gamma"].append(float(comp.parameters.get("gamma", np.nan)))
+                buffer["amplitude"].append(float(comp.parameters.get("amplitude", np.nan)))
+                buffer["center_err"].append(float(meta.get("center", {}).get("error", np.nan) or np.nan))
+                buffer["gamma_err"].append(float(meta.get("gamma", {}).get("error", np.nan) or np.nan))
+                buffer["amplitude_err"].append(float(meta.get("amplitude", {}).get("error", np.nan) or np.nan))
+            r2_values.append(float(result.r_squared) if result.r_squared is not None else np.nan)
+
+        if not energies:
+            QMessageBox.information(self, "No fits", "No valid MDC fits were produced.")
+            return
+
+        components_result: list[_BatchComponentResult] = []
+        for key, label in component_keys:
+            buffer = component_buffers[key]
+            components_result.append(
+                _BatchComponentResult(
+                    component_id=key,
+                    label=label,
+                    centers=np.asarray(buffer["center"]),
+                    center_errors=np.asarray(buffer["center_err"]),
+                    gammas=np.asarray(buffer["gamma"]),
+                    gamma_errors=np.asarray(buffer["gamma_err"]),
+                    amplitudes=np.asarray(buffer["amplitude"]),
+                    amplitude_errors=np.asarray(buffer["amplitude_err"]),
+                )
+            )
+
+        batch_entry = _BatchFitEntry(
+            id=str(uuid4()),
+            label=f"Batch MDC ({len(energies)} slices)",
+            view_id=entry.id,
+            energies=np.asarray(energies),
+            r_squared=np.asarray(r2_values),
+            components=components_result,
+        )
+        self._batch_results.insert(0, batch_entry)
+        self._selected_batch_id = batch_entry.id
+        self._refresh_batch_results()
+        self.canvas.display_dataset(entry.dataset, colormap=entry.colormap, integration_radius=entry.integration_radius)
+        palette = self._component_colors or ["#ff8800"]
+        series = []
+        for idx, comp in enumerate(batch_entry.components):
+            color = palette[idx % len(palette)]
+            series.append(
+                {
+                    "x_values": comp.centers,
+                    "y_values": batch_entry.energies,
+                    "color": color,
+                    "size": 6,
+                    "symbol": "o",
+                }
+            )
+        if series:
+            self.canvas.set_overlay_series(series)
+
+    def _refresh_batch_results(self) -> None:
+        self._set_results_headers_batch()
+        self.results_tree.blockSignals(True)
+        self.results_tree.clear()
+        created_items: dict[str, QTreeWidgetItem] = {}
+        for batch in self._batch_results:
+            label = f"{batch.label} ({len(batch.energies)} slices)"
+            parent = QTreeWidgetItem([label, "R²", f"{np.nanmean(batch.r_squared):.4f}", "", ""])
+            parent.setData(0, Qt.UserRole, batch.id)
+            for idx, energy in enumerate(batch.energies):
+                energy_label = f"Energy {energy:.6g}"
+                energy_item = QTreeWidgetItem([energy_label, "", "", "", ""])
+                for comp_index, comp in enumerate(batch.components):
+                    comp_label = comp.label or f"Component {comp_index + 1}"
+                    comp_item = QTreeWidgetItem([comp_label, "", "", "", ""])
+                    center = comp.centers[idx]
+                    center_err = comp.center_errors[idx]
+                    gamma = comp.gammas[idx]
+                    gamma_err = comp.gamma_errors[idx]
+                    amp = comp.amplitudes[idx]
+                    amp_err = comp.amplitude_errors[idx]
+                    comp_item.addChild(
+                        QTreeWidgetItem(
+                            [
+                                "",
+                                "Center",
+                                f"{center:.6g}",
+                                f"{center_err:.3g}" if np.isfinite(center_err) else "—",
+                                "",
+                            ]
+                        )
+                    )
+                    comp_item.addChild(
+                        QTreeWidgetItem(
+                            [
+                                "",
+                                "Gamma",
+                                f"{gamma:.6g}",
+                                f"{gamma_err:.3g}" if np.isfinite(gamma_err) else "—",
+                                "",
+                            ]
+                        )
+                    )
+                    comp_item.addChild(
+                        QTreeWidgetItem(
+                            [
+                                "",
+                                "Amplitude",
+                                f"{amp:.6g}",
+                                f"{amp_err:.3g}" if np.isfinite(amp_err) else "—",
+                                "",
+                            ]
+                        )
+                    )
+                    energy_item.addChild(comp_item)
+                r2 = batch.r_squared[idx]
+                energy_item.addChild(
+                    QTreeWidgetItem(
+                        [
+                            "",
+                            "R²",
+                            f"{r2:.4f}" if np.isfinite(r2) else "—",
+                            "",
+                            "",
+                        ]
+                    )
+                )
+                parent.addChild(energy_item)
+            remove_btn = QPushButton("Remove")
+            remove_btn.setProperty("class", "danger")
+            remove_btn.clicked.connect(lambda _, entry_id=batch.id: self._remove_batch_entry(entry_id))
+            self.results_tree.addTopLevelItem(parent)
+            self.results_tree.setItemWidget(parent, 4, remove_btn)
+            created_items[batch.id] = parent
+        self.results_tree.blockSignals(False)
+        if not created_items:
+            self._clear_batch_results_view()
+            return
+        selected_id = self._selected_batch_id or next(iter(created_items))
+        if selected_id in created_items:
+            item = created_items[selected_id]
+            self.results_tree.setCurrentItem(item)
+            self._activate_batch_entry(item)
+        else:
+            self._selected_batch_id = None
+            self.results_tree.clearSelection()
+
     def _plot_fit_result(self, entry: CurveCaptureEntry, result: FitResult) -> None:
         axis_label = f"{entry.axis_name} ({entry.axis_unit})" if entry.axis_unit else entry.axis_name
         curves = [
@@ -467,6 +968,8 @@ class FittingModule(AnalysisModule):
         self._rebuild_components_from_result(result)
 
     def _refresh_results_view(self) -> None:
+        if self._mode != "1d":
+            return
         capture_id = self._current_capture_id()
         self.results_tree.blockSignals(True)
         self.results_tree.clear()
@@ -538,6 +1041,15 @@ class FittingModule(AnalysisModule):
         return None
 
     def _on_results_selection_changed(self) -> None:
+        if self._mode == "2d":
+            items = self.results_tree.selectedItems()
+            if not items:
+                return
+            item = items[0]
+            self._activate_batch_entry(item)
+            return
+        if self._mode != "1d":
+            return
         items = self.results_tree.selectedItems()
         if not items:
             self._selected_result_id = None
@@ -547,12 +1059,22 @@ class FittingModule(AnalysisModule):
         self._activate_result_item(item)
 
     def _on_result_item_clicked(self, item: QTreeWidgetItem) -> None:
+        if self._mode == "2d":
+            if item is None:
+                return
+            self.results_tree.setCurrentItem(item)
+            self._activate_batch_entry(item)
+            return
+        if self._mode != "1d":
+            return
         if item is None:
             return
         self.results_tree.setCurrentItem(item)
         self._activate_result_item(item)
 
     def _activate_result_item(self, item: QTreeWidgetItem) -> None:
+        if self._mode != "1d":
+            return
         capture_id = self._current_capture_id()
         parent = item
         while parent.parent() is not None:
@@ -569,6 +1091,49 @@ class FittingModule(AnalysisModule):
             self._plot_fit_result(self._active_curve, entry.result)
         self._apply_fit_range(entry.fit_range)
         self._rebuild_components_from_result(entry.result)
+
+    def _remove_batch_entry(self, entry_id: str) -> None:
+        self._batch_results = [entry for entry in self._batch_results if entry.id != entry_id]
+        if self._selected_batch_id == entry_id:
+            self._selected_batch_id = self._batch_results[0].id if self._batch_results else None
+        self._refresh_batch_results()
+
+    def _activate_batch_entry(self, item: QTreeWidgetItem) -> None:
+        if self._mode != "2d":
+            return
+        parent = item
+        while parent.parent() is not None:
+            parent = parent.parent()
+        entry_id = parent.data(0, Qt.UserRole)
+        if not entry_id:
+            return
+        entry = next((e for e in self._batch_results if e.id == entry_id), None)
+        if entry is None:
+            return
+        self._selected_batch_id = entry_id
+        view_entry = self.capture_history.get_entry(entry.view_id)
+        if not isinstance(view_entry, ViewCaptureEntry):
+            return
+        self.canvas.display_dataset(
+            view_entry.dataset,
+            colormap=view_entry.colormap,
+            integration_radius=view_entry.integration_radius,
+        )
+        palette = self._component_colors or ["#ff8800"]
+        series = []
+        for idx, comp in enumerate(entry.components):
+            color = palette[idx % len(palette)]
+            series.append(
+                {
+                    "x_values": comp.centers,
+                    "y_values": entry.energies,
+                    "color": color,
+                    "size": 6,
+                    "symbol": "o",
+                }
+            )
+        if series:
+            self.canvas.set_overlay_series(series)
 
     def _update_status_for_result(self, result: FitResult) -> None:
         if result.success and not result.message:
@@ -668,6 +1233,12 @@ class FittingModule(AnalysisModule):
             lower, upper = upper, lower
         self.region_min_spin.setValue(lower)
         self.region_max_spin.setValue(upper)
+
+    @staticmethod
+    def _axis_label(axis, fallback: str) -> str:
+        name = getattr(axis, "name", None) or fallback
+        unit = getattr(axis, "unit", "") or ""
+        return f"{name} ({unit})" if unit else str(name)
 
     def _rebuild_components_from_result(self, result: FitResult) -> None:
         self._remove_all_components(preserve_history=True)

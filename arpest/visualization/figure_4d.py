@@ -9,7 +9,7 @@ Energy/angle selections are adjusted by dragging directly on the plots.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 import pyqtgraph as pg
@@ -21,6 +21,7 @@ from ..models import Dataset, FileStack
 from ..utils.cursor.cursor_helpers import DragMode, DragState
 from ..utils.cursor.cursor_manager import CursorManager, CursorState
 from ..utils.cursor.pg_line_cursor import PGLineCursor
+from .roi import RoiOverlay
 
 pg.setConfigOptions(
     imageAxisOrder="row-major",
@@ -38,6 +39,8 @@ class _GraphicsViewEventFilter(QObject):
         self._figure = figure
 
     def eventFilter(self, obj, event):  # type: ignore[override]
+        if self._figure._roi_event_passthrough(event):
+            return False
         etype = event.type()
         if etype == QEvent.MouseMove:
             self._figure._handle_mouse_move_event(event)
@@ -93,6 +96,7 @@ class Figure4D(QWidget):
             (float(self.z_axis.values.min()), float(self.z_axis.values.max())),
             (float(self.w_axis.values.min()), float(self.w_axis.values.max())),
         )
+        self._roi: Optional[RoiOverlay] = None
 
         self.view = pg.GraphicsLayoutWidget()
         layout = QVBoxLayout()
@@ -103,6 +107,7 @@ class Figure4D(QWidget):
 
         self._setup_plots()
         self._plot_map_and_profiles()
+        self._init_roi()
 
         self.cursor_mgr.on_cursor_change(self._on_cursor_changed)
         self.cursor_mgr.on_cut_change(self._on_cut_changed)
@@ -268,6 +273,79 @@ class Figure4D(QWidget):
         self._update_map_title()
 
     # ------------------------------------------------------------------
+    # ROI helpers
+    # ------------------------------------------------------------------
+    def _init_roi(self) -> None:
+        self._roi = RoiOverlay(self.x_axis.values, self.y_axis.values)
+        self._roi.attach(self.ax_map)
+        self._roi.add_listener(self._on_roi_changed)
+
+    def _on_roi_changed(self) -> None:
+        self._update_edc_curve()
+        self._update_angle_curve()
+        self._update_point_spectrum()
+
+    def add_roi_listener(self, callback: Callable[[], None]) -> None:
+        if self._roi is not None:
+            self._roi.add_listener(callback)
+
+    def _roi_event_passthrough(self, event) -> bool:
+        if self._roi is None:
+            return False
+        etype = event.type()
+        if etype not in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
+            return False
+        scene_pos = self.view.mapToScene(event.pos())
+        return self._roi.should_capture_event(scene_pos, event)
+
+    def set_roi_enabled(self, enabled: bool) -> None:
+        if self._roi is None:
+            return
+        self._roi.set_enabled(enabled)
+        self._update_edc_curve()
+        self._update_angle_curve()
+        self._update_point_spectrum()
+
+    def is_roi_enabled(self) -> bool:
+        return self._roi.is_enabled() if self._roi is not None else False
+
+    def reset_roi(self) -> None:
+        if self._roi is not None:
+            self._roi.reset()
+
+    def clear_roi(self) -> None:
+        if self._roi is not None:
+            self._roi.clear()
+
+    def get_roi_bounds(self) -> Optional[Tuple[float, float, float, float]]:
+        return self._roi.get_bounds() if self._roi is not None else None
+
+    def set_roi_bounds(
+        self,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+        *,
+        enabled: bool = True,
+    ) -> None:
+        if self._roi is None:
+            return
+        self._roi.set_bounds(x_min, x_max, y_min, y_max, enabled=enabled)
+
+    def get_roi_axis_labels(self) -> Tuple[str, str]:
+        def label(axis) -> str:
+            return f"{axis.name} ({axis.unit})" if axis.unit else axis.name
+
+        return (
+            label(self.x_axis),
+            label(self.y_axis),
+        )
+
+    def _roi_masks(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        return self._roi.axis_masks() if self._roi is not None else None
+
+    # ------------------------------------------------------------------
     # Curve helpers
     # ------------------------------------------------------------------
     def _current_map_slice(self) -> np.ndarray:
@@ -310,6 +388,16 @@ class Figure4D(QWidget):
         y_start, y_end = self._index_range(cut.y_idx, len(self.y_axis.values))
         x_start, x_end = self._index_range(cut.x_idx, len(self.x_axis.values))
         block = self.dataset.intensity[y_start : y_end + 1, x_start : x_end + 1]
+        masks = self._roi_masks()
+        if masks is not None:
+            x_mask, y_mask = masks
+            y_local = y_mask[y_start : y_end + 1]
+            x_local = x_mask[x_start : x_end + 1]
+            if not np.any(y_local) or not np.any(x_local):
+                block = np.full_like(block, np.nan)
+            else:
+                mask2d = y_local[:, None] & x_local[None, :]
+                block = np.where(mask2d[..., None, None], block, np.nan)
         averaged = np.nanmean(block, axis=(0, 1))
         if averaged.ndim != 2:
             averaged = np.reshape(averaged, (len(self.z_axis.values), len(self.w_axis.values)))

@@ -8,7 +8,7 @@ primitives so the large 3D datasets remain interactive while dragging.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 import pyqtgraph as pg
@@ -20,6 +20,7 @@ from ..models import Axis, Dataset, FileStack
 from ..utils.cursor.cursor_manager import CursorManager, CursorState
 from ..utils.cursor.cursor_helpers import DragMode, DragState
 from ..utils.cursor.pg_line_cursor import PGLineCursor
+from .roi import RoiOverlay
 
 # Configure sane defaults for all plots hosted by this widget
 pg.setConfigOptions(
@@ -37,6 +38,8 @@ class _GraphicsViewEventFilter(QObject):
         self._figure = figure
 
     def eventFilter(self, obj, event):  # type: ignore[override]
+        if self._figure._roi_event_passthrough(event):
+            return False
         etype = event.type()
         if etype == QEvent.MouseMove:
             self._figure._handle_mouse_move_event(event)
@@ -78,6 +81,7 @@ class Figure3D(QWidget):
         self._color_levels: Optional[Tuple[float, float]] = None
         self._image_data: Dict[str, np.ndarray] = {}
         self._image_extents: Dict[str, Tuple[Tuple[float, float], Tuple[float, float]]] = {}
+        self._roi: Optional[RoiOverlay] = None
 
         self.view = pg.GraphicsLayoutWidget()
         layout = QVBoxLayout()
@@ -88,6 +92,7 @@ class Figure3D(QWidget):
         self._setup_plots()
         self._plot_figures()
         self._plot_cursors()
+        self._init_roi()
 
         self.cursor_mgr.on_cut_change(self._on_cut_changed)
 
@@ -327,6 +332,89 @@ class Figure3D(QWidget):
         )
 
         self._update_integration_overlays()
+
+    # ------------------------------------------------------------------
+    # ROI helpers
+    # ------------------------------------------------------------------
+    def _init_roi(self) -> None:
+        self._roi = RoiOverlay(self.dataset.x_axis.values, self.dataset.y_axis.values)
+        self._roi.attach(self.ax_fermi)
+        self._roi.add_listener(self._on_roi_changed)
+
+    def _on_roi_changed(self) -> None:
+        self._update_imshows_for_cut()
+        self._update_imshow_for_energy()
+
+    def add_roi_listener(self, callback: Callable[[], None]) -> None:
+        if self._roi is not None:
+            self._roi.add_listener(callback)
+
+    def _roi_event_passthrough(self, event) -> bool:
+        if self._roi is None:
+            return False
+        etype = event.type()
+        if etype not in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
+            return False
+        scene_pos = self.view.mapToScene(event.pos())
+        return self._roi.should_capture_event(scene_pos, event)
+
+    def set_roi_enabled(self, enabled: bool) -> None:
+        if self._roi is None:
+            return
+        self._roi.set_enabled(enabled)
+        self._update_imshows_for_cut()
+        self._update_imshow_for_energy()
+
+    def is_roi_enabled(self) -> bool:
+        return self._roi.is_enabled() if self._roi is not None else False
+
+    def reset_roi(self) -> None:
+        if self._roi is not None:
+            self._roi.reset()
+
+    def clear_roi(self) -> None:
+        if self._roi is not None:
+            self._roi.clear()
+
+    def get_roi_bounds(self) -> Optional[Tuple[float, float, float, float]]:
+        return self._roi.get_bounds() if self._roi is not None else None
+
+    def set_roi_bounds(
+        self,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+        *,
+        enabled: bool = True,
+    ) -> None:
+        if self._roi is None:
+            return
+        self._roi.set_bounds(x_min, x_max, y_min, y_max, enabled=enabled)
+
+    def get_roi_axis_labels(self) -> Tuple[str, str]:
+        def label(axis) -> str:
+            return f"{axis.name} ({axis.unit})" if axis.unit else axis.name
+
+        return (
+            label(self.dataset.x_axis),
+            label(self.dataset.y_axis),
+        )
+
+    def _roi_masks(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        return self._roi.axis_masks() if self._roi is not None else None
+
+    def _apply_roi_mask(self, data: np.ndarray, y_start: int, y_end: int, x_start: int, x_end: int) -> np.ndarray:
+        masks = self._roi_masks()
+        if masks is None:
+            return data
+        x_mask, y_mask = masks
+        y_local = y_mask[y_start : y_end + 1]
+        x_local = x_mask[x_start : x_end + 1]
+        if not np.any(y_local) or not np.any(x_local):
+            return np.full_like(data, np.nan)
+        mask2d = y_local[:, None] & x_local[None, :]
+        return np.where(mask2d[..., None], data, np.nan)
 
     # ------------------------------------------------------------------
     # Mouse handling via event filter
@@ -571,11 +659,13 @@ class Figure3D(QWidget):
     def _compute_cut_y(self, cut: CursorState) -> np.ndarray:
         start, end = self._index_range(cut.y_idx, len(self.dataset.y_axis))
         slice_data = self.dataset.intensity[start : end + 1, :, :]
+        slice_data = self._apply_roi_mask(slice_data, start, end, 0, len(self.dataset.x_axis) - 1)
         return np.nanmean(slice_data, axis=0)
 
     def _compute_cut_x(self, cut: CursorState) -> np.ndarray:
         start, end = self._index_range(cut.x_idx, len(self.dataset.x_axis))
         slice_data = self.dataset.intensity[:, start : end + 1, :]
+        slice_data = self._apply_roi_mask(slice_data, 0, len(self.dataset.y_axis) - 1, start, end)
         return np.nanmean(slice_data, axis=1)
 
     def _compute_edc_curves(self, cut: CursorState) -> Tuple[np.ndarray, np.ndarray]:
@@ -585,10 +675,33 @@ class Figure3D(QWidget):
 
         # Cut_y (x vs energy) -> average a narrow band along y only
         y_slice = self.dataset.intensity[y_start : y_end + 1, cut.x_idx, :]
+        masks = self._roi_masks()
+        if masks is not None:
+            x_mask, y_mask = masks
+            if not x_mask[cut.x_idx]:
+                y_slice = np.full_like(y_slice, np.nan)
+            else:
+                y_local = y_mask[y_start : y_end + 1]
+                if not np.any(y_local):
+                    y_slice = np.full_like(y_slice, np.nan)
+                else:
+                    y_slice = y_slice.copy()
+                    y_slice[~y_local, :] = np.nan
         edc_from_cut_y = np.nanmean(y_slice, axis=0)
 
         # Cut_x (y vs energy) -> average a narrow band along x only
         x_slice = self.dataset.intensity[cut.y_idx, x_start : x_end + 1, :]
+        if masks is not None:
+            x_mask, y_mask = masks
+            if not y_mask[cut.y_idx]:
+                x_slice = np.full_like(x_slice, np.nan)
+            else:
+                x_local = x_mask[x_start : x_end + 1]
+                if not np.any(x_local):
+                    x_slice = np.full_like(x_slice, np.nan)
+                else:
+                    x_slice = x_slice.copy()
+                    x_slice[~x_local, :] = np.nan
         edc_from_cut_x = np.nanmean(x_slice, axis=0)
         return edc_from_cut_y, edc_from_cut_x
 

@@ -49,6 +49,8 @@ class AnalysisPanel(QWidget):
         self.capture_history.entries_changed.connect(self._refresh_history_view)
         self._curve_selection_callbacks: list[Callable[[CurveCaptureEntry | None], None]] = []
         self._current_curve_selection: CurveCaptureEntry | None = None
+        self._view_selection_callbacks: list[Callable[[ViewCaptureEntry | None], None]] = []
+        self._current_view_selection: ViewCaptureEntry | None = None
         self._history_curve_palette = [
             "#1f77b4",
             "#d62728",
@@ -148,6 +150,7 @@ class AnalysisPanel(QWidget):
             get_file_stack=self.get_file_stack,
             context_providers=self.context_providers,
             register_curve_selection_callback=self.register_curve_selection_listener,
+            register_view_selection_callback=self.register_view_selection_listener,
         )
         self._modules = []
         self.fitting_module: FittingModule | None = None
@@ -284,6 +287,7 @@ class AnalysisPanel(QWidget):
             self.remove_history_btn.setEnabled(has_selection)
         if not items:
             self._notify_curve_selection(None)
+            self._notify_view_selection(None)
             return
         entry_ids = [item.data(0, Qt.UserRole) for item in items if item.data(0, Qt.UserRole)]
         if not entry_ids:
@@ -300,6 +304,7 @@ class AnalysisPanel(QWidget):
                 curve_entries.append(entry)
 
         selected_curve = curve_entries[0] if curve_entries else None
+        selected_view = view_entries[0] if view_entries else None
 
         if view_entries:
             entry = view_entries[0]
@@ -309,6 +314,7 @@ class AnalysisPanel(QWidget):
                 integration_radius=entry.integration_radius,
             )
             self._notify_curve_selection(selected_curve)
+            self._notify_view_selection(entry)
             return
 
         if curve_entries:
@@ -316,6 +322,7 @@ class AnalysisPanel(QWidget):
         else:
             self.canvas.clear("No curves captured yet.")
         self._notify_curve_selection(selected_curve)
+        self._notify_view_selection(selected_view)
 
     def _remove_selected_history_items(self) -> None:
         if not hasattr(self, "history_tree"):
@@ -350,9 +357,20 @@ class AnalysisPanel(QWidget):
         self._curve_selection_callbacks.append(callback)
         callback(self._current_curve_selection)
 
+    def register_view_selection_listener(
+        self, callback: Callable[[ViewCaptureEntry | None], None]
+    ) -> None:
+        self._view_selection_callbacks.append(callback)
+        callback(self._current_view_selection)
+
     def _notify_curve_selection(self, entry: CurveCaptureEntry | None) -> None:
         self._current_curve_selection = entry
         for callback in self._curve_selection_callbacks:
+            callback(entry)
+
+    def _notify_view_selection(self, entry: ViewCaptureEntry | None) -> None:
+        self._current_view_selection = entry
+        for callback in self._view_selection_callbacks:
             callback(entry)
 
     def serialize_state(self) -> dict:

@@ -10,14 +10,21 @@ from PyQt5.QtWidgets import QWidget
 
 from .....models import FileStack
 from .....visualization.analysis_canvas import AnalysisCanvas
-from ..history import CaptureHistoryModel, CurveCaptureEntry
+from ..history import CaptureHistoryModel, CurveCaptureEntry, ViewCaptureEntry
 
 CurveSelectionCallback = Callable[[CurveCaptureEntry or None], None]
+ViewSelectionCallback = Callable[[ViewCaptureEntry or None], None]
 
 class CurveSelectionRegistrar(Protocol):
     """Protocol describing the capture history selection hook."""
 
     def __call__(self, callback: CurveSelectionCallback) -> None: ...
+
+
+class ViewSelectionRegistrar(Protocol):
+    """Protocol describing the view selection hook."""
+
+    def __call__(self, callback: ViewSelectionCallback) -> None: ...
 
 
 @dataclass()
@@ -29,6 +36,7 @@ class AnalysisModuleContext:
     get_file_stack: Callable[[], FileStack or None]
     context_providers: dict[str, Callable[[], object]]
     register_curve_selection_callback: CurveSelectionRegistrar
+    register_view_selection_callback: ViewSelectionRegistrar
 
 
 class AnalysisModule(QWidget):

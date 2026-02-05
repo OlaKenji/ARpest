@@ -8,7 +8,7 @@ remains responsive even for large datasets.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import numpy as np
 import pyqtgraph as pg
@@ -20,6 +20,7 @@ from ..models import Dataset, FileStack
 from ..utils.cursor.cursor_manager import CursorManager, CursorState
 from ..utils.cursor.cursor_helpers import DragMode, DragState
 from ..utils.cursor.pg_line_cursor import PGLineCursor
+from .roi import RoiOverlay
 
 # Configure PyQtGraph defaults for the whole module
 pg.setConfigOptions(
@@ -38,6 +39,8 @@ class _GraphicsViewEventFilter(QObject):
         self._figure = figure
 
     def eventFilter(self, obj, event):  # type: ignore[override]
+        if self._figure._roi_event_passthrough(event):
+            return False
         etype = event.type()
         if etype == QEvent.MouseMove:
             self._figure._handle_mouse_move_event(event)
@@ -76,6 +79,7 @@ class Figure2D(QWidget):
             (float(self.x_axis.values.min()), float(self.x_axis.values.max())),
             (float(self.y_axis.values.min()), float(self.y_axis.values.max())),
         )
+        self._roi: Optional[RoiOverlay] = None
 
         self.view = pg.GraphicsLayoutWidget()
         layout = QVBoxLayout()
@@ -85,6 +89,7 @@ class Figure2D(QWidget):
 
         self._setup_plots()
         self._plot_band_and_curves()
+        self._init_roi()
 
         self.cursor_mgr.on_cursor_change(self._on_cursor_changed)
         self.cursor_mgr.on_cut_change(self._on_cut_changed)
@@ -206,6 +211,133 @@ class Figure2D(QWidget):
         )
 
         self._update_integration_overlays()
+        self._overlay_scatter = None
+        self._overlay_scatter_items: list[pg.ScatterPlotItem] = []
+
+    # ------------------------------------------------------------------
+    # Overlay helpers
+    # ------------------------------------------------------------------
+    def set_overlay_points(
+        self,
+        x_values: np.ndarray,
+        y_values: np.ndarray,
+        *,
+        color: str = "#ff8800",
+        size: int = 6,
+        symbol: str = "o",
+    ) -> None:
+        if self._overlay_scatter is None:
+            self._overlay_scatter = pg.ScatterPlotItem(
+                pen=pg.mkPen(color),
+                brush=pg.mkBrush(color),
+                size=size,
+                symbol=symbol,
+            )
+            self.ax_band.addItem(self._overlay_scatter)
+        else:
+            self._overlay_scatter.setPen(pg.mkPen(color))
+            self._overlay_scatter.setBrush(pg.mkBrush(color))
+            self._overlay_scatter.setSize(size)
+            self._overlay_scatter.setSymbol(symbol)
+        self._overlay_scatter.setData(np.asarray(x_values, dtype=float), np.asarray(y_values, dtype=float))
+
+    def clear_overlay_points(self) -> None:
+        if self._overlay_scatter is not None:
+            self.ax_band.removeItem(self._overlay_scatter)
+            self._overlay_scatter = None
+        if self._overlay_scatter_items:
+            for item in self._overlay_scatter_items:
+                self.ax_band.removeItem(item)
+            self._overlay_scatter_items = []
+
+    def set_overlay_series(self, series: list[dict]) -> None:
+        self.clear_overlay_points()
+        for entry in series:
+            x_vals = np.asarray(entry.get("x_values", []), dtype=float)
+            y_vals = np.asarray(entry.get("y_values", []), dtype=float)
+            if x_vals.size == 0 or y_vals.size == 0:
+                continue
+            color = entry.get("color", "#ff8800")
+            size = int(entry.get("size", 6))
+            symbol = entry.get("symbol", "o")
+            scatter = pg.ScatterPlotItem(
+                pen=pg.mkPen(color),
+                brush=pg.mkBrush(color),
+                size=size,
+                symbol=symbol,
+            )
+            scatter.setData(x_vals, y_vals)
+            self.ax_band.addItem(scatter)
+            self._overlay_scatter_items.append(scatter)
+
+    # ------------------------------------------------------------------
+    # ROI helpers
+    # ------------------------------------------------------------------
+    def _init_roi(self) -> None:
+        self._roi = RoiOverlay(self.x_axis.values, self.y_axis.values)
+        self._roi.attach(self.ax_band)
+        self._roi.add_listener(self._on_roi_changed)
+
+    def _on_roi_changed(self) -> None:
+        self._update_cut_visuals(self.cursor_mgr.cut)
+
+    def add_roi_listener(self, callback: Callable[[], None]) -> None:
+        if self._roi is not None:
+            self._roi.add_listener(callback)
+
+    def _roi_event_passthrough(self, event) -> bool:
+        if self._roi is None:
+            return False
+        etype = event.type()
+        if etype not in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
+            return False
+        scene_pos = self.view.mapToScene(event.pos())
+        return self._roi.should_capture_event(scene_pos, event)
+
+    def set_roi_enabled(self, enabled: bool) -> None:
+        if self._roi is None:
+            return
+        self._roi.set_enabled(enabled)
+        self._update_cut_visuals(self.cursor_mgr.cut)
+
+    def is_roi_enabled(self) -> bool:
+        return self._roi.is_enabled() if self._roi is not None else False
+
+    def reset_roi(self) -> None:
+        if self._roi is not None:
+            self._roi.reset()
+
+    def clear_roi(self) -> None:
+        if self._roi is not None:
+            self._roi.clear()
+
+    def get_roi_bounds(self) -> Optional[Tuple[float, float, float, float]]:
+        return self._roi.get_bounds() if self._roi is not None else None
+
+    def set_roi_bounds(
+        self,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+        *,
+        enabled: bool = True,
+    ) -> None:
+        if self._roi is None:
+            return
+        self._roi.set_bounds(x_min, x_max, y_min, y_max, enabled=enabled)
+
+    def get_roi_axis_labels(self) -> Tuple[str, str]:
+        def label(axis) -> str:
+            return f"{axis.name} ({axis.unit})" if axis.unit else axis.name
+
+        return (
+            label(self.x_axis),
+            label(self.y_axis),
+        )
+
+    def _roi_masks(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        return self._roi.axis_masks() if self._roi is not None else None
 
     def get_current_edc_curves(self) -> dict[str, np.ndarray]:
         """Return the currently displayed MDC curve keyed by its axis."""
@@ -293,11 +425,33 @@ class Figure2D(QWidget):
     def _compute_edc(self, cut: CursorState) -> np.ndarray:
         start, end = self._index_range(cut.x_idx, self.intensity.shape[1])
         edc_slice = self.intensity[:, start : end + 1]
+        masks = self._roi_masks()
+        if masks is not None:
+            x_mask, y_mask = masks
+            x_local = x_mask[start : end + 1]
+            if not np.any(x_local) or not np.any(y_mask):
+                return np.full(edc_slice.shape[0], np.nan)
+            edc_slice = edc_slice.copy()
+            if not np.all(y_mask):
+                edc_slice[~y_mask, :] = np.nan
+            if not np.all(x_local):
+                edc_slice[:, ~x_local] = np.nan
         return np.nanmean(edc_slice, axis=1)
 
     def _compute_mdc(self, cut: CursorState) -> np.ndarray:
         start, end = self._index_range(cut.y_idx, self.intensity.shape[0])
         mdc_slice = self.intensity[start : end + 1, :]
+        masks = self._roi_masks()
+        if masks is not None:
+            x_mask, y_mask = masks
+            y_local = y_mask[start : end + 1]
+            if not np.any(x_mask) or not np.any(y_local):
+                return np.full(mdc_slice.shape[1], np.nan)
+            mdc_slice = mdc_slice.copy()
+            if not np.all(y_local):
+                mdc_slice[~y_local, :] = np.nan
+            if not np.all(x_mask):
+                mdc_slice[:, ~x_mask] = np.nan
         return np.nanmean(mdc_slice, axis=0)
 
     def _update_integration_overlays(self) -> None:

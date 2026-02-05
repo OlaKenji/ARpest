@@ -34,6 +34,7 @@ from .panels.operations.panel import OperationsPanel
 from .panels.operations.widgets.state_history import StateHistoryWidget
 from .panels.overview.panel import OverviewPanel
 from ..visualization.analysis_canvas import AnalysisCanvas
+from .roi_controller import RoiController
 from ..visualization.figure_2d import Figure2D
 from ..visualization.figure_3d import Figure3D
 from ..visualization.figure_4d import Figure4D
@@ -92,6 +93,9 @@ class DatasetTab(QWidget):
         self.integration_value_label: Optional[QLabel] = None
         self._cursor_states: list[Optional[CursorState]] = []
         self._cut_states: list[Optional[CursorState]] = []
+        self._roi_bounds: list[Optional[tuple[float, float, float, float]]] = []
+        self._roi_enabled: list[bool] = []
+        self.roi_controller = RoiController(self)
         
         colours = ['arpest', 'RdYlBu_r', 'terrain','binary', 'binary_r'] + sorted(['RdBu_r','Spectral_r','bwr','coolwarm', 'twilight_shifted','twilight_shifted_r', 'PiYG', 'gist_ncar','gist_ncar_r', 'gist_stern','gnuplot2', 'hsv', 'hsv_r', 'magma', 'magma_r', 'seismic', 'seismic_r','turbo', 'turbo_r'])        
         self.available_colormaps = colours
@@ -119,14 +123,22 @@ class DatasetTab(QWidget):
         stack_count = len(self.file_stacks)
         self._cursor_states = [None] * stack_count
         self._cut_states = [None] * stack_count
+        self._roi_bounds = [None] * stack_count
+        self._roi_enabled = [False] * stack_count
 
         if session_state is not None:
             saved_cursors = getattr(session_state, "cursor_states", []) or []
             saved_cuts = getattr(session_state, "cut_states", []) or []
+            saved_roi_bounds = getattr(session_state, "roi_bounds", []) or []
+            saved_roi_enabled = getattr(session_state, "roi_enabled", []) or []
             for idx in range(min(len(saved_cursors), stack_count)):
                 self._cursor_states[idx] = saved_cursors[idx]
             for idx in range(min(len(saved_cuts), stack_count)):
                 self._cut_states[idx] = saved_cuts[idx]
+            for idx in range(min(len(saved_roi_bounds), stack_count)):
+                self._roi_bounds[idx] = saved_roi_bounds[idx]
+            for idx in range(min(len(saved_roi_enabled), stack_count)):
+                self._roi_enabled[idx] = bool(saved_roi_enabled[idx])
         
         self._setup_ui()
         if session_state is not None and getattr(session_state, "analysis_state", None):
@@ -261,6 +273,7 @@ class DatasetTab(QWidget):
                 "start_path": self._current_start_path,
                 "current_edc_curves": self._current_edc_curves,
                 "current_mdc_curves": self._current_mdc_curves,
+                "roi_controller": lambda: self.roi_controller,
                 "panel_dataset_top_left": lambda: self._export_dataset_for_operations("top_left"),
                 "panel_dataset_top_right": lambda: self._export_dataset_for_operations("top_right"),
                 "panel_dataset_bottom_left": lambda: self._export_dataset_for_operations("bottom_left"),
@@ -328,6 +341,12 @@ class DatasetTab(QWidget):
         get_cut = getattr(self.figure, "get_cut_state", None)
         if callable(get_cut):
             self._cut_states[idx] = get_cut()
+        get_roi = getattr(self.figure, "get_roi_bounds", None)
+        if callable(get_roi):
+            self._roi_bounds[idx] = get_roi()
+        get_roi_enabled = getattr(self.figure, "is_roi_enabled", None)
+        if callable(get_roi_enabled):
+            self._roi_enabled[idx] = bool(get_roi_enabled())
 
     def _apply_saved_cursor_state(self, index: int) -> None:
         """Restore previously saved cursor/cut positions for the given index."""
@@ -339,6 +358,14 @@ class DatasetTab(QWidget):
         set_cut = getattr(self.figure, "set_cut_state", None)
         if callable(set_cut):
             set_cut(self._cut_states[index])
+        set_roi = getattr(self.figure, "set_roi_bounds", None)
+        if callable(set_roi):
+            bounds = self._roi_bounds[index]
+            if bounds is not None:
+                set_roi(*bounds, enabled=self._roi_enabled[index])
+        set_roi_enabled = getattr(self.figure, "set_roi_enabled", None)
+        if callable(set_roi_enabled) and self._roi_bounds[index] is None:
+            set_roi_enabled(self._roi_enabled[index])
     
     def _format_metadata(self, file_stack: FileStack) -> str:
         """Format metadata for display."""
@@ -488,6 +515,7 @@ class DatasetTab(QWidget):
             self.figure.deleteLater()
 
         self.figure = new_figure
+        self.roi_controller.attach_figure(self.figure)
         self.figure_container_layout.addWidget(self.figure)
         self._apply_colormap_to_current_figure()
         self._apply_integration_radius_to_current_figure()
@@ -508,12 +536,11 @@ class DatasetTab(QWidget):
             self.state_history.set_file_stack(file_stack)
 
     def _update_panel_availability(self, dataset: Dataset) -> None:
-        disable_panels = dataset.is_4d
         if self.side_tabs is not None:
             if hasattr(self, "_operations_tab_index") and self._operations_tab_index is not None:
-                self.side_tabs.setTabEnabled(self._operations_tab_index, not disable_panels)
+                self.side_tabs.setTabEnabled(self._operations_tab_index, True)
             if hasattr(self, "_analysis_tab_index") and self._analysis_tab_index is not None:
-                self.side_tabs.setTabEnabled(self._analysis_tab_index, not disable_panels)
+                self.side_tabs.setTabEnabled(self._analysis_tab_index, not dataset.is_4d)
 
     def _capture_current_view_for_analysis(
         self, view: Optional[str] = None, *, set_tab: bool = True
@@ -655,6 +682,8 @@ class DatasetTab(QWidget):
             self.file_stacks.append(file_stack)
             self._cursor_states.append(None)
             self._cut_states.append(None)
+            self._roi_bounds.append(None)
+            self._roi_enabled.append(False)
             new_indices.append(len(self.file_stacks) - 1)
 
         if new_indices:
@@ -678,6 +707,8 @@ class DatasetTab(QWidget):
             del self.file_stacks[idx]
             del self._cursor_states[idx]
             del self._cut_states[idx]
+            del self._roi_bounds[idx]
+            del self._roi_enabled[idx]
 
         self.file_catalog.refresh()
         self.current_index = min(self.current_index, len(self.file_stacks) - 1)
@@ -711,6 +742,8 @@ class DatasetTab(QWidget):
         self.file_stacks.append(combined_stack)
         self._cursor_states.append(None)
         self._cut_states.append(None)
+        self._roi_bounds.append(None)
+        self._roi_enabled.append(False)
         self.file_catalog.refresh()
         self.file_catalog.select_index(len(self.file_stacks) - 1)
 
@@ -979,6 +1012,8 @@ class DatasetTab(QWidget):
             integration_radius=self.integration_radius,
             cursor_states=list(self._cursor_states),
             cut_states=list(self._cut_states),
+            roi_bounds=list(self._roi_bounds),
+            roi_enabled=list(self._roi_enabled),
             analysis_state=analysis_state,
         )
     
