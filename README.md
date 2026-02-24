@@ -112,11 +112,16 @@ This project is licensed under the MIT License.
 If you use ARpest in your research, please cite:
 
 ```bibtex
-@software{arpest2025,
-  author = {Ola Kenji Forslund},
-  title = {ARpest: Interactive ARPES Data Analysis Tool},
-  year = {2025},
-  url = {https://github.com/OlaKenji/arpest}
+@article{ARpest2025,
+title = {ARpest: A GUI-driven ARPES analysis platform},
+journal = {SoftwareX},
+volume = {34},
+pages = {102573},
+year = {2026},
+issn = {2352-7110},
+doi = {https://doi.org/10.1016/j.softx.2026.102573},
+url = {https://www.sciencedirect.com/science/article/pii/S2352711026000671},
+author = {Ola Kenji Forslund},
 }
 ```
 
